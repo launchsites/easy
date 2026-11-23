@@ -99,6 +99,13 @@ void main() {
     expect(find.text('After midnight').hitTestable(), findsOneWidget);
     await wheel(-650);
     expect(selected.value, date);
+
+    await tester.dragFrom(const Offset(192, 810), const Offset(0, -695));
+    await tester.pumpAndSettle();
+    expect(selected.value, nextDay);
+
+    await wheel(-1500);
+    expect(selected.value, DateTime(2024, 3, 7));
   });
 
   testWidgets('Mobile date menu opens the date picker', (tester) async {

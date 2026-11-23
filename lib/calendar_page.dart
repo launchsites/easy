@@ -129,7 +129,9 @@ class _CalendarPageState extends State<CalendarPage> {
               padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 96),
-                child: SingleChildScrollView(child: _allDayStrip(colors, allDay)),
+                child: SingleChildScrollView(
+                  child: _allDayStrip(colors, allDay),
+                ),
               ),
             ),
           Expanded(
