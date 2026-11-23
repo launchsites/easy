@@ -1,4 +1,5 @@
 import 'package:easy/calendar_page.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -7,7 +8,7 @@ void main() {
     testWidgets(
       'Calendar navigation and event details at ${width.toInt()} px',
       (tester) async {
-        final monday = DateTime(2026, 11, 23);
+        final monday = DateTime(2020, 11, 23);
         final meeting = _event('Planning meeting', monday, 9, 0, 75);
         final focus = _event('Project focus', monday, 9, 30, 90);
         CalendarEvent? opened;
@@ -20,37 +21,104 @@ void main() {
         );
 
         expect(
-          find.byTooltip(width < 720 ? 'Next day' : 'Next week'),
+          find.byTooltip(width < 720 ? 'Calendar date options' : 'Next week'),
           findsOneWidget,
         );
-        await tester.tap(find.text('Day'));
-        await tester.pumpAndSettle();
+        if (width >= 720) await _chooseView(tester, CalendarView.day);
         await tester.tap(find.text('Planning meeting'));
         expect(opened, same(meeting));
 
-        await tester.tap(find.byTooltip('Next day'));
-        await tester.pumpAndSettle();
-        expect(view.value, DateTime(2026, 11, 24));
+        await _nextDay(tester);
+        expect(view.value, DateTime(2020, 11, 24));
 
-        await tester.tap(find.text('Week'));
-        await tester.pumpAndSettle();
+        await _chooseView(tester, CalendarView.week);
         expect(find.byTooltip('Next week'), findsOneWidget);
-        await tester.tap(find.text('Month'));
-        await tester.pumpAndSettle();
+        await _chooseView(tester, CalendarView.month);
         await tester.ensureVisible(find.text('Open day'));
         await tester.tap(find.text('Open day'));
         await tester.pumpAndSettle();
-        expect(find.byTooltip('Next day'), findsOneWidget);
-        expect(view.value, DateTime(2026, 11, 24));
+        expect(
+          find.byTooltip(width < 720 ? 'Calendar date options' : 'Next day'),
+          findsOneWidget,
+        );
+        expect(view.value, DateTime(2020, 11, 24));
         expect(tester.takeException(), isNull);
       },
     );
   }
 
+  testWidgets('Mobile day swipes keep the visible clock time', (tester) async {
+    final date = DateTime(2024, 3, 8);
+    final nextDay = DateTime(2024, 3, 9);
+    final selected = await _mountCalendar(
+      tester,
+      width: 390,
+      date: date,
+      events: [
+        _event('First morning', date, 9, 30, 45),
+        _event('Second morning', nextDay, 9, 30, 45),
+      ],
+    );
+    expect(find.byTooltip('Saturday, March 9, 2024'), findsNothing);
+    final firstY = tester.getTopLeft(find.text('First morning')).dy;
+
+    await tester.dragFrom(const Offset(318, 295), const Offset(-180, 0));
+    await tester.pumpAndSettle();
+
+    expect(selected.value, nextDay);
+    final nextY = tester.getTopLeft(find.text('Second morning')).dy;
+    expect(nextY, closeTo(firstY, 2));
+  });
+
+  testWidgets('Mobile day scrolls naturally through both midnight boundaries', (
+    tester,
+  ) async {
+    final date = DateTime(2024, 3, 8);
+    final nextDay = DateTime(2024, 3, 9);
+    final selected = await _mountCalendar(
+      tester,
+      width: 390,
+      date: date,
+      events: [_event('After midnight', nextDay, 0, 15, 25)],
+    );
+
+    Future<void> wheel(double distance) async {
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          position: const Offset(192, 415),
+          scrollDelta: Offset(0, distance),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await wheel(500);
+    expect(selected.value, date);
+    await wheel(385);
+    expect(selected.value, nextDay);
+    expect(find.text('After midnight').hitTestable(), findsOneWidget);
+    await wheel(-650);
+    expect(selected.value, date);
+  });
+
+  testWidgets('Mobile date menu opens the date picker', (tester) async {
+    await _mountCalendar(
+      tester,
+      width: 390,
+      date: DateTime(2024, 3, 8),
+      events: [],
+    );
+    await tester.tap(find.byTooltip('Calendar date options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Jump to date'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+  });
+
   testWidgets('Adjacent short events stay separate from overlapping events', (
     tester,
   ) async {
-    final date = DateTime(2026, 11, 23);
+    final date = DateTime(2020, 11, 23);
     await _mountCalendar(
       tester,
       width: 390,
@@ -76,7 +144,7 @@ void main() {
   testWidgets('Month preview handles dense dates and large text', (
     tester,
   ) async {
-    final date = DateTime(2026, 11, 23);
+    final date = DateTime(2020, 11, 23);
     await _mountCalendar(
       tester,
       width: 320,
@@ -87,10 +155,9 @@ void main() {
           _event('Event $index', date, 9 + index, 0, 30),
       ],
     );
-    await tester.tap(find.text('Month'));
-    await tester.pumpAndSettle();
+    await _chooseView(tester, CalendarView.month);
     expect(
-      find.bySemanticsLabel('Monday, November 23, 2026, 5 events'),
+      find.bySemanticsLabel('Monday, November 23, 2020, 5 events'),
       findsOneWidget,
     );
     expect(find.text('Event 4'), findsOneWidget);
@@ -100,7 +167,7 @@ void main() {
   testWidgets('All-day entries stop on their exclusive end date', (
     tester,
   ) async {
-    final date = DateTime(2026, 11, 23);
+    final date = DateTime(2020, 11, 23);
     await _mountCalendar(
       tester,
       width: 390,
@@ -110,20 +177,40 @@ void main() {
           id: 'trip',
           title: 'Trip',
           start: date,
-          end: DateTime(2026, 11, 25),
+          end: DateTime(2020, 11, 25),
           category: 'personal',
           allDay: true,
         ),
       ],
     );
     expect(find.text('Trip'), findsOneWidget);
-    await tester.tap(find.byTooltip('Next day'));
-    await tester.pumpAndSettle();
+    await _nextDay(tester);
     expect(find.text('Trip'), findsOneWidget);
-    await tester.tap(find.byTooltip('Next day'));
-    await tester.pumpAndSettle();
+    await _nextDay(tester);
     expect(find.text('Trip'), findsNothing);
   });
+}
+
+Future<void> _chooseView(WidgetTester tester, CalendarView view) async {
+  final viewMenu = find.byTooltip('Calendar view');
+  if (viewMenu.evaluate().isNotEmpty) {
+    await tester.tap(viewMenu);
+    await tester.pumpAndSettle();
+  }
+  await tester.tap(find.text(view.label).last);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _nextDay(WidgetTester tester) async {
+  final dateMenu = find.byTooltip('Calendar date options');
+  if (dateMenu.evaluate().isNotEmpty) {
+    await tester.tap(dateMenu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Next day'));
+  } else {
+    await tester.tap(find.byTooltip('Next day'));
+  }
+  await tester.pumpAndSettle();
 }
 
 CalendarEvent _event(

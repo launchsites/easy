@@ -32,6 +32,17 @@ enum CalendarView {
   final String label;
 }
 
+enum _MobileDateAction {
+  today('Today'),
+  previous('Previous day'),
+  next('Next day'),
+  jump('Jump to date');
+
+  const _MobileDateAction(this.label);
+
+  final String label;
+}
+
 class CalendarPage extends StatefulWidget {
   const CalendarPage({
     required this.date,
@@ -107,6 +118,32 @@ class _CalendarPageState extends State<CalendarPage> {
     final view =
         _selectedView ?? (mobile ? CalendarView.day : CalendarView.week);
     final colors = _CalendarColors.of(context);
+    if (mobile && view == CalendarView.day) {
+      final allDay = _eventsOn(_date).where((event) => event.allDay);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _mobileDayHeader(context, colors),
+          if (allDay.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 96),
+                child: SingleChildScrollView(child: _allDayStrip(colors, allDay)),
+              ),
+            ),
+          Expanded(
+            child: _ContinuousDayTimeline(
+              date: _date,
+              onDateChanged: widget.onDateChanged,
+              eventsOn: _eventsOn,
+              section: (context, date, timelineKey) =>
+                  _mobileDaySection(context, colors, date, timelineKey),
+            ),
+          ),
+        ],
+      );
+    }
     final week = _weekContaining(_date);
     final inset = mobile ? 22.0 : 44.0;
 
@@ -155,6 +192,126 @@ class _CalendarPageState extends State<CalendarPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _mobileDayHeader(BuildContext context, _CalendarColors colors) {
+    final dateLabel = MaterialLocalizations.of(context).formatMediumDate(_date);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 5, 22, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: PopupMenuButton<_MobileDateAction>(
+              tooltip: 'Calendar date options',
+              onSelected: (action) {
+                switch (action) {
+                  case _MobileDateAction.today:
+                    widget.onDateChanged(DateUtils.dateOnly(DateTime.now()));
+                  case _MobileDateAction.previous:
+                    _advance(CalendarView.day, -1);
+                  case _MobileDateAction.next:
+                    _advance(CalendarView.day, 1);
+                  case _MobileDateAction.jump:
+                    _jumpToDate();
+                }
+              },
+              itemBuilder: (_) => [
+                for (final action in _MobileDateAction.values)
+                  PopupMenuItem(value: action, child: Text(action.label)),
+              ],
+              child: SizedBox(
+                height: 44,
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        dateLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.ink,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                          letterSpacing: -.3,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.expand_more_rounded,
+                      size: 19,
+                      color: colors.muted,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          PopupMenuButton<CalendarView>(
+            tooltip: 'Calendar view',
+            initialValue: CalendarView.day,
+            onSelected: (view) => setState(() => _selectedView = view),
+            itemBuilder: (_) => [
+              for (final view in CalendarView.values)
+                PopupMenuItem(value: view, child: Text(view.label)),
+            ],
+            child: SizedBox(
+              height: 44,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Day',
+                    style: TextStyle(
+                      color: colors.muted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.expand_more_rounded,
+                    size: 17,
+                    color: colors.muted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mobileDaySection(
+    BuildContext context,
+    _CalendarColors colors,
+    DateTime date,
+    GlobalKey timelineKey,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 6, 0, 10),
+            child: Semantics(
+              header: true,
+              child: Text(
+                MaterialLocalizations.of(context).formatFullDate(date),
+                style: TextStyle(
+                  color: colors.ink,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+          _day(context, colors, true, date: date, timelineKey: timelineKey),
+        ],
+      ),
     );
   }
 
@@ -403,46 +560,63 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
-  Widget _day(BuildContext context, _CalendarColors colors, bool mobile) {
-    final events = _eventsOn(_date);
-    if (_dayShowsAgenda) return _eventList(context, colors, events);
+  Widget _day(
+    BuildContext context,
+    _CalendarColors colors,
+    bool mobile, {
+    DateTime? date,
+    GlobalKey? timelineKey,
+  }) {
+    final day = date ?? _date;
+    final events = _eventsOn(day);
+    if (!mobile && _dayShowsAgenda) return _eventList(context, colors, events);
     final allDay = events.where((event) => event.allDay);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (allDay.isNotEmpty) ...[
-          _calendarSurface(
-            colors,
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Text(
-                      'All day',
-                      style: TextStyle(color: colors.muted, fontSize: 12),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 5,
-                      children: allDay
-                          .map((event) => _eventChip(colors, event))
-                          .toList(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        if (!mobile && allDay.isNotEmpty) ...[
+          _allDayStrip(colors, allDay),
           const SizedBox(height: 12),
         ],
-        _timeline(context, colors, [_date], mobile: mobile),
+        _timeline(
+          context,
+          colors,
+          [day],
+          mobile: mobile,
+          timelineKey: timelineKey,
+        ),
       ],
+    );
+  }
+
+  Widget _allDayStrip(_CalendarColors colors, Iterable<CalendarEvent> events) {
+    return _calendarSurface(
+      colors,
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                'All day',
+                style: TextStyle(color: colors.muted, fontSize: 12),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 5,
+                children: events
+                    .map((event) => _eventChip(colors, event))
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -451,6 +625,7 @@ class _CalendarPageState extends State<CalendarPage> {
     _CalendarColors colors,
     List<DateTime> days, {
     required bool mobile,
+    GlobalKey? timelineKey,
   }) {
     final multiDay = days.length > 1;
     final daysEvents = days.map(_eventsOn).toList();
@@ -460,7 +635,8 @@ class _CalendarPageState extends State<CalendarPage> {
     ];
     final ruler = _TimelineRuler(
       placements.expand((day) => day),
-      mobile ? 62 : 59,
+      mobile ? _mobileHourHeight : 59,
+      fullDay: mobile,
     );
     final hourColumn = mobile ? 47.0 : 60.0;
     final localizations = MaterialLocalizations.of(context);
@@ -469,99 +645,102 @@ class _CalendarPageState extends State<CalendarPage> {
         daysEvents.any((events) => events.any((event) => event.allDay));
     final now = DateTime.now();
 
-    return _calendarSurface(
-      colors,
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (multiDay)
-            Row(
-              children: [
-                SizedBox(width: hourColumn),
-                for (final day in days)
-                  Expanded(
-                    child: InkWell(
-                      onTap: () => _openDay(day),
-                      child: _weekHeading(localizations, colors, day, now),
+    return KeyedSubtree(
+      key: timelineKey,
+      child: _calendarSurface(
+        colors,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (multiDay)
+              Row(
+                children: [
+                  SizedBox(width: hourColumn),
+                  for (final day in days)
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _openDay(day),
+                        child: _weekHeading(localizations, colors, day, now),
+                      ),
+                    ),
+                ],
+              ),
+            if (showAllDay)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: hourColumn,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 8, top: 10),
+                      child: Text(
+                        'All day',
+                        style: TextStyle(color: colors.muted, fontSize: 11),
+                      ),
                     ),
                   ),
-              ],
-            ),
-          if (showAllDay)
+                  for (final events in daysEvents)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(3, 0, 3, 6),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final event in events.where(
+                              (event) => event.allDay,
+                            ))
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 3),
+                                child: _eventChip(colors, event),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
                   width: hourColumn,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8, top: 10),
-                    child: Text(
-                      'All day',
-                      style: TextStyle(color: colors.muted, fontSize: 11),
-                    ),
+                  height: ruler.height,
+                  child: Stack(
+                    children: [
+                      for (
+                        var hour = ruler.firstHour;
+                        hour < ruler.lastHour;
+                        hour++
+                      )
+                        Positioned(
+                          left: 0,
+                          right: mobile ? 6 : 9,
+                          top: ruler.offset(hour * 60) + 4,
+                          child: Text(
+                            _time(context, TimeOfDay(hour: hour, minute: 0)),
+                            textAlign: TextAlign.right,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: colors.muted, fontSize: 10),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                for (final events in daysEvents)
+                for (var i = 0; i < days.length; i++)
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(3, 0, 3, 6),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final event in events.where(
-                            (event) => event.allDay,
-                          ))
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 3),
-                              child: _eventChip(colors, event),
-                            ),
-                        ],
-                      ),
+                    child: _timelineColumn(
+                      context,
+                      colors,
+                      day: days[i],
+                      placements: placements[i],
+                      ruler: ruler,
+                      now: now,
+                      compact: multiDay,
                     ),
                   ),
               ],
             ),
-          Row(
-            children: [
-              SizedBox(
-                width: hourColumn,
-                height: ruler.height,
-                child: Stack(
-                  children: [
-                    for (
-                      var hour = ruler.firstHour;
-                      hour < ruler.lastHour;
-                      hour++
-                    )
-                      Positioned(
-                        left: 0,
-                        right: mobile ? 6 : 9,
-                        top: ruler.offset(hour * 60) + 4,
-                        child: Text(
-                          _time(context, TimeOfDay(hour: hour, minute: 0)),
-                          textAlign: TextAlign.right,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: colors.muted, fontSize: 10),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              for (var i = 0; i < days.length; i++)
-                Expanded(
-                  child: _timelineColumn(
-                    context,
-                    colors,
-                    day: days[i],
-                    placements: placements[i],
-                    ruler: ruler,
-                    now: now,
-                    compact: multiDay,
-                  ),
-                ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1115,6 +1294,193 @@ List<DateTime> _weekContaining(DateTime date) {
   return List.generate(7, (index) => DateUtils.addDaysToDate(monday, index));
 }
 
+const _mobileHourHeight = 53.0;
+
+class _ContinuousDayTimeline extends StatefulWidget {
+  const _ContinuousDayTimeline({
+    required this.date,
+    required this.onDateChanged,
+    required this.eventsOn,
+    required this.section,
+  });
+
+  final DateTime date;
+  final ValueChanged<DateTime> onDateChanged;
+  final List<CalendarEvent> Function(DateTime) eventsOn;
+  final Widget Function(BuildContext, DateTime, GlobalKey) section;
+
+  @override
+  State<_ContinuousDayTimeline> createState() => _ContinuousDayTimelineState();
+}
+
+class _ContinuousDayTimelineState extends State<_ContinuousDayTimeline> {
+  final _viewportKey = GlobalKey();
+  final _centerKey = const ValueKey('calendar-current-day-sliver');
+  final _keys = <int, ({GlobalKey section, GlobalKey timeline})>{};
+  late ScrollController _controller;
+  late DateTime _anchor;
+  late DateTime _visibleDay;
+  bool _placing = false;
+  bool _checkScheduled = false;
+  double _swipeDistance = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _positionAt(widget.date, _initialMinute(widget.date));
+  }
+
+  @override
+  void didUpdateWidget(_ContinuousDayTimeline oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.date == oldWidget.date || widget.date == _visibleDay) return;
+
+    final relative = _dateOffset(widget.date, _visibleDay).abs() == 1;
+    final minute = relative ? _visibleMinute() : _initialMinute(widget.date);
+    final previous = _controller;
+    previous.removeListener(_onScroll);
+    _positionAt(widget.date, minute);
+    WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  _TimelineRuler _ruler(DateTime date) => _TimelineRuler(
+    _placeEvents(widget.eventsOn(date), date),
+    _mobileHourHeight,
+    fullDay: true,
+  );
+
+  void _positionAt(DateTime date, int minute) {
+    _anchor = _visibleDay = date;
+    _keys.clear();
+    _placing = true;
+    final rulerOffset = _ruler(date).offset(minute);
+    final controller = ScrollController(
+      initialScrollOffset: 36 + rulerOffset,
+      keepScrollOffset: false,
+    )..addListener(_onScroll);
+    _controller = controller;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || controller != _controller) return;
+      final viewport = _topOf(_viewportKey);
+      final timeline = _topOf(_keys[0]?.timeline);
+      if (controller.hasClients && viewport != null && timeline != null) {
+        final offset = controller.offset + timeline - viewport + rulerOffset;
+        if ((offset - controller.offset).abs() > .5) controller.jumpTo(offset);
+      }
+      _placing = false;
+    });
+  }
+
+  int _initialMinute(DateTime date) {
+    final now = DateTime.now();
+    return DateUtils.isSameDay(date, now) && now.hour >= 8 && now.hour <= 20
+        ? (now.hour - 1) * 60
+        : 8 * 60;
+  }
+
+  int _visibleMinute() {
+    final viewport = _topOf(_viewportKey);
+    final timeline = _topOf(_keys[_dateOffset(_visibleDay, _anchor)]?.timeline);
+    if (viewport == null || timeline == null) {
+      return _initialMinute(_visibleDay);
+    }
+    return _ruler(_visibleDay).minuteAtOffset(viewport - timeline);
+  }
+
+  void _onScroll() {
+    if (_placing || _checkScheduled) return;
+    _checkScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkScheduled = false;
+      if (!mounted || _placing) return;
+      final viewport = _topOf(_viewportKey);
+      if (viewport == null) return;
+
+      // The date changes as the next day heading reaches the top of the viewport.
+      final leadingEdge = viewport + 24;
+      for (final entry in _keys.entries) {
+        final box = _renderBox(entry.value.section);
+        if (box == null) continue;
+        final top = box.localToGlobal(Offset.zero).dy;
+        if (top > leadingEdge || top + box.size.height <= leadingEdge) continue;
+        final date = DateUtils.addDaysToDate(_anchor, entry.key);
+        if (date != _visibleDay) {
+          _visibleDay = date;
+          widget.onDateChanged(date);
+        }
+        break;
+      }
+    });
+  }
+
+  int _dateOffset(DateTime date, DateTime origin) => DateTime.utc(
+    date.year,
+    date.month,
+    date.day,
+  ).difference(DateTime.utc(origin.year, origin.month, origin.day)).inDays;
+
+  RenderBox? _renderBox(GlobalKey? key) {
+    final renderObject = key?.currentContext?.findRenderObject();
+    return renderObject is RenderBox && renderObject.hasSize
+        ? renderObject
+        : null;
+  }
+
+  double? _topOf(GlobalKey? key) =>
+      _renderBox(key)?.localToGlobal(Offset.zero).dy;
+
+  Widget _daySliver({required bool before}) => SliverPadding(
+    key: before ? null : _centerKey,
+    padding: const EdgeInsets.symmetric(horizontal: 22),
+    sliver: SliverList.builder(
+      itemCount: 3660,
+      itemBuilder: (context, index) {
+        final offset = before ? -index - 1 : index;
+        final day = DateUtils.addDaysToDate(_anchor, offset);
+        final keys = _keys.putIfAbsent(
+          offset,
+          () => (section: GlobalKey(), timeline: GlobalKey()),
+        );
+        return KeyedSubtree(
+          key: keys.section,
+          child: widget.section(context, day, keys.timeline),
+        );
+      },
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragStart: (_) => _swipeDistance = 0,
+      onHorizontalDragUpdate: (details) => _swipeDistance += details.delta.dx,
+      onHorizontalDragEnd: (_) {
+        if (_swipeDistance.abs() >= 48) {
+          final step = _swipeDistance < 0 ? 1 : -1;
+          widget.onDateChanged(DateUtils.addDaysToDate(_visibleDay, step));
+        }
+      },
+      child: RepaintBoundary(
+        key: _viewportKey,
+        child: CustomScrollView(
+          key: ValueKey(_anchor),
+          center: _centerKey,
+          controller: _controller,
+          slivers: [_daySliver(before: true), _daySliver(before: false)],
+        ),
+      ),
+    );
+  }
+}
+
 String _weekday(MaterialLocalizations localizations, DateTime date) =>
     localizations.narrowWeekdays[date.weekday % 7];
 
@@ -1187,15 +1553,20 @@ class _TimelinePlacement {
 }
 
 class _TimelineRuler {
-  _TimelineRuler(Iterable<_TimelinePlacement> events, this.hourHeight) {
-    firstHour = events.fold(
-      8,
-      (hour, event) => math.min(hour, event.start ~/ 60),
-    );
-    lastHour = events.fold(
-      19,
-      (hour, event) => math.max(hour, (event.end / 60).ceil()),
-    );
+  _TimelineRuler(
+    Iterable<_TimelinePlacement> events,
+    this.hourHeight, {
+    bool fullDay = false,
+  }) {
+    firstHour = fullDay
+        ? 0
+        : events.fold(8, (hour, event) => math.min(hour, event.start ~/ 60));
+    lastHour = fullDay
+        ? 24
+        : events.fold(
+            19,
+            (hour, event) => math.max(hour, (event.end / 60).ceil()),
+          );
     final eventStartsByEnd = <int, List<int>>{};
     final minutes = {
       for (var hour = firstHour; hour <= lastHour; hour++) hour * 60,
@@ -1237,6 +1608,19 @@ class _TimelineRuler {
     final progress = (minute - before) / (after - before);
     return _offsets[before]! +
         (_offsets[after]! - _offsets[before]!) * progress;
+  }
+
+  int minuteAtOffset(double position) {
+    if (position <= 0) return _minutes.first;
+    if (position >= height) return _minutes.last;
+    final index = _minutes.indexWhere(
+      (minute) => _offsets[minute]! >= position,
+    );
+    final before = _minutes[index - 1];
+    final after = _minutes[index];
+    final progress =
+        (position - _offsets[before]!) / (_offsets[after]! - _offsets[before]!);
+    return (before + (after - before) * progress).round();
   }
 }
 
