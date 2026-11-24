@@ -887,7 +887,7 @@ Widget _timelineTick(
         : '$fullTime, ${_utcOffset(repeated.timeZoneOffset)}',
     textAlign: TextAlign.right,
     maxLines: repeated == null ? null : 2,
-    overflow: TextOverflow.ellipsis,
+    overflow: compact ? TextOverflow.clip : TextOverflow.ellipsis,
     style: TextStyle(
       color: colors.muted,
       fontSize: 11,

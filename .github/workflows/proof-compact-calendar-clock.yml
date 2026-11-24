@@ -15,10 +15,12 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           persist-credentials: false
-      - name: Set up the locked SDK and dependencies
+      - name: Install the pinned SDK
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           bash .github/scripts/bootstrap-flutter.sh
+      - name: Restore locked dependencies
+        run: |
           flutter pub get --enforce-lockfile
           git diff --exit-code -- pubspec.lock
       - name: Check formatting and static analysis
