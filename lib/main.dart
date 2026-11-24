@@ -135,6 +135,7 @@ part 'workspace_task_objectives.dart';
 part 'workspace_automation.dart';
 part 'workspace_apple_access.dart';
 part 'workspace_task_completion.dart';
+part 'workspace_review_availability.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -288,6 +289,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   Timer? _automationCalendarTimer;
   Object? _automationCacheKey;
   AutomationData? _cachedAutomation;
+  Object? _reviewAvailabilityKey;
+  final _reviewAvailabilityCache = <DateTime, Future<ReviewDayAvailability?>>{};
   var _planningDay = false;
   var _recordingVoice = false;
   final _heldVoiceOverlay = HeldVoiceCaptureOverlay();
@@ -2017,6 +2020,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         builder: (_) => ReviewPage(
           data: review,
           agendaForDay: _reviewAgenda,
+          availabilityForDay: _reviewAvailabilityFor,
           activityMinutesForDay: (day) =>
               _confirmedMinutes(day, plusDays(day, 1)),
           onChanged: _saveReviewWithAutomation,

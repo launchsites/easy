@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../ui_theme.dart';
 import '../workout_plan.dart';
 import 'review_agenda.dart';
+import 'review_availability.dart';
 import 'review_data.dart';
 
 class ReviewPage extends StatefulWidget {
@@ -12,6 +13,7 @@ class ReviewPage extends StatefulWidget {
     required this.data,
     required this.onChanged,
     required this.agendaForDay,
+    this.availabilityForDay,
     this.activityMinutesForDay,
     this.onRollForward,
     this.onReviewActions,
@@ -23,6 +25,11 @@ class ReviewPage extends StatefulWidget {
   final ReviewData data;
   final Future<void> Function(ReviewData data) onChanged;
   final ReviewAgenda Function(DateTime day) agendaForDay;
+
+  /// Loads verified availability for the day shown in the briefing.
+  /// The agenda's synchronous availability remains available to legacy callers.
+  final Future<ReviewDayAvailability?> Function(DateTime day)?
+  availabilityForDay;
 
   /// Optional fast path for History. The host can provide a cached lookup by
   /// civil date. With no callback, History uses the day agenda's activity total.
@@ -44,14 +51,40 @@ class _ReviewPageState extends State<ReviewPage> {
   var _view = _ReviewView.day;
   var _monthHistory = false;
   var _busy = false;
+  DateTime? _requestedAvailabilityDay;
+  Future<ReviewDayAvailability?>? _dayAvailability;
 
   DateTime get _now => (widget.clock ?? DateTime.now)().toLocal();
   DateTime get _today => reviewDay(_now);
 
   @override
+  void initState() {
+    super.initState();
+    _requestDayAvailability();
+  }
+
+  @override
   void didUpdateWidget(covariant ReviewPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_busy && oldWidget.data != widget.data) _data = widget.data;
+    if (oldWidget.availabilityForDay != widget.availabilityForDay) {
+      _requestedAvailabilityDay = null;
+      _dayAvailability = null;
+      _requestDayAvailability();
+    }
+  }
+
+  void _requestDayAvailability() {
+    final load = widget.availabilityForDay;
+    final day = _day;
+    if (load == null ||
+        _view != _ReviewView.day ||
+        _requestedAvailabilityDay == day) {
+      return;
+    }
+    _requestedAvailabilityDay = day;
+    _dayAvailability = Future<ReviewDayAvailability?>.sync(() => load(day))
+        .onError((_, _) => null);
   }
 
   Future<bool> _save(ReviewData next) async {
@@ -87,7 +120,12 @@ class _ReviewPageState extends State<ReviewPage> {
       lastDate: dates.last,
       helpText: 'Choose review date',
     );
-    if (mounted && choice != null) setState(() => _day = reviewDay(choice));
+    if (mounted && choice != null) {
+      setState(() {
+        _day = reviewDay(choice);
+        _requestDayAvailability();
+      });
+    }
   }
 
   Future<void> _priorities(DailyReview review) async {
@@ -282,8 +320,7 @@ class _ReviewPageState extends State<ReviewPage> {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = MaterialLocalizations.of(context);
-    final day = _day;
+    final availability = _view == _ReviewView.day ? _dayAvailability : null;
     return Scaffold(
       appBar: AppBar(title: const Text('Review')),
       body: SafeArea(
@@ -310,35 +347,25 @@ class _ReviewPageState extends State<ReviewPage> {
                           label: Text(label),
                           onSelected: _busy
                               ? null
-                              : (_) => setState(() => _view = view),
+                              : (_) => setState(() {
+                                  _view = view;
+                                  _requestDayAvailability();
+                                }),
                         ),
                     ],
                   ),
                 ),
                 Expanded(
-                  child: ListView(
-                    key: PageStorageKey(_view),
-                    padding: const EdgeInsets.fromLTRB(21, 8, 21, 35),
-                    children: [
-                      if (_view case _ReviewView.day || _ReviewView.week)
-                        Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: TextButton.icon(
-                            onPressed: _busy ? null : _pickDay,
-                            icon: const Icon(
-                              Icons.calendar_today_outlined,
-                              size: 17,
-                            ),
-                            label: Text(localizations.formatFullDate(day)),
+                  child: availability == null
+                      ? _reviewContent()
+                      : FutureBuilder(
+                          future: availability,
+                          builder: (context, snapshot) => _reviewContent(
+                            snapshot.connectionState == ConnectionState.done
+                                ? snapshot.data
+                                : null,
                           ),
                         ),
-                      ...switch (_view) {
-                        _ReviewView.day => _daySections(day),
-                        _ReviewView.week => _weekSections(day),
-                        _ReviewView.habits => _habitSections(),
-                      },
-                    ],
-                  ),
                 ),
               ],
             ),
@@ -348,9 +375,45 @@ class _ReviewPageState extends State<ReviewPage> {
     );
   }
 
-  List<Widget> _daySections(DateTime day) {
+  Widget _reviewContent([ReviewDayAvailability? availability]) {
+    final day = _day;
+    final localizations = MaterialLocalizations.of(context);
+    return ListView(
+      key: PageStorageKey(_view),
+      padding: const EdgeInsets.fromLTRB(21, 8, 21, 35),
+      children: [
+        if (_view case _ReviewView.day || _ReviewView.week)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: _busy ? null : _pickDay,
+              icon: const Icon(Icons.calendar_today_outlined, size: 17),
+              label: Text(localizations.formatFullDate(day)),
+            ),
+          ),
+        ...switch (_view) {
+          _ReviewView.day => _daySections(day, availability),
+          _ReviewView.week => _weekSections(day),
+          _ReviewView.habits => _habitSections(),
+        },
+      ],
+    );
+  }
+
+  List<Widget> _daySections(DateTime day, ReviewDayAvailability? availability) {
     final review = _data.dayFor(day);
-    final brief = widget.agendaForDay(day).forDay(day);
+    final agenda = widget.agendaForDay(day);
+    final brief =
+        (widget.availabilityForDay == null
+                ? agenda
+                : ReviewAgenda(
+                    events: agenda.events,
+                    tasks: agenda.tasks,
+                    unresolvedCaptures: agenda.unresolvedCaptures,
+                    confirmedActivityMinutes: agenda.confirmedActivityMinutes,
+                    availability: availability?.windows,
+                  ))
+            .forDay(day);
     final stats = [
       if (brief.freeMinutes case final free?) '${_durationLabel(free)} free',
       if (brief.knownEffortMinutes > 0)
@@ -628,6 +691,7 @@ class _ReviewPageState extends State<ReviewPage> {
                   : () => setState(() {
                       _day = item.day;
                       _view = _ReviewView.day;
+                      _requestDayAvailability();
                     }),
             ),
         ],
