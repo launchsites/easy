@@ -1,10 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 
+import 'categories/category_palette.dart';
 import 'notes/note_model.dart';
 import 'task_model.dart';
 import 'ui_theme.dart';
-import 'workspace_data.dart' show spaceColor, spaceName;
 
 export 'notes/note_model.dart';
 export 'task_model.dart';
@@ -515,14 +515,14 @@ class _CategoryLabel extends StatelessWidget {
           width: 6,
           height: 6,
           decoration: BoxDecoration(
-            color: spaceColor(name),
+            color: WorkspaceCategoryPalette.colorFor(context, name),
             shape: BoxShape.circle,
           ),
         ),
         const SizedBox(width: 5),
         Flexible(
           child: Text(
-            spaceName(name),
+            WorkspaceCategoryPalette.labelFor(context, name),
             style: const TextStyle(color: muted, fontSize: 12, height: 1.25),
           ),
         ),

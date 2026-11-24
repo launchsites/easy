@@ -5,7 +5,7 @@ import 'dart:typed_data' show BytesBuilder;
 import 'package:crypto/crypto.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart'
-    show compute, defaultTargetPlatform, kIsWeb, listEquals;
+    show compute, defaultTargetPlatform, kIsWeb, listEquals, setEquals;
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
@@ -44,6 +44,9 @@ import 'capture/local_transcriber.dart';
 import 'capture/voice_capture_sheet.dart';
 import 'capture/voice_playback_dialog.dart';
 import 'capture/voice_transcription_settings.dart';
+import 'categories/category_palette.dart';
+import 'categories/workspace_categories.dart';
+import 'categories/workspace_categories_page.dart';
 import 'focus/focus_mode.dart';
 import 'focus/focus_modes_page.dart';
 import 'gym_history_page.dart';
@@ -80,6 +83,7 @@ import 'workspace_data.dart';
 
 part 'workspace_chrome.dart';
 part 'workspace_repeating_tasks.dart';
+part 'workspace_category_views.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -240,6 +244,14 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   List<WorkspaceIcsCalendar> _icsCalendars = const [];
   List<InternalRecurringEvent> _eventSeries = const [];
   Set<String> _eventSeriesIds = const {};
+  Object? _categoryRevision;
+  Object? _categorySource;
+  Set<String> _categoryReferences = const {};
+  WorkspaceCategories _categoryCache = WorkspaceCategories.defaults();
+  Object? _focusedTasksRevision;
+  List<TaskItem> _focusedTasks = const [];
+  Object? _focusedNotesRevision;
+  List<NoteItem> _focusedNotes = const [];
   var _taskFeed = TaskWorkspaceFeed();
   var _taskSeriesUnreadable = false;
   Future<AttachmentStore?>? _attachmentStore;
@@ -382,24 +394,15 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     );
   }
 
-  Map<String, String> _categories() => {
-    for (final key in {
-      ...spaceColors.keys,
-      ..._data.tasks.map((task) => task.category),
-      ..._data.events.map((event) => event.category),
-      ..._data.notes.map((note) => note.category).nonNulls,
-      ..._modes.expand((mode) => mode.categories ?? const <String>{}),
-    })
-      if (key.isNotEmpty) key: spaceName(key),
-  };
-
   CalendarSourcePreferences _defaultCalendarPreferences() {
-    final categories = _categories().keys;
+    final categories = _categories(includeArchived: true).keys;
     return CalendarSourcePreferences(
       allCalendars: ['', ...categories].map(_localCalendar),
       memberships: CalendarModeMemberships({
         for (final mode in _modes)
-          mode.id: ['', ...categories].where(mode.includes).map(_localCalendar),
+          mode.id: ['', ...categories]
+              .where((category) => _modeIncludes(mode, category))
+              .map(_localCalendar),
       }),
     );
   }
@@ -780,6 +783,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                     title: 'Focus modes',
                     subtitle: 'Choose what each mode brings into view',
                     onTap: _openFocusSettings,
+                  ),
+                  SettingsItem(
+                    icon: Icons.label_outline_rounded,
+                    title: 'Categories',
+                    subtitle: 'Names, colours and subcategories',
+                    onTap: _openCategories,
                   ),
                   SettingsItem(
                     icon: Icons.calendar_today_outlined,
@@ -1170,11 +1179,15 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         onChanged: _changeCalendarPreferences,
         modes: {for (final mode in _modes) mode.id: mode.name},
         localSources: [
-          for (final entry in {'': 'General', ..._categories()}.entries)
+          for (final entry in {
+            '': 'General',
+            ..._categories(includeArchived: true),
+          }.entries)
             CalendarSource(
               id: _localCalendar(entry.key),
               name: entry.value,
               accountName: appName,
+              color: _catalog.colorArgbFor(entry.key),
               capabilities: CalendarCapability.values,
             ),
           for (final source in _icsCalendars)
@@ -2657,11 +2670,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   NoteItem? _homeNote() {
     NoteItem? latest;
     final mode = _focus;
-    for (final note in _data.notes) {
+    for (final note in _notesInMode(mode)) {
       if (mode == null && (note.category != null || !note.noteToSelf)) continue;
-      if (mode != null && !mode.includes(note.category?.toLowerCase())) {
-        continue;
-      }
       if (latest == null ||
           (note.noteToSelf && !latest.noteToSelf) ||
           (note.noteToSelf == latest.noteToSelf &&
@@ -2673,18 +2683,19 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   Future<Object?> _showEditor(Widget editor) {
+    final content = _categoryScope(editor);
     if (MediaQuery.sizeOf(context).width < 720) {
       return showModalBottomSheet<Object>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
         backgroundColor: paper,
-        builder: (_) => editor,
+        builder: (_) => content,
       );
     }
     return showDialog<Object>(
       context: context,
-      builder: (_) => Dialog(backgroundColor: paper, child: editor),
+      builder: (_) => Dialog(backgroundColor: paper, child: content),
     );
   }
 
@@ -2708,7 +2719,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             captureKind == RecordKind.event &&
                 calendar?.accountId == _localCalendarAccount
             ? calendar!.calendarId
-            : _focus?.preferredCategory,
+            : _preferredFocusCategory,
         categories: _categories(),
         noteToSelf: noteToSelf,
         allowReview: !noteToSelf,
@@ -2752,7 +2763,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _inform('Your scheduling settings could not be opened.');
       return;
     }
-    final categories = _focus?.categories;
+    final categories = _expandCategoryScope(_focus);
     final result = await _showEditor(
       PlanDaySheet(
         day: day,
@@ -3069,7 +3080,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     context: CaptureContext(
       anchor: source.capturedAt,
       revision: _contentRevision,
-      focusCategory: _focus?.preferredCategory,
+      focusCategory: _preferredFocusCategory,
       selectedRecordId: _inspected == null ? null : _recordId(_inspected!),
       categories: _categories(),
       records: [
@@ -3446,25 +3457,27 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(context).height * .68,
         ),
-        child: _RecordDetails(
-          record: record,
-          onEdit: () => Navigator.pop(context, 'edit'),
-          onDelete: () => Navigator.pop(context, 'delete'),
-          noteTargets: record is NoteItem ? _noteTargets() : const [],
-          onOpenNoteLink: (link) => Navigator.pop(context, link),
-          onEstimate: _canEstimate(record)
-              ? () => Navigator.pop(context, 'estimate')
-              : null,
-          onAppleCopy: _canCopyToApple(record)
-              ? () => Navigator.pop(context, 'apple-copy')
-              : null,
-          repeatingTask: _repeatingTask(record) != null,
-          onRepeat: _canRepeatEvent(record) || _canRepeatTask(record)
-              ? () => Navigator.pop(context, 'repeat')
-              : null,
-          onAssignPlace: _canAssignPlace(record)
-              ? () => Navigator.pop(context, 'place')
-              : null,
+        child: _categoryScope(
+          _RecordDetails(
+            record: record,
+            onEdit: () => Navigator.pop(context, 'edit'),
+            onDelete: () => Navigator.pop(context, 'delete'),
+            noteTargets: record is NoteItem ? _noteTargets() : const [],
+            onOpenNoteLink: (link) => Navigator.pop(context, link),
+            onEstimate: _canEstimate(record)
+                ? () => Navigator.pop(context, 'estimate')
+                : null,
+            onAppleCopy: _canCopyToApple(record)
+                ? () => Navigator.pop(context, 'apple-copy')
+                : null,
+            repeatingTask: _repeatingTask(record) != null,
+            onRepeat: _canRepeatEvent(record) || _canRepeatTask(record)
+                ? () => Navigator.pop(context, 'repeat')
+                : null,
+            onAssignPlace: _canAssignPlace(record)
+                ? () => Navigator.pop(context, 'place')
+                : null,
+          ),
         ),
       ),
     );
@@ -3866,6 +3879,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     int,
     List<InternalRecurringEvent>,
     List<InternalWorkspaceEvent>,
+    WorkspaceCategories,
   )?
   _visibleEventRevision;
   List<CalendarEvent> _visibleEvents = const [];
@@ -3881,12 +3895,14 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _appleCopyRevision,
       _eventSeries,
       _internalFeed.events,
+      _catalog,
     );
     if (_visibleEventRevision == revision) return _visibleEvents;
     final calendars = preferences?.calendarsFor(mode?.id);
+    final categoryScope = _expandCategoryScope(mode);
     bool visible(CalendarEvent event) =>
         calendars?.contains(_localCalendar(event.category)) ??
-        (mode?.includes(event.category.toLowerCase()) ?? true);
+        (categoryScope?.contains(_catalog.canonicalId(event.category)) ?? true);
     final local = [
       for (final event in _standaloneEvents(_data.events))
         if (visible(event)) event,
@@ -3947,17 +3963,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final mode = _focus;
     final modes = _availableModes.toList(growable: false);
     final events = _calendarEvents(mode);
-    final workspaceTasks = _workspaceTasks;
-    final tasks = mode == null || mode.categories == null
-        ? workspaceTasks
-        : workspaceTasks
-              .where((item) => mode.includes(item.category.toLowerCase()))
-              .toList();
-    final notes = mode == null || mode.categories == null
-        ? _data.notes
-        : _data.notes
-              .where((item) => mode.includes(item.category?.toLowerCase()))
-              .toList();
+    final tasks = _tasksInMode(mode);
+    final notes = _notesInMode(mode);
     final showSchedule = mode?.sections.contains(FocusSection.schedule) ?? true;
     final showTasks = mode?.sections.contains(FocusSection.tasks) ?? true;
     final focusedContent = _focusedContent(context, mode);
@@ -4066,146 +4073,157 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       const SingleActivator(LogicalKeyboardKey.keyK, control: true): _search,
       const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _search,
     };
-    return CallbackShortcuts(
-      bindings: shortcuts,
-      child: Focus(
-        autofocus: true,
-        child: AbsorbPointer(
-          absorbing: _reviewSaving,
-          child: MobileModeFrame(
-            mode: space,
-            modeColor: mode == null ? null : Color(mode.color),
-            child: Scaffold(
-              backgroundColor: mobile ? paper : shell,
-              body: SafeArea(
-                bottom: !mobile,
-                child: mobile
-                    ? Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Column(
-                            children: [
-                              if (_destination != _Destination.today &&
-                                  (_destination != _Destination.calendar ||
-                                      space != null))
-                                _MobileHeader(
-                                  space: space,
-                                  modes: modes,
-                                  displayBrand:
-                                      _destination != _Destination.calendar,
-                                  onSpaceChanged: _changeSpace,
-                                  onSearch: _search,
-                                  onSettings: _openSettings,
-                                ),
-                              Expanded(child: page),
-                            ],
-                          ),
-                          Positioned(
-                            right: 20,
-                            bottom: MediaQuery.paddingOf(context).bottom + 20,
-                            child: HoldCaptureButton(
-                              onTap: _capture,
-                              onHeldRecord:
-                                  kIsWeb || !_allows(EasyFeature.captureMedia)
-                                  ? null
-                                  : (action) =>
-                                        _openVoiceCapture(heldAction: action),
-                            ),
-                          ),
-                          Positioned.fill(
-                            child: OrbitNavigation(
-                              destinations: [
-                                for (final destination in _Destination.values)
-                                  OrbitDestination(
-                                    destination.label,
-                                    destination.icon,
-                                  ),
-                              ],
-                              selectedIndex: _destination.index,
-                              onSelected: (index) =>
-                                  _navigate(_Destination.values[index]),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Column(
-                        children: [
-                          _DesktopHeader(
-                            onSearch: _search,
-                            onCapture: _capture,
-                          ),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 0, 14, 14),
-                              child: Row(
-                                children: [
-                                  _Sidebar(
-                                    destination: _destination,
-                                    compact: compact,
+    return _categoryScope(
+      CallbackShortcuts(
+        bindings: shortcuts,
+        child: Focus(
+          autofocus: true,
+          child: AbsorbPointer(
+            absorbing: _reviewSaving,
+            child: MobileModeFrame(
+              mode: space,
+              modeColor: mode == null ? null : Color(mode.color),
+              child: Scaffold(
+                backgroundColor: mobile ? paper : shell,
+                body: SafeArea(
+                  bottom: !mobile,
+                  child: mobile
+                      ? Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Column(
+                              children: [
+                                if (_destination != _Destination.today &&
+                                    (_destination != _Destination.calendar ||
+                                        space != null))
+                                  _MobileHeader(
                                     space: space,
                                     modes: modes,
-                                    onNavigate: _navigate,
+                                    displayBrand:
+                                        _destination != _Destination.calendar,
                                     onSpaceChanged: _changeSpace,
+                                    onSearch: _search,
                                     onSettings: _openSettings,
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _Surface(child: page)),
-                                  if (_inspected != null && width >= 1000) ...[
-                                    const SizedBox(width: 12),
-                                    SizedBox(
-                                      width: width >= 1250 ? 294 : 264,
-                                      child: _Surface(
-                                        child: _RecordDetails(
-                                          record: _inspected!,
-                                          onClose: () =>
-                                              setState(() => _inspected = null),
-                                          onEdit: () =>
-                                              _editRecord(_inspected!),
-                                          onDelete: () =>
-                                              _deleteRecord(_inspected!),
-                                          noteTargets: _inspected is NoteItem
-                                              ? _noteTargets()
-                                              : const [],
-                                          onOpenNoteLink: _openNoteLink,
-                                          onEstimate: _canEstimate(_inspected)
-                                              ? () => _suggestDuration(
-                                                  _inspected! as TaskItem,
-                                                )
-                                              : null,
-                                          onAppleCopy:
-                                              _canCopyToApple(_inspected)
-                                              ? () => _copyToApple(
-                                                  _inspected! as CalendarEvent,
-                                                )
-                                              : null,
-                                          repeatingTask:
-                                              _repeatingTask(_inspected) !=
-                                              null,
-                                          onRepeat: switch (_inspected) {
-                                            CalendarEvent event
-                                                when _canRepeatEvent(event) =>
-                                              () => _setEventRepeat(event),
-                                            TaskItem task
-                                                when _canRepeatTask(task) =>
-                                              () => _setTaskRepeat(task),
-                                            _ => null,
-                                          },
-                                          onAssignPlace:
-                                              _canAssignPlace(_inspected)
-                                              ? () => _assignPlace(
-                                                  _inspected! as CalendarEvent,
-                                                )
-                                              : null,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                                Expanded(child: page),
+                              ],
+                            ),
+                            Positioned(
+                              right: 20,
+                              bottom: MediaQuery.paddingOf(context).bottom + 20,
+                              child: HoldCaptureButton(
+                                onTap: _capture,
+                                onHeldRecord:
+                                    kIsWeb || !_allows(EasyFeature.captureMedia)
+                                    ? null
+                                    : (action) =>
+                                          _openVoiceCapture(heldAction: action),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
+                            Positioned.fill(
+                              child: OrbitNavigation(
+                                destinations: [
+                                  for (final destination in _Destination.values)
+                                    OrbitDestination(
+                                      destination.label,
+                                      destination.icon,
+                                    ),
+                                ],
+                                selectedIndex: _destination.index,
+                                onSelected: (index) =>
+                                    _navigate(_Destination.values[index]),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            _DesktopHeader(
+                              onSearch: _search,
+                              onCapture: _capture,
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  0,
+                                  14,
+                                  14,
+                                ),
+                                child: Row(
+                                  children: [
+                                    _Sidebar(
+                                      destination: _destination,
+                                      compact: compact,
+                                      space: space,
+                                      modes: modes,
+                                      onNavigate: _navigate,
+                                      onSpaceChanged: _changeSpace,
+                                      onSettings: _openSettings,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: _Surface(child: page)),
+                                    if (_inspected != null &&
+                                        width >= 1000) ...[
+                                      const SizedBox(width: 12),
+                                      SizedBox(
+                                        width: width >= 1250 ? 294 : 264,
+                                        child: _Surface(
+                                          child: _RecordDetails(
+                                            record: _inspected!,
+                                            onClose: () => setState(
+                                              () => _inspected = null,
+                                            ),
+                                            onEdit: () =>
+                                                _editRecord(_inspected!),
+                                            onDelete: () =>
+                                                _deleteRecord(_inspected!),
+                                            noteTargets: _inspected is NoteItem
+                                                ? _noteTargets()
+                                                : const [],
+                                            onOpenNoteLink: _openNoteLink,
+                                            onEstimate: _canEstimate(_inspected)
+                                                ? () => _suggestDuration(
+                                                    _inspected! as TaskItem,
+                                                  )
+                                                : null,
+                                            onAppleCopy:
+                                                _canCopyToApple(_inspected)
+                                                ? () => _copyToApple(
+                                                    _inspected!
+                                                        as CalendarEvent,
+                                                  )
+                                                : null,
+                                            repeatingTask:
+                                                _repeatingTask(_inspected) !=
+                                                null,
+                                            onRepeat: switch (_inspected) {
+                                              CalendarEvent event
+                                                  when _canRepeatEvent(event) =>
+                                                () => _setEventRepeat(event),
+                                              TaskItem task
+                                                  when _canRepeatTask(task) =>
+                                                () => _setTaskRepeat(task),
+                                              _ => null,
+                                            },
+                                            onAssignPlace:
+                                                _canAssignPlace(_inspected)
+                                                ? () => _assignPlace(
+                                                    _inspected!
+                                                        as CalendarEvent,
+                                                  )
+                                                : null,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
               ),
             ),
           ),

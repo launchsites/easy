@@ -1,10 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'calendar_page.dart';
+import 'categories/category_palette.dart';
 import 'list_pages.dart';
 import 'notes/note_preview.dart';
 import 'ui_theme.dart' show accent, ink, line, muted, paper, raisedPaper;
-import 'workspace_data.dart' show spaceColor, spaceColors, spaceName;
+import 'workspace_data.dart' show spaceName;
 
 enum RecordKind { task, event, note }
 
@@ -119,8 +120,9 @@ class _RecordEditorState extends State<RecordEditor> {
     _category =
         event?.category ??
         task?.category ??
+        note?.category ??
         widget.initialCategory ??
-        'personal';
+        (_kind == RecordKind.note ? '' : 'personal');
     _dueDate = _dueAt == null
         ? task == null
               ? widget.initialTaskDate
@@ -458,7 +460,7 @@ class _RecordEditorState extends State<RecordEditor> {
       title: _title.text.trim(),
       body: _body.text,
       updated: updated,
-      category: existing == null ? widget.initialCategory : existing.category,
+      category: _category.isEmpty ? null : _category,
       noteToSelf: existing?.noteToSelf ?? false,
       pinned: _notePinned,
       folder: existing != null && _noteFolder.text == (existing.folder ?? '')
@@ -577,33 +579,19 @@ class _RecordEditorState extends State<RecordEditor> {
   }
 
   Widget _spaceRow() {
-    return MenuAnchor(
-      alignmentOffset: const Offset(0, 4),
-      builder: (context, controller, _) => _propertyButton(
-        label: 'Space',
-        value: spaceName(_category),
-        icon: Icons.folder_outlined,
-        onPressed: () =>
-            controller.isOpen ? controller.close() : controller.open(),
-      ),
-      menuChildren: [
-        for (final category in {...spaceColors.keys, _category})
-          MenuItemButton(
-            leadingIcon: Icon(
-              Icons.circle,
-              color: spaceColor(category),
-              size: 8,
-            ),
-            trailingIcon: category == _category
-                ? const Icon(Icons.check_rounded, color: accent, size: 16)
-                : null,
-            onPressed: () => setState(() => _category = category),
-            child: Semantics(
-              selected: category == _category,
-              child: Text(spaceName(category)),
-            ),
-          ),
-      ],
+    final categories = WorkspaceCategoryPalette.of(context);
+    return _propertyButton(
+      label: 'Category',
+      value: categories.pathLabelFor(_category),
+      icon: Icons.folder_outlined,
+      onPressed: () async {
+        final id = await showWorkspaceCategoryPicker(
+          context,
+          categories: categories,
+          selectedId: _category,
+        );
+        if (mounted && id != null) setState(() => _category = id);
+      },
     );
   }
 
@@ -1066,6 +1054,7 @@ class _RecordEditorState extends State<RecordEditor> {
     ),
     if (_showNoteDetails) ...[
       _propertyPanel([
+        _spaceRow(),
         SwitchListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 13),
           title: const Text('Pin note'),

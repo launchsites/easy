@@ -6,7 +6,8 @@ import 'package:material_ui/material_ui.dart';
 
 import 'appearance/appearance.dart' show readableTint;
 import 'calendar_event_index.dart';
-import 'workspace_data.dart' show spaceColor;
+import 'categories/category_palette.dart';
+import 'categories/workspace_categories.dart';
 
 class CalendarEvent {
   const CalendarEvent({
@@ -1002,12 +1003,15 @@ Widget _calendarSurface(_CalendarColors colors, Widget child) => Material(
 );
 
 class _CalendarColors {
-  const _CalendarColors(this.scheme);
+  const _CalendarColors(this.scheme, this.categories);
 
-  factory _CalendarColors.of(BuildContext context) =>
-      _CalendarColors(Theme.of(context).colorScheme);
+  factory _CalendarColors.of(BuildContext context) => _CalendarColors(
+    Theme.of(context).colorScheme,
+    WorkspaceCategoryPalette.of(context),
+  );
 
   final ColorScheme scheme;
+  final WorkspaceCategories categories;
 
   bool get dark => scheme.brightness == Brightness.dark;
   Color get surface => scheme.surfaceContainerLow;
@@ -1023,7 +1027,12 @@ class _CalendarColors {
   );
 
   ({Color ink, Color fill, Color edge}) event(CalendarEvent event) {
-    final hue = event.color ?? spaceColor(event.category);
+    final hue =
+        event.color ??
+        switch (categories.colorArgbFor(event.category)) {
+          final value? => Color(value),
+          _ => accent,
+        };
     final fill = Color.alphaBlend(
       hue.withValues(alpha: dark ? .24 : .09),
       dark ? surface : scheme.surface,

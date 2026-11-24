@@ -4,9 +4,10 @@ import 'package:material_ui/material_ui.dart';
 
 import 'appearance/appearance.dart' show readableTint;
 import 'calendar_page.dart';
+import 'categories/category_palette.dart';
 import 'list_pages.dart';
 import 'ui_theme.dart';
-import 'workspace_data.dart' show spaceColor, spaceName;
+import 'workspace_data.dart' show spaceName;
 
 class MobileHome extends StatelessWidget {
   const MobileHome({
@@ -505,7 +506,7 @@ class _HomeEvent extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final format = MaterialLocalizations.of(context);
     final tone = readableTint(
-      event.color ?? spaceColor(event.category),
+      event.color ?? WorkspaceCategoryPalette.colorFor(context, event.category),
       surface: colors.surface,
       foreground: colors.onSurface,
       minimumContrast: 3,
@@ -640,13 +641,19 @@ class _HomeTask extends StatelessWidget {
                     ),
                     if (showCategory && task.category.trim().isNotEmpty)
                       Text(
-                        spaceName(task.category),
+                        WorkspaceCategoryPalette.labelFor(
+                          context,
+                          task.category,
+                        ),
                         style: TextStyle(
                           fontSize: 12,
                           height: 1.3,
                           color: readableTint(
                             Color.lerp(
-                              spaceColor(task.category),
+                              WorkspaceCategoryPalette.colorFor(
+                                context,
+                                task.category,
+                              ),
                               colors.onSurface,
                               .2,
                             )!,

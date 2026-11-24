@@ -5,11 +5,12 @@ import 'calendar_page.dart';
 import 'capture/capture_review_sheet.dart' show CaptureReviewRequest;
 import 'capture/task_category_hint.dart';
 import 'capture_text.dart';
+import 'categories/category_palette.dart';
 import 'list_pages.dart';
 import 'record_editor.dart' show RecordKind;
 import 'ui_theme.dart'
     show accent, ink, line, muted, paper, raisedPaper, softAccent;
-import 'workspace_data.dart' show spaceColor, spaceColors, spaceName;
+import 'workspace_data.dart' show spaceColors, spaceName;
 
 class QuickCapture extends StatefulWidget {
   const QuickCapture({
@@ -67,15 +68,19 @@ class _QuickCaptureState extends State<QuickCapture> {
 
   String? get _noteCategory =>
       _categoryChosen ? _selectedCategory : widget.initialCategory;
-  String get _category =>
-      (!_categoryChosen && _kind == RecordKind.task
-          ? taskCategoryHint(_text.text, {
-              ...spaceColors.keys,
-              ...widget.categories.keys,
-            })
-          : null) ??
-      _noteCategory ??
-      'personal';
+  Iterable<String> get _categoryIds =>
+      widget.categories.isNotEmpty ||
+          WorkspaceCategoryPalette.maybeOf(context) != null
+      ? widget.categories.keys
+      : spaceColors.keys;
+
+  String get _category => _categoryChosen
+      ? _selectedCategory ?? ''
+      : (_kind == RecordKind.task
+                ? taskCategoryHint(_text.text, {..._categoryIds})
+                : null) ??
+            _noteCategory ??
+            (_categoryIds.contains('personal') ? 'personal' : '');
 
   EventCaptureText _parseEvent(String input) =>
       parseEventCapture(input, date: widget.date, now: _openedAt);
@@ -339,33 +344,51 @@ class _QuickCaptureState extends State<QuickCapture> {
 
   Widget _categoryChoice() {
     final current = _kind == RecordKind.note ? _noteCategory : _category;
-    return MenuAnchor(
-      builder: (context, controller, child) => Tooltip(
-        message: 'Choose category',
-        child: TextButton.icon(
-          onPressed: () =>
-              controller.isOpen ? controller.close() : controller.open(),
-          icon: const Icon(Icons.expand_more_rounded, size: 16),
-          iconAlignment: IconAlignment.end,
-          label: Text(current == null ? 'General' : spaceName(current)),
-          style: TextButton.styleFrom(
-            foregroundColor: current == null ? muted : spaceColor(current),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-          ),
+    final catalog = WorkspaceCategoryPalette.of(context);
+    final activeIds = _categoryIds;
+    final label = catalog.labelFor(current);
+    final tint = current == null || current.isEmpty
+        ? muted
+        : WorkspaceCategoryPalette.colorFor(context, current);
+    Widget button(VoidCallback onPressed) => Tooltip(
+      message: 'Choose category',
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.expand_more_rounded, size: 16),
+        iconAlignment: IconAlignment.end,
+        label: Text(label, overflow: TextOverflow.ellipsis),
+        style: TextButton.styleFrom(
+          foregroundColor: tint,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
         ),
       ),
+    );
+    if (activeIds.length > 8 ||
+        catalog.categories.any((entry) => entry.parentId != null)) {
+      return button(() async {
+        final selected = await showWorkspaceCategoryPicker(
+          context,
+          categories: catalog,
+          selectedId: current,
+        );
+        if (mounted && selected != null) _chooseCategory(selected);
+      });
+    }
+    return MenuAnchor(
+      builder: (_, controller, _) => button(
+        () => controller.isOpen ? controller.close() : controller.open(),
+      ),
       menuChildren: [
-        if (_kind == RecordKind.note)
-          MenuItemButton(
-            onPressed: () => _chooseCategory(null),
-            child: const Text('General'),
-          ),
-        for (final category in {...spaceColors.keys, ...widget.categories.keys})
+        MenuItemButton(
+          onPressed: () => _chooseCategory(''),
+          child: const Text('General'),
+        ),
+        for (final category in activeIds)
           MenuItemButton(
             onPressed: () => _chooseCategory(category),
             leadingIcon: Icon(
               Icons.circle,
-              color: spaceColor(category),
+              color: WorkspaceCategoryPalette.colorFor(context, category),
               size: 8,
             ),
             trailingIcon: current == category
@@ -380,7 +403,7 @@ class _QuickCaptureState extends State<QuickCapture> {
   void _chooseCategory(String? category) {
     setState(() {
       _categoryChosen = true;
-      _selectedCategory = category;
+      _selectedCategory = category?.isEmpty == true ? null : category;
     });
     _focus.requestFocus();
   }

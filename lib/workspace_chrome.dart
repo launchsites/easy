@@ -519,13 +519,20 @@ class _RecordDetails extends StatelessWidget {
           ),
         if (item.location?.isNotEmpty ?? false)
           (Icons.place_outlined, item.location!),
-        (Icons.circle_outlined, item.sourceLabel ?? spaceName(item.category)),
+        (
+          Icons.circle_outlined,
+          item.sourceLabel ??
+              WorkspaceCategoryPalette.labelFor(context, item.category),
+        ),
       ],
       TaskItem() => [
         (Icons.check_box_outlined, item.done ? 'Completed' : 'Open'),
         if (repeatingTask) (Icons.repeat_rounded, 'Repeating task'),
         if (item.date != null) (Icons.calendar_today_outlined, day(item.date!)),
-        (Icons.circle_outlined, spaceName(item.category)),
+        (
+          Icons.circle_outlined,
+          WorkspaceCategoryPalette.labelFor(context, item.category),
+        ),
         if (item.estimatedMinutes case final minutes?)
           (Icons.timer_outlined, '$minutes min estimate'),
       ],

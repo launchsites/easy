@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'appearance/appearance.dart' show readableTint;
 import 'calendar_page.dart';
+import 'categories/category_palette.dart';
 import 'list_pages.dart';
 import 'workspace_data.dart';
 
@@ -232,7 +233,9 @@ class _ScheduleItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final tone = event.color ?? spaceColor(event.category);
+    final tone =
+        event.color ??
+        WorkspaceCategoryPalette.colorFor(context, event.category);
     final localizations = MaterialLocalizations.of(context);
     final use24Hours = MediaQuery.alwaysUse24HourFormatOf(context);
     String time(DateTime value) => localizations.formatTimeOfDay(
@@ -246,7 +249,7 @@ class _ScheduleItem extends StatelessWidget {
         : time(event.start);
     final place = event.location?.trim();
     final contextLabel = place == null || place.isEmpty
-        ? spaceName(event.category)
+        ? WorkspaceCategoryPalette.labelFor(context, event.category)
         : place;
     final shape = BorderRadius.circular(11);
     final fill = Color.alphaBlend(
@@ -434,11 +437,17 @@ class _TodayTask extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        spaceName(task.category),
+                        WorkspaceCategoryPalette.labelFor(
+                          context,
+                          task.category,
+                        ),
                         style: TextStyle(
                           color: readableTint(
                             Color.lerp(
-                              spaceColor(task.category),
+                              WorkspaceCategoryPalette.colorFor(
+                                context,
+                                task.category,
+                              ),
                               colors.onSurface,
                               .16,
                             )!,
