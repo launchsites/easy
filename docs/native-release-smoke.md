@@ -91,3 +91,14 @@ python3 tool/benchmark/native_gym_finish_fault.py \
   --app-revision "$(git rev-parse HEAD)" \
   --deny-ip /tmp/easy-deny-ip-sockets --output "$(mktemp -d)"
 ```
+
+## Planned workouts and custom metrics
+
+The extracted `6f18fe9` release passed 24 offline checkpoints at 390×844. It saved an anchored three-day interval plan and a separate two-weekday plan. Each plan committed once, and the unfinished plan editor left the stored workspace unchanged. After a forced process exit, Gym opened the due interval workout. Its cardio targets were 0.6 km, 2% incline, and six minutes. Editing the custom Stride score from 7 points to 6.5 changed one live-session revision. The planned value, saved template and metric identifier stayed intact. The live screen showed both values after reopening. [Workout plan report](benchmark-results/native-workout-plan-6f18fe9-20261124.json)
+
+```sh
+python3 tool/benchmark/native_workout_plan.py \
+  --binary build/linux/x64/release/bundle/easy \
+  --app-revision "$(git rev-parse HEAD)" \
+  --deny-ip /tmp/easy-deny-ip-sockets --output "$(mktemp -d)"
+```
