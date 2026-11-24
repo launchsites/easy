@@ -142,6 +142,16 @@ void main() {
   test(
     'passphrase setup and later unlock are distinct and cancellable',
     () async {
+      final vaultPath = '${temp.path}/vault.easysync';
+      var wrotePending = false;
+      prefs = _SetupPreferences(
+        onWrite: (key, value) async {
+          if (key == preferenceKey && value.endsWith(',false]')) {
+            expect(await File(vaultPath).exists(), isTrue);
+            wrotePending = true;
+          }
+        },
+      );
       final phases = <bool>[];
       bool cancel = true;
       Future<SyncPasswordVault?> open(bool forSetup) async {
@@ -149,7 +159,7 @@ void main() {
         if (cancel) return null;
         return openSyncPasswordVault(
           passphrase: 'synthetic installation vault passphrase',
-          filePath: '${temp.path}/vault.easysync',
+          filePath: vaultPath,
           createIfMissing: forSetup,
         );
       }
@@ -172,6 +182,7 @@ void main() {
       expect(await temp.list().isEmpty, isTrue);
       cancel = false;
       final device = (await first.enable(null)).device.fingerprint;
+      expect(wrotePending, isTrue);
       await first.close();
 
       final reopened = newRoute();
@@ -186,6 +197,18 @@ void main() {
       await reopened.close();
     },
   );
+}
+
+class _SetupPreferences extends SharedPreferencesAsync {
+  _SetupPreferences({required this.onWrite});
+
+  final Future<void> Function(String, String) onWrite;
+
+  @override
+  Future<void> setString(String key, String value) async {
+    await onWrite(key, value);
+    await super.setString(key, value);
+  }
 }
 
 final class _Vault implements SyncSecretVault {

@@ -42,45 +42,46 @@ final class ManualSyncInstallation {
     );
   });
 
-  Future<ManualSyncWorkspace> enable(SyncWorkspaceId? joinWorkspace) => _queue(
-    () async {
-      final saved = await _read();
-      final id = saved?.id ?? joinWorkspace ?? SyncWorkspaceId.generate();
-      if (joinWorkspace != null && id != joinWorkspace) {
-        throw const SyncPairedWorkspaceException(
-          'This device already has a different sync workspace.',
-        );
-      }
-      if (_session case final workspace?) return workspace;
-      final credentials = await _openCredentials(forSetup: saved == null);
-      if (saved?.initialized == true) {
-        return _session = await ManualSyncWorkspace.open(
+  Future<ManualSyncWorkspace> enable(SyncWorkspaceId? joinWorkspace) =>
+      _queue(() async {
+        final saved = await _read();
+        final id = saved?.id ?? joinWorkspace ?? SyncWorkspaceId.generate();
+        if (joinWorkspace != null && id != joinWorkspace) {
+          throw const SyncPairedWorkspaceException(
+            'This device already has a different sync workspace.',
+          );
+        }
+        if (_session case final workspace?) return workspace;
+        final credentials = await _openCredentials(forSetup: saved == null);
+        if (saved?.initialized == true) {
+          return _session = await ManualSyncWorkspace.open(
+            credentials: credentials,
+            workspaceId: id,
+            databasePath: _databasePath,
+          );
+        }
+        if (saved == null) {
+          // Persist vault contents before the pending marker. A restarted
+          // passphrase setup requires this existing file when it resumes.
+          final identity =
+              await credentials.loadIdentity() ??
+              await credentials.createIdentity();
+          identity.destroy();
+          await _write(id, initialized: false);
+        }
+        final workspace = await ManualSyncWorkspace.create(
           credentials: credentials,
           workspaceId: id,
           databasePath: _databasePath,
         );
-      }
-      if (saved == null) {
-        // Check vault access before putting a partially configured workspace
-        // on disk. An explicit retry can resume the same ID after interruption.
-        final existing = await credentials.loadIdentity();
-        existing?.destroy();
-        await _write(id, initialized: false);
-      }
-      final workspace = await ManualSyncWorkspace.create(
-        credentials: credentials,
-        workspaceId: id,
-        databasePath: _databasePath,
-      );
-      try {
-        await _write(id, initialized: true);
-        return _session = workspace;
-      } catch (_) {
-        await workspace.close();
-        rethrow;
-      }
-    },
-  );
+        try {
+          await _write(id, initialized: true);
+          return _session = workspace;
+        } catch (_) {
+          await workspace.close();
+          rethrow;
+        }
+      });
 
   Future<SyncDeviceCredentials> _openCredentials({
     required bool forSetup,
