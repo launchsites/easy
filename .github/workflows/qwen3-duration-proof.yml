@@ -1,0 +1,105 @@
+name: Qwen3 4B duration comparison
+
+on:
+  push:
+    branches: [proof/qwen3-duration-5c4bd85-20261124]
+    paths: [.github/workflows/qwen3-duration-proof.yml]
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  DART_SUPPRESS_ANALYTICS: 'true'
+  PROOF_SOURCE_REVISION: 5c4bd854f21d864a7eb352b29acfb95358c8e8f8
+
+jobs:
+  paired-estimates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the exact provider source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: 5c4bd854f21d864a7eb352b29acfb95358c8e8f8
+          persist-credentials: false
+
+      - name: Verify source and install pinned Flutter
+        run: |
+          test "$(git rev-parse HEAD)" = "$PROOF_SOURCE_REVISION"
+          bash .github/scripts/bootstrap-flutter.sh
+
+      - name: Compile the production duration provider
+        run: |
+          flutter pub get --enforce-lockfile
+          git diff --exit-code -- pubspec.lock
+          printf '%s\n' 'e495672be3cdd28b844aec140fada40168e05b7f52c722e7317695b8e6e377cf  tool/benchmark/provider_estimate_cases.json' | sha256sum -c
+          dart compile exe tool/benchmark/provider_estimate_bench.dart -o "$RUNNER_TEMP/easy-duration-provider"
+
+      - name: Verify public model and runtime artifacts
+        run: |
+          mkdir -p "$RUNNER_TEMP/easy-duration-runtime"
+          cd "$RUNNER_TEMP/easy-duration-runtime"
+          curl --fail --location --retry 2 --retry-max-time 180 --max-time 120 \
+            'https://github.com/ggml-org/llama.cpp/releases/download/b12657/llama-b12657-bin-ubuntu-x64.tar.gz' \
+            -o llama-b12657.tar.gz
+          printf '%s\n' 'ee4fd1751a406fd93c4e1110cbadd253777861f29261f3e17fc6b751343d3e26  llama-b12657.tar.gz' | sha256sum -c
+          tar -xzf llama-b12657.tar.gz
+          printf '%s\n' 'c1f5dd06d002486296aab0e703e592c1675aafb8e56d619738dd59b226a80575  llama-b12657/llama-server' | sha256sum -c
+          curl --fail --location --retry 2 --retry-max-time 600 --max-time 600 \
+            'https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/bc640142c66e1fdd12af0bd68f40445458f3869b/Qwen3-4B-Q4_K_M.gguf' \
+            -o Qwen3-4B-Q4_K_M.gguf
+          printf '%s\n' '7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5  Qwen3-4B-Q4_K_M.gguf' | sha256sum -c
+
+      - name: Measure 12 paired estimates on one logical CPU
+        run: |
+          cpu=$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')
+          scratch="$RUNNER_TEMP/easy-duration-runtime"
+          report="$RUNNER_TEMP/provider-estimate-range-qwen4b-5c4bd85.json"
+          python3 tool/benchmark/provider_estimate_local.py \
+            --server "$scratch/llama-b12657/llama-server" \
+            --model "$scratch/Qwen3-4B-Q4_K_M.gguf" \
+            --model-sha256 7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5 \
+            --client "$RUNNER_TEMP/easy-duration-provider" \
+            --source-revision "$PROOF_SOURCE_REVISION" \
+            --cpu "$cpu" --address-space-mib 6144 --disable-thinking --compare-ranges --output "$report"
+          sha256sum "$report"
+          python3 - "$report" <<'PY'
+          import collections
+          import json
+          import os
+          import statistics
+          import sys
+
+          with open(sys.argv[1], encoding='utf-8') as source:
+              report = json.load(source)
+          assert report['source_revision'] == os.environ['PROOF_SOURCE_REVISION']
+          assert report['compare_ranges'] and report['synthetic_only']
+          assert report['paid_network_requests'] == 0
+          assert report['address_space_limit_mib'] == 6144 and report['thinking_disabled']
+          assert len(report['cases']) == 12 and len(report['cpu_affinity']) == 1
+          for variant in ('point_only', 'range_requested'):
+              rows = [case[variant] for case in report['cases']]
+              points = [row for row in rows if row['status'] == 'review']
+              ranges = [row for row in points if 'range_minutes' in row]
+              print(json.dumps({
+                  'variant': variant,
+                  'statuses': dict(collections.Counter(row['status'] for row in rows)),
+                  'points_within_tolerance': sum(row['within_tolerance'] for row in points),
+                  'validated_ranges': len(ranges),
+                  'ranges_covering_holdout': sum(row['holdout_within_range'] for row in ranges),
+                  'median_latency_ms': statistics.median(row['wall_ms'] for row in rows),
+              }, sort_keys=True))
+          print(json.dumps({key: report[key] for key in ('host', 'cpu_affinity', 'runtime_memory_kib', 'runtime_start_ms', 'cgroup_memory_events_after')}))
+          PY
+
+      - name: Upload raw synthetic evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: qwen3-4b-paired-duration-5c4bd85
+          path: ${{ runner.temp }}/provider-estimate-range-qwen4b-5c4bd85.json
+          if-no-files-found: error
+          retention-days: 7
