@@ -186,7 +186,7 @@ final class WeeklyPlanSelection {
     for (final original in this.tasks) {
       final candidate = byId[original.task.id];
       if (candidate == null ||
-          !_sameSchedule(original, candidate) ||
+          !sameReviewedSchedule(original, candidate) ||
           candidate.blocks.any((block) => block.start.isBefore(notBefore))) {
         return null;
       }
@@ -301,8 +301,11 @@ List<CalendarEvent> _uniqueEvents(List<CalendarEvent> events) {
     } else if (!_sameInstant(existing.start, event.start) ||
         !_sameInstant(existing.end, event.end) ||
         existing.plannedTaskId != event.plannedTaskId ||
-        existing.savedPlaceId != event.savedPlaceId) {
-      throw const FormatException('A calendar event has conflicting times.');
+        existing.savedPlaceId != event.savedPlaceId ||
+        existing.isReadOnly != event.isReadOnly ||
+        existing.allDay != event.allDay ||
+        existing.recurringSeriesId != event.recurringSeriesId) {
+      throw const FormatException('A calendar event has conflicting details.');
     }
   }
   return byId.values.toList();
@@ -317,31 +320,6 @@ bool _includesPrerequisites(
     (id) => ids.contains(id) || proposal.satisfiedPrerequisites.contains(id),
   ),
 );
-
-bool _sameSchedule(ScheduledTask earlier, ScheduledTask current) {
-  final old = earlier.task;
-  final task = current.task;
-  if (old.title != task.title ||
-      old.category != task.category ||
-      old.remainingMinutes != task.remainingMinutes ||
-      old.priority != task.priority ||
-      old.allowSplit != task.allowSplit ||
-      old.minimumChunkMinutes != task.minimumChunkMinutes ||
-      !_sameInstant(old.deadline, task.deadline) ||
-      !_sameInstant(old.earliest, task.earliest) ||
-      !_sameCategories(old.prerequisites, task.prerequisites) ||
-      earlier.blocks.length != current.blocks.length) {
-    return false;
-  }
-  for (final (index, block) in earlier.blocks.indexed) {
-    final next = current.blocks[index];
-    if (!_sameInstant(block.start, next.start) ||
-        !_sameInstant(block.end, next.end)) {
-      return false;
-    }
-  }
-  return true;
-}
 
 bool _sameInstant(DateTime? a, DateTime? b) =>
     a == null || b == null ? a == b : a.isAtSameMomentAs(b);

@@ -32,6 +32,86 @@ void main() {
     priority: priority,
   );
 
+  test('reviewed schedules require the same task and exact block instants', () {
+    ScheduledTask preview({
+      String id = 'draft',
+      String title = 'Write draft',
+      String category = 'work',
+      int minutes = 30,
+      int minimum = 15,
+      bool split = true,
+      bool blocked = false,
+      PlannerPriority priority = PlannerPriority.normal,
+      DateTime? release,
+      DateTime? due,
+      Set<String> needs = const {'research', 'brief'},
+      List<TimeSpan>? blocks,
+      bool local = false,
+    }) {
+      final earliest = release ?? at(5);
+      final deadline = due ?? at(70);
+      return ScheduledTask(
+        task: PlanningTask(
+          id: id,
+          title: title,
+          category: category,
+          remainingMinutes: minutes,
+          allowSplit: split,
+          minimumChunkMinutes: minimum,
+          priority: priority,
+          earliest: local ? earliest.toLocal() : earliest,
+          deadline: local ? deadline.toLocal() : deadline,
+          prerequisites: needs,
+          reservationsNeedReview: blocked,
+        ),
+        blocks:
+            blocks ??
+            [
+              for (final block in [span(15, 30), span(45, 60)])
+                if (local)
+                  TimeSpan(block.start.toLocal(), block.end.toLocal())
+                else
+                  block,
+            ],
+        reason: 'Explicit reservation',
+      );
+    }
+
+    final original = preview();
+    expect(sameReviewedSchedule(original, preview()), isTrue);
+    expect(
+      sameReviewedSchedule(
+        original,
+        preview(local: true, needs: {'brief', 'research'}),
+      ),
+      isTrue,
+    );
+    for (final changed in [
+      preview(id: 'another'),
+      preview(title: 'Review draft'),
+      preview(category: 'work-alias'),
+      preview(minutes: 29),
+      preview(minimum: 16),
+      preview(split: false),
+      preview(blocked: true),
+      preview(priority: PlannerPriority.high),
+      preview(release: at(6)),
+      preview(due: at(71)),
+      preview(needs: {'research'}),
+      preview(needs: {'research', 'review'}),
+      preview(blocks: [span(15, 45)]),
+      preview(blocks: [span(45, 60), span(15, 30)]),
+      preview(
+        blocks: [
+          TimeSpan(at(15).add(const Duration(microseconds: 1)), at(30)),
+          span(45, 60),
+        ],
+      ),
+    ]) {
+      expect(sameReviewedSchedule(original, changed), isFalse);
+    }
+  });
+
   test('explicit hours, buffers, release and deadline are hard boundaries', () {
     final result = proposeSchedule(
       horizon: span(0, 300),
@@ -213,8 +293,9 @@ void main() {
             ),
             isTrue,
           );
-          if (blocks.length > 1)
+          if (blocks.length > 1) {
             expect(block.length.inMinutes, greaterThanOrEqualTo(min));
+          }
         }
       }
     },

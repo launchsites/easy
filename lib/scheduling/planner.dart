@@ -123,6 +123,41 @@ class ScheduledTask implements PlanningDecision {
   DateTime get end => blocks.last.end;
 }
 
+/// Matches a reviewed allocation and the task fields that authorized it.
+/// Identical instants also match when represented in different timezones.
+bool sameReviewedSchedule(ScheduledTask earlier, ScheduledTask current) {
+  final before = earlier.task;
+  final after = current.task;
+  if (before.id != after.id ||
+      before.title != after.title ||
+      before.category != after.category ||
+      before.remainingMinutes != after.remainingMinutes ||
+      before.priority != after.priority ||
+      before.allowSplit != after.allowSplit ||
+      before.minimumChunkMinutes != after.minimumChunkMinutes ||
+      before.completed != after.completed ||
+      before.needsDetails != after.needsDetails ||
+      before.needsDetailsMessage != after.needsDetailsMessage ||
+      before.reservationsNeedReview != after.reservationsNeedReview ||
+      before.deadline?.microsecondsSinceEpoch !=
+          after.deadline?.microsecondsSinceEpoch ||
+      before.earliest?.microsecondsSinceEpoch !=
+          after.earliest?.microsecondsSinceEpoch ||
+      before.prerequisites.length != after.prerequisites.length ||
+      !before.prerequisites.containsAll(after.prerequisites) ||
+      earlier.blocks.length != current.blocks.length) {
+    return false;
+  }
+  for (final (index, block) in earlier.blocks.indexed) {
+    final candidate = current.blocks[index];
+    if (!block.start.isAtSameMomentAs(candidate.start) ||
+        !block.end.isAtSameMomentAs(candidate.end)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 class UnscheduledTask implements PlanningDecision {
   const UnscheduledTask(this.task, this.problem, {this.prerequisiteId});
 

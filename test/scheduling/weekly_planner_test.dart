@@ -89,6 +89,36 @@ void main() {
       ),
       isNull,
     );
+    for (final conflict in [
+      CalendarEvent(
+        id: reserved.id,
+        title: reserved.title,
+        category: reserved.category,
+        start: reserved.start,
+        end: reserved.end,
+        plannedTaskId: reserved.plannedTaskId,
+        sourceLabel: 'Imported',
+      ),
+      CalendarEvent(
+        id: reserved.id,
+        title: reserved.title,
+        category: reserved.category,
+        start: reserved.start,
+        end: reserved.end,
+        plannedTaskId: reserved.plannedTaskId,
+        recurringSeriesId: 'different-series',
+      ),
+    ]) {
+      expect(
+        selection.verify(
+          events: [reserved, conflict],
+          tasks: tasks,
+          settings: settings,
+          notBefore: _at(0, 8),
+        ),
+        isNull,
+      );
+    }
 
     final added = [
       for (final item in selection.tasks)
