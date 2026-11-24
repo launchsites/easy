@@ -240,6 +240,7 @@ class WorkspaceData {
             category: event['category'] as String,
             allDay: event['allDay'] as bool,
             location: event['location'] as String?,
+            savedPlaceId: event['savedPlaceId'] as String?,
             plannedTaskId: event['plannedTaskId'] as String?,
             initialPlannedStart: DateTime.tryParse(
               event['initialPlannedStart'] as String? ?? '',
@@ -306,6 +307,7 @@ class WorkspaceData {
           'category': event.category,
           'allDay': event.allDay,
           'location': event.location,
+          if (event.savedPlaceId != null) 'savedPlaceId': event.savedPlaceId,
           if (event.description != null) 'description': event.description,
           if (event.plannedTaskId != null) 'plannedTaskId': event.plannedTaskId,
           if (event.initialPlannedStart != null)

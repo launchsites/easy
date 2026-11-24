@@ -129,11 +129,17 @@ class ScheduleProposal {
   ScheduleProposal({
     required List<ScheduledTask> scheduled,
     required List<UnscheduledTask> unscheduled,
+    Set<String> satisfiedPrerequisites = const {},
+    List<String> advisories = const [],
   }) : scheduled = List.unmodifiable(scheduled),
-       unscheduled = List.unmodifiable(unscheduled);
+       unscheduled = List.unmodifiable(unscheduled),
+       satisfiedPrerequisites = Set.unmodifiable(satisfiedPrerequisites),
+       advisories = List.unmodifiable(advisories);
 
   final List<ScheduledTask> scheduled;
   final List<UnscheduledTask> unscheduled;
+  final Set<String> satisfiedPrerequisites;
+  final List<String> advisories;
 }
 
 /// Plans only within explicitly supplied availability. Commitments are fixed,
@@ -159,6 +165,7 @@ ScheduleProposal proposeSchedule({
     for (final task in tasksById.values)
       if (task.completed) task.id: horizon.start,
   };
+  final satisfied = finishedAt.keys.toSet();
   final remaining = {
     for (final task in tasksById.values)
       if (!finishedAt.containsKey(task.id)) task.id: task,
@@ -222,7 +229,11 @@ ScheduleProposal proposeSchedule({
       (task) => UnscheduledTask(task, PlannerProblem.dependencyCycle),
     ),
   );
-  return ScheduleProposal(scheduled: scheduled, unscheduled: unscheduled);
+  return ScheduleProposal(
+    scheduled: scheduled,
+    unscheduled: unscheduled,
+    satisfiedPrerequisites: satisfied,
+  );
 }
 
 int _compareTasks(PlanningTask a, PlanningTask b, TimeSpan horizon) {

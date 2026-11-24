@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../calendar_page.dart';
 import '../task_model.dart';
 import '../ui_theme.dart';
+import 'availability_settings.dart';
 import 'planner.dart';
 
 class PlanSelection {
@@ -23,14 +24,30 @@ ScheduleProposal planWorkspaceDay({
   required List<CalendarEvent> events,
   required List<TaskItem> tasks,
   DateTime? reservationStart,
+  SchedulingSettings? settings,
+  Set<String>? categories,
 }) {
   final cutoff = reservationStart ?? window.start;
   final commitments = <FixedCommitment>[];
+  final placed = <PlacedCommitment>[];
+  final placeIds =
+      settings?.places.map((place) => place.id).toSet() ?? const <String>{};
   final reserved = <String, List<TimeSpan>>{};
   for (final event in events) {
     if (!event.end.isAfter(event.start)) continue;
     final eventSpan = TimeSpan(event.start, event.end);
     commitments.add(FixedCommitment(eventSpan));
+    if (settings != null) {
+      placed.add(
+        PlacedCommitment(
+          id: event.id,
+          span: eventSpan,
+          placeId: placeIds.contains(event.savedPlaceId)
+              ? event.savedPlaceId
+              : null,
+        ),
+      );
+    }
     final id = event.plannedTaskId;
     if (id == null || !event.end.isAfter(cutoff)) continue;
     final from = event.start.isBefore(cutoff) ? cutoff : event.start;
@@ -44,9 +61,18 @@ ScheduleProposal planWorkspaceDay({
     for (final task in tasks)
       if (task.done) task.id,
   };
+  final accepted = {
+    for (final task in tasks)
+      if ((task.estimatedMinutes ?? 0) > 0 &&
+          (reservations[task.id]?.minutes ?? 0) >= task.estimatedMinutes!)
+        task.id,
+  };
   final planning = <PlanningTask>[];
   for (final task in tasks) {
-    if (task.done) continue;
+    if (task.done ||
+        (categories != null && !categories.contains(task.category))) {
+      continue;
+    }
     final estimate = task.estimatedMinutes;
     final planned = reservations[task.id]?.minutes ?? 0;
     if (estimate != null && estimate > 0 && planned >= estimate) continue;
@@ -87,12 +113,34 @@ ScheduleProposal planWorkspaceDay({
       ),
     );
   }
-  return proposeSchedule(
+  final inputs = settings?.planningInputs(
     horizon: window,
-    availability: [PlanningWindow(window)],
-    commitments: commitments,
+    categories: planning.map((task) => task.category),
+    commitments: placed,
+  );
+  final result = proposeSchedule(
+    horizon: window,
+    availability: inputs?.availability ?? [PlanningWindow(window)],
+    commitments: inputs?.commitments ?? commitments,
     tasks: planning,
-    completedPrerequisites: completed,
+    completedPrerequisites: {...completed, ...accepted},
+  );
+  if (inputs == null) return result;
+  return ScheduleProposal(
+    scheduled: result.scheduled,
+    unscheduled: result.unscheduled,
+    satisfiedPrerequisites: result.satisfiedPrerequisites,
+    advisories: [
+      if (inputs.availability.isEmpty) 'This window has no saved availability.',
+      if (inputs.travelIssues.any(
+        (issue) => issue.kind == TravelIssueKind.missingDuration,
+      ))
+        'Some gaps need a saved travel duration.',
+      if (inputs.travelIssues.any(
+        (issue) => issue.kind == TravelIssueKind.insufficientGap,
+      ))
+        'Some commitments leave too little travel time.',
+    ],
   );
 }
 
@@ -119,6 +167,8 @@ typedef _PlanInput = ({
   List<CalendarEvent> events,
   List<TaskItem> tasks,
   DateTime reservationStart,
+  SchedulingSettings? settings,
+  Set<String>? categories,
 });
 
 ScheduleProposal _previewDay(_PlanInput input) => planWorkspaceDay(
@@ -126,6 +176,8 @@ ScheduleProposal _previewDay(_PlanInput input) => planWorkspaceDay(
   events: input.events,
   tasks: input.tasks,
   reservationStart: input.reservationStart,
+  settings: input.settings,
+  categories: input.categories,
 );
 
 class PlanDaySheet extends StatefulWidget {
@@ -134,6 +186,8 @@ class PlanDaySheet extends StatefulWidget {
     required this.events,
     required this.tasks,
     this.clock,
+    this.settings,
+    this.categories,
     super.key,
   });
 
@@ -141,6 +195,8 @@ class PlanDaySheet extends StatefulWidget {
   final List<CalendarEvent> events;
   final List<TaskItem> tasks;
   final DateTime Function()? clock;
+  final SchedulingSettings? settings;
+  final Set<String>? categories;
 
   @override
   State<PlanDaySheet> createState() => _PlanDaySheetState();
@@ -227,6 +283,8 @@ class _PlanDaySheetState extends State<PlanDaySheet> {
         events: widget.events,
         tasks: widget.tasks,
         reservationStart: now,
+        settings: widget.settings,
+        categories: widget.categories,
       ));
       if (!mounted) return;
       setState(() {
@@ -389,6 +447,15 @@ class _PlanDaySheetState extends State<PlanDaySheet> {
                               padding: EdgeInsets.only(top: 15),
                               child: Text(
                                 'No blocks to add.',
+                                style: contentMetadataStyle,
+                              ),
+                            ),
+                          for (final advisory
+                              in proposal?.advisories ?? const <String>[])
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                advisory,
                                 style: contentMetadataStyle,
                               ),
                             ),

@@ -437,6 +437,7 @@ class _RecordEditorState extends State<RecordEditor> {
             category: _category,
             allDay: _allDay,
             location: location.isEmpty ? null : location,
+            savedPlaceId: widget.event?.savedPlaceId,
             plannedTaskId: widget.event?.plannedTaskId,
             initialPlannedStart: widget.event?.initialPlannedStart,
             initialPlannedEnd: widget.event?.initialPlannedEnd,

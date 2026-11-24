@@ -100,8 +100,9 @@ void main() {
     };
     expect(issues, {
       exact.id: PlannerProblem.noFeasibleTime,
-      _review.id: PlannerProblem.unavailableDependency,
+      _review.id: PlannerProblem.noFeasibleTime,
     });
+    expect(proposal.satisfiedPrerequisites, {_draft.id});
   });
 
   test('earlier future blocks reserve effort before the selected day', () {

@@ -17,6 +17,7 @@ class CalendarEvent {
     required this.category,
     this.allDay = false,
     this.location,
+    this.savedPlaceId,
     this.plannedTaskId,
     this.initialPlannedStart,
     this.initialPlannedEnd,
@@ -33,6 +34,7 @@ class CalendarEvent {
   final String category;
   final bool allDay;
   final String? location;
+  final String? savedPlaceId;
   final String? plannedTaskId;
   final DateTime? initialPlannedStart;
   final DateTime? initialPlannedEnd;
@@ -41,6 +43,24 @@ class CalendarEvent {
   final String? description;
   final Color? color;
   bool get isReadOnly => sourceLabel != null;
+
+  CalendarEvent withPlace(String? placeId) => CalendarEvent(
+    id: id,
+    title: title,
+    start: start,
+    end: end,
+    category: category,
+    allDay: allDay,
+    location: location,
+    savedPlaceId: placeId,
+    plannedTaskId: plannedTaskId,
+    initialPlannedStart: initialPlannedStart,
+    initialPlannedEnd: initialPlannedEnd,
+    recurringSeriesId: recurringSeriesId,
+    sourceLabel: sourceLabel,
+    description: description,
+    color: color,
+  );
 }
 
 class CalendarPage extends StatefulWidget {
