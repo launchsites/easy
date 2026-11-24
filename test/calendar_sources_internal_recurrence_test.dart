@@ -109,25 +109,69 @@ void main() {
     },
   );
 
+  test('editing details from a moved occurrence preserves both clocks', () {
+    final original = _series(_rule(count: 4));
+    final detached = original.edit(
+      _visible(original)[1],
+      scope: InternalOccurrenceScope.one,
+      event: _event(DateTime.utc(2026, 11, 29, 14)),
+    );
+    final target = _visible(detached)
+        .singleWhere((occurrence) => occurrence.identityDate.day == 25);
+    final edited = detached.edit(
+      target,
+      scope: InternalOccurrenceScope.series,
+      event: _event(target.start, title: 'Renamed'),
+    );
+    expect(_visible(edited).map((occurrence) => occurrence.start), [
+      for (final day in [24, 26, 27]) DateTime.utc(2026, 11, day, 9),
+      DateTime.utc(2026, 11, 29, 14),
+    ]);
+    expect(_visible(edited).map((event) => event.event.title).toSet(), {
+      'Renamed',
+    });
+  });
+
   test(
-    'editing series fields from a moved occurrence preserves the regular clock',
+    'details-only edits retain the dates and IDs of existing future segments',
     () {
-      final original = _series(_rule(count: 4));
-      final detached = original.edit(
-        _visible(original)[1],
-        scope: InternalOccurrenceScope.one,
-        event: _event(DateTime.utc(2026, 11, 29, 14)),
+      final original = _series(_rule(count: 7));
+      final pivot = _visible(original)[3];
+      final shifted = original.edit(
+        pivot,
+        scope: InternalOccurrenceScope.future,
+        event: _event(DateTime.utc(2026, 11, 28, 13), title: 'Later schedule'),
       );
-      final target = _visible(detached)
-          .singleWhere((occurrence) => occurrence.identityDate.day == 25);
-      final edited = detached.edit(
-        target,
+      final before = _visible(shifted);
+      final firstChange = shifted.edit(
+        before[1],
+        scope: InternalOccurrenceScope.future,
+        event: _event(before[1].start, title: 'Renamed future'),
+      );
+      final afterFuture = _visible(firstChange);
+      expect(
+        afterFuture.map((item) => (item.id, item.start)),
+        before.map((item) => (item.id, item.start)),
+      );
+      expect(afterFuture.first.event.title, 'Workshop');
+      expect(afterFuture.skip(1).map((item) => item.event.title).toSet(), {
+        'Renamed future',
+      });
+
+      final fromShifted = afterFuture.firstWhere((item) => item.id == pivot.id);
+      final allChange = firstChange.edit(
+        fromShifted,
         scope: InternalOccurrenceScope.series,
-        event: _event(target.start, title: 'Renamed'),
+        event: _event(fromShifted.start, title: 'Renamed series'),
       );
-      expect(_visible(edited).map((occurrence) => occurrence.start), [
-        for (final day in [24, 25, 26, 27]) DateTime.utc(2026, 11, day, 9),
-      ]);
+      final afterward = _visible(allChange);
+      expect(
+        afterward.map((item) => (item.id, item.start)),
+        before.map((item) => (item.id, item.start)),
+      );
+      expect(afterward.map((item) => item.event.title).toSet(), {
+        'Renamed series',
+      });
     },
   );
 

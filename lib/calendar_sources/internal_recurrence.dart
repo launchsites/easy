@@ -182,6 +182,23 @@ class InternalEventDraft {
         plannedTaskId: plannedTaskId,
       );
 
+  InternalEventDraft _applyDetails(
+    InternalEventDraft before,
+    InternalEventDraft edited,
+  ) => InternalEventDraft(
+    title: edited.title == before.title ? title : edited.title,
+    start: start,
+    end: end,
+    category: edited.category == before.category ? category : edited.category,
+    location: edited.location == before.location ? location : edited.location,
+    description: edited.description == before.description
+        ? description
+        : edited.description,
+    plannedTaskId: edited.plannedTaskId == before.plannedTaskId
+        ? plannedTaskId
+        : edited.plannedTaskId,
+  );
+
   InternalEventDraft _shiftDays(int days) => _withTimes(
     _atComponents(start, start.components.add(Duration(days: days))),
     _atComponents(end, end.components.add(Duration(days: days))),
@@ -546,16 +563,30 @@ class InternalRecurringEvent {
         ? previous.rule
         : this.rule;
     final replacesRule = rule != null && rule != previousRule;
+    final before = occurrence.event;
+    final detailsOnly =
+        !replacesRule && event.start == before.start && event.end == before.end;
+    if (detailsOnly && scope == InternalOccurrenceScope.series) {
+      return _updated(
+        [for (final segment in _segments) segment.withDetails(before, event)],
+        {
+          for (final entry in _overrides.entries)
+            entry.key: entry.value.withDetails(before, event),
+        },
+        _cutoff,
+      );
+    }
     var newRule = rule ?? previousRule;
     var anchor = event;
     if (_overrides.containsKey(date) &&
         event.start == occurrence.event.start &&
         event.end == occurrence.event.end) {
-      final offset = occurrence.scheduledStart.components.difference(
+      final scheduled = previous.scheduledOn(date);
+      final offset = scheduled.components.difference(
         previous.event.start.components,
       );
       anchor = event._withTimes(
-        occurrence.scheduledStart,
+        scheduled,
         _atComponents(
           previous.event.end,
           previous.event.end.components.add(offset),
@@ -570,16 +601,28 @@ class InternalRecurringEvent {
     if (scope == InternalOccurrenceScope.series) {
       anchor = anchor._shiftDays(-date.difference(first).inDays);
     }
+    if (detailsOnly) {
+      anchor = previous.event
+          ._applyDetails(before, event)
+          ._withTimes(anchor.start, anchor.end);
+    }
     return _updated(
       [
         for (final segment in _segments)
           if (segment.firstIdentity.isBefore(boundary)) segment,
         _Segment(boundary, anchor, newRule),
+        if (detailsOnly)
+          for (final segment in _segments)
+            if (segment.firstIdentity.isAfter(boundary))
+              segment.withDetails(before, event),
       ],
       {
         for (final entry in _overrides.entries)
-          if (entry.key.isBefore(boundary) ||
-              (!replacesRule && entry.key != date))
+          if (entry.key.isBefore(boundary))
+            entry.key: entry.value
+          else if (detailsOnly)
+            entry.key: entry.value.withDetails(before, event)
+          else if (!replacesRule && entry.key != date)
             entry.key: entry.value,
       },
       _cutoff,
@@ -771,6 +814,9 @@ class _Segment {
     event.start.components.add(identity.difference(firstIdentity)),
   );
 
+  _Segment withDetails(InternalEventDraft before, InternalEventDraft edited) =>
+      _Segment(firstIdentity, event._applyDetails(before, edited), rule);
+
   Map<String, Object?> toJson() => {
     'firstIdentity': firstIdentity.toIso8601String(),
     'event': event.toJson(),
@@ -782,6 +828,12 @@ class _OccurrenceOverride {
   const _OccurrenceOverride(this.scheduledStart, this.event);
   final IcsDateTime scheduledStart;
   final InternalEventDraft? event;
+
+  _OccurrenceOverride withDetails(
+    InternalEventDraft before,
+    InternalEventDraft edited,
+  ) =>
+      _OccurrenceOverride(scheduledStart, event?._applyDetails(before, edited));
 }
 
 DateTime _day(DateTime date) => DateTime.utc(date.year, date.month, date.day);
