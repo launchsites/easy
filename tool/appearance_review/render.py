@@ -56,51 +56,73 @@ PALETTES = {
         ),
         "list_pages.dart": ("edf3fa", "697b95"),
     },
+    "graphite": {
+        "appearance/appearance.dart": (
+            "fafafe", "1f2026", "5b5d69", "e1e2ea", "4d4594", "18191e",
+            "c5c6d0", "ffffff", "eeecfb", "222430", "f4f4fa", "3b3d4b",
+            "303245", "f2f0f8", "e1dafa", "30285f", "f0f0f6", "737782",
+        ),
+        "workspace_chrome.dart": (
+            "e1dafa", "f4f4fa", "3b3d4b", "474a59", "e8e2fb", "30285f",
+            "363746", "acaebe", "303245", "dcd9f8", "f2f0f8",
+        ),
+        "list_pages.dart": ("f0f0f6", "737782"),
+    },
 }
 
 STYLES = {
     "ui_theme.dart": {
-        "Radius.circular(16)": ("Radius.circular(20)", "Radius.circular(14)"),
-        "Radius.circular(11)": ("Radius.circular(13)", "Radius.circular(9)"),
+        "Radius.circular(16)": ("Radius.circular(20)", "Radius.circular(14)", "Radius.circular(18)"),
+        "Radius.circular(11)": ("Radius.circular(13)", "Radius.circular(9)", "Radius.circular(12)"),
         "fontSize: mobile ? 44 : 54": (
             "fontSize: mobile ? 45 : 58",
             "fontSize: mobile ? 42 : 50",
+            "fontSize: mobile ? 43 : 55",
         ),
         "letterSpacing: mobile ? -2.5 : -3.3": (
             "letterSpacing: mobile ? -2.1 : -2.8",
             "letterSpacing: mobile ? -1.8 : -2.6",
+            "letterSpacing: mobile ? -1.9 : -2.9",
         ),
     },
     "workspace_chrome.dart": {
         "BorderRadius.circular(19)": (
             "BorderRadius.circular(25)",
             "BorderRadius.circular(15)",
+            "BorderRadius.circular(21)",
         ),
     },
     "list_pages.dart": {
-        "availableWidth - 1030": ("availableWidth - 970", "availableWidth - 1100"),
+        "availableWidth - 1030": ("availableWidth - 970", "availableWidth - 1100", "availableWidth - 1020"),
         "constraints: const BoxConstraints(minHeight: 58)": (
             "constraints: const BoxConstraints(minHeight: 62)",
             "constraints: const BoxConstraints(minHeight: 52)",
+            "constraints: const BoxConstraints(minHeight: 56)",
         ),
-        "fromSTEB(8, 9, 10, 9)": ("fromSTEB(8, 10, 10, 10)", "fromSTEB(8, 6, 10, 6)"),
+        "fromSTEB(8, 9, 10, 9)": (
+            "fromSTEB(8, 10, 10, 10)", "fromSTEB(8, 6, 10, 6)", "fromSTEB(8, 8, 10, 8)",
+        ),
         "shortLandscape ? 12 : (mobile ? 25 : 42)": (
             "shortLandscape ? 12 : (mobile ? 25 : 49)",
             "shortLandscape ? 12 : (mobile ? 25 : 36)",
+            "shortLandscape ? 12 : (mobile ? 25 : 44)",
         ),
     },
     "mobile_home.dart": {
         "gap = SizedBox(height: compact ? 15 : 27)": (
             "gap = SizedBox(height: compact ? 15 : 29)",
             "gap = SizedBox(height: compact ? 15 : 21)",
+            "gap = SizedBox(height: compact ? 15 : 24)",
         ),
         "block(SizedBox(height: compact ? 16 : 32))": (
             "block(SizedBox(height: compact ? 16 : 34))",
             "block(SizedBox(height: compact ? 16 : 26))",
+            "block(SizedBox(height: compact ? 16 : 30))",
         ),
         "letterSpacing: -fontSize * .051": (
             "letterSpacing: -fontSize * .04",
             "letterSpacing: -fontSize * .045",
+            "letterSpacing: -fontSize * .047",
         ),
     },
 }
