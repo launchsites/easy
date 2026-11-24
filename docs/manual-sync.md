@@ -1,6 +1,6 @@
 # Manual sync
 
-The device starts with local records. The host opens a manual sync workspace after setup or joining. The encrypted journal and Easy workspace retain their own revisions and review steps.
+The device starts with local records. Open **Settings → Manual sync** to enable it or join another device. The encrypted journal and Easy workspace retain their own revisions and review steps.
 
 ## Pair two devices
 
@@ -12,7 +12,7 @@ The invitation secret is 32 random bytes. The two ephemeral X25519 keys are boun
 
 ## Local keys and bundles
 
-The system vault stores the installation identity, journal encryption keys and pair keys. The optional native password vault uses the Argon2id and AES-GCM backup envelope around its own credential format. Its writes use a file lock, flushed ciphertext staging, and an atomic rename. The password unlocks this local vault for the current session. Reopening requires the existing vault and journal.
+On Linux, a passphrase unlocks the local sync vault for the current session. Apple and Android builds use their system credential service. The vault stores the installation identity, journal encryption keys and pair keys. The Linux vault wraps its credential format in the Argon2id and AES-GCM backup envelope. Its writes use a file lock, flushed ciphertext staging, and an atomic rename. Reopening requires the existing vault and journal.
 
 A journal approval binds the peer's public fingerprint to an immutable key ID. A competing approval can leave its own candidate in protected storage while the committed key remains attached to the active grant. Revocation removes journal permission before cleaning up the vault entry. If vault cleanup fails, the caller can retry while the earlier permission stays revoked. Copies already exported remain with their recipients.
 
@@ -33,5 +33,7 @@ The tests exercise the code exchange, stale and competing approvals, locked-vaul
 A native test stages 54 synthetic notes carrying about 1.2 MB of text. The first encrypted file reaches the byte limit before the record-count limit. The receiver rejects a modified file, saves the valid bundle, and both journal owners reopen from their original credentials. An authenticated progress code fetches the next file. The final workspace matches every source note and retains the first page as its recovery point. The test completed in about 13 seconds on the shared Linux host with affinity limited to one logical CPU, excluding Flutter test startup. [Transport test](../test/manual_sync_workspace_test.dart)
 
 Four independent native SQLite journals also converge after partitioned note edits and a concurrent deletion. The test verifies that a relayed author must be approved, removals and conflicts require separate review, a process-session preview expires on reopen, replay preserves the revision, and a reviewed restore resolves the conflict without losing the note body. Revocation rejects both direct and relayed new changes from the revoked device. [Four-peer test](../test/manual_sync_workspace_test.dart)
+
+The AOT causal-register benchmark generated 64 five-device histories with temporary partitions, concurrent edits, tombstones and restores. Across 1,024 seeded delivery orders, all resulting records and watermarks matched their chronological reference. The run applied 40,960 unique changes, handled 10,240 duplicate deliveries and revisited delayed dependencies. It took 35.47 seconds and peaked at 16.32 MiB RSS on one logical CPU with a 768 MiB address-space limit. [Runner](../tool/benchmark/sync_partition_bench.dart) · [Raw results](benchmark-results/sync-partitions-epyc-20261124.json)
 
 A Linux release probe used two independent process launches and D-Bus sessions against a disposable GNOME Keyring profile. The system vault retained the installation identity, sealed journal and peer key across the restart. A separate profile with no Secret Service verified the same restart using the encrypted passphrase vault and rejected a wrong passphrase. The passphrase prompt tests cover a 320-pixel portrait viewport at 135% text and a 568×320 right-to-left landscape viewport at 200% text, both with a simulated keyboard. They also confirm that cancellation and an unlock attempt with a missing vault preserve the saved configuration for recovery. [Vault tests](../test/sync_password_vault_test.dart) · [Prompt tests](../test/sync_password_vault_prompt_test.dart)

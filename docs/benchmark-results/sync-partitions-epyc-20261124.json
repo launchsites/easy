@@ -1,0 +1,26 @@
+{
+  "source_revision": "a34a8a05ffcb0a953dea83fbe0a71e6d8f417436",
+  "runner_sha256": "3005259fa38ca31f8031343106b4c14cc4992aac0d3dc97ffefe83cb8619e7d5",
+  "dart": "3.14.0",
+  "target": "linux-x64 AOT",
+  "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+  "settings": {
+    "logical_cpu_count": 1,
+    "address_space_limit_bytes": 805306368
+  },
+  "maximum_rss_kib": 16708,
+  "wall_seconds": 35.474,
+  "result": {
+    "graphs": 64,
+    "devices_per_graph": 5,
+    "delivery_schedules": 1024,
+    "delivered_packets": 51200,
+    "applied_changes": 40960,
+    "duplicate_deliveries": 10240,
+    "deferred_observations": 876809,
+    "final_conflicting_records": 348,
+    "final_records_with_deletion": 235,
+    "canonical_fingerprints_sha256": "c0783fdc959d5119d82876e3c6e6c20f581c7059bd33199b8b6083939ec11726",
+    "elapsed_seconds": 35.406
+  }
+}
