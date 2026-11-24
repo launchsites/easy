@@ -46,4 +46,6 @@ On the frozen `5c4bd85` source, the full Flutter suite passed 881 tests in Europ
 - The paid allowance settings test at 320 × 500, right-to-left direction and 200% text lowers the cap below existing usage with a simulated keyboard. It verifies that the remainder reaches zero and that reloading after a stale save shows the current allowance.
 - A published-advisory query on 24 November 2026 matched none of the 119 hosted package versions in the Dart dependency lockfile. The query used exact locked versions. [OSV database](https://osv.dev/) · [Dart lockfile](../pubspec.lock)
 
+- The focused proof for the Local range option passed 95 tests, including real loopback manual and automatic estimates, request limits, separate timing-history consent, the settings toggle, and the unchanged paid cadence. The exact `a339bf8` Local retry and allowance proof separately passed 72 tests and the synthetic two-process rollover and policy replay. [Local range proof](https://github.com/launchsites/easy/actions/runs/45352305654) · [Retry and allowance proof](https://github.com/launchsites/easy/actions/runs/45350721248)
+
 [Local inference measurements](local-inference-benchmark.md) · [Native local model lifecycle](local-ai-setup.md) · [Scheduling performance](scheduling-performance.md)

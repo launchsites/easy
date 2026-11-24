@@ -701,11 +701,16 @@ class AiRuntime extends ChangeNotifier {
         return localReview(message);
       }
       final fields = payload(activeSettings);
+      final wantsEstimateRange = switch (activeSettings.route) {
+        AiRoute.offline => false,
+        AiRoute.local => activeSettings.localEstimateRanges,
+        AiRoute.api =>
+          automatic == null || (pace!.adaptive && pace.dailyAttempts > 1),
+      };
       final includeEstimateRange =
           discretionary &&
-          activeSettings.route == AiRoute.api &&
+          wantsEstimateRange &&
           config.maxOutputTokens >= _minimumDetailedEstimateOutputTokens &&
-          (automatic == null || (pace!.adaptive && pace.dailyAttempts > 1)) &&
           _provider.fitsRequest(
             config,
             fields,
