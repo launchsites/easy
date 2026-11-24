@@ -67,6 +67,7 @@ class AiRuntimeSettings {
     this.apiModel = '',
     this.localBaseUrl = 'http://127.0.0.1:11434/v1',
     this.localModel = '',
+    this.localCaptureJsonSchema = false,
     this.monthlyCapMicros = 0,
     this.inputMicrosPerMillion,
     this.outputMicrosPerMillion,
@@ -87,6 +88,7 @@ class AiRuntimeSettings {
   final String apiModel;
   final String localBaseUrl;
   final String localModel;
+  final bool localCaptureJsonSchema;
   final int monthlyCapMicros;
   final int? inputMicrosPerMillion;
   final int? outputMicrosPerMillion;
@@ -199,6 +201,7 @@ class AiRuntimeSettings {
     final config = AiProviderConfig.loopback(
       baseUri: uri,
       model: localModel.trim(),
+      captureJsonSchema: localCaptureJsonSchema,
       maxInputTokens: maxInputTokens,
       maxOutputTokens: maxOutputTokens,
       allowEstimates: allowEstimates,
@@ -212,6 +215,7 @@ class AiRuntimeSettings {
     'apiModel': apiModel.trim(),
     'localBaseUrl': localBaseUrl.trim(),
     'localModel': localModel.trim(),
+    'localCaptureJsonSchema': localCaptureJsonSchema,
     'monthlyCapMicros': monthlyCapMicros,
     'inputMicrosPerMillion': inputMicrosPerMillion,
     'outputMicrosPerMillion': outputMicrosPerMillion,
@@ -235,6 +239,7 @@ class AiRuntimeSettings {
     apiModel: values['apiModel'] as String,
     localBaseUrl: values['localBaseUrl'] as String,
     localModel: values['localModel'] as String,
+    localCaptureJsonSchema: values['localCaptureJsonSchema'] as bool? ?? false,
     monthlyCapMicros: values['monthlyCapMicros'] as int,
     inputMicrosPerMillion: values['inputMicrosPerMillion'] as int?,
     outputMicrosPerMillion: values['outputMicrosPerMillion'] as int?,

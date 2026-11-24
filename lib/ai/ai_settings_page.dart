@@ -128,6 +128,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   AiRoute _route = AiRoute.offline;
   bool _metadata = false;
   bool _confirmLocal = true;
+  bool _localCaptureJsonSchema = false;
   bool _estimates = false;
   bool _automatic = false;
   bool _adaptive = false;
@@ -179,6 +180,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       _route = settings.route;
       _metadata = settings.includeOptionalMetadata;
       _confirmLocal = settings.confirmLocal;
+      _localCaptureJsonSchema = settings.localCaptureJsonSchema;
       _estimates = settings.allowEstimates;
       _automatic = settings.automaticEstimates;
       _adaptive = settings.adaptiveEstimatePacing;
@@ -263,6 +265,9 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       apiModel: paid ? _apiModel.text.trim() : prior.apiModel,
       localBaseUrl: local ? _localUrl.text.trim() : prior.localBaseUrl,
       localModel: local ? _localModel.text.trim() : prior.localModel,
+      localCaptureJsonSchema: local
+          ? _localCaptureJsonSchema
+          : prior.localCaptureJsonSchema,
       monthlyCapMicros: cap,
       inputMicrosPerMillion: inputRate,
       outputMicrosPerMillion: outputRate,
@@ -538,6 +543,17 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             value: _confirmLocal,
             title: const Text('Confirm local requests'),
             onChanged: (value) => setState(() => _confirmLocal = value),
+          ),
+        if (local)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _localCaptureJsonSchema,
+            title: const Text('Structured capture replies'),
+            subtitle: const Text(
+              'Use with local servers that support JSON Schema',
+            ),
+            onChanged: (value) =>
+                setState(() => _localCaptureJsonSchema = value),
           ),
         if (api || local)
           SwitchListTile(
