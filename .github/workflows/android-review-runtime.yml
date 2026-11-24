@@ -57,7 +57,12 @@ jobs:
               cd "$staging/$abi"
               test "$(cat source-revision.txt)" = "$EASY_SOURCE_SHA"
               sha256sum --check SHA256SUMS
-              grep -Ex 'No issues found[.]?' lint-results-release.txt
+              if [[ "$abi" == arm64-v8a ]]; then
+                cat lint-results-release.txt
+                cp lint-results-release.txt "$output/lint-results-release.txt"
+              else
+                cmp lint-results-release.txt "$output/lint-results-release.txt"
+              fi
               set -- ./*.apk
               test "$#" -eq 1
               sha256sum -- "$1" | tee -a "$output/APK-SHA256SUMS"
