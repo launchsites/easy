@@ -1,0 +1,31 @@
+name: Read the exact Linux startup failure
+
+on:
+  push:
+    branches: [codex/final-linux-smoke-diagnostics]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  read-report:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Read the preserved startup failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          report="$RUNNER_TEMP/prior-linux-proof"
+          mkdir -p "$report"
+          if ! gh run download 45354844715 --repo "$GITHUB_REPOSITORY" \
+            --name easy-linux-package-smoke-ecdc55a --dir "$report" \
+            > "$RUNNER_TEMP/download.log" 2>&1; then
+            sed -E 's#https://[^" ]+#<redacted download URL>#g' "$RUNNER_TEMP/download.log" >&2
+            exit 1
+          fi
+          jq '{status, failure, current_step, elapsed_seconds, checks: (.checks | length)}' \
+            "$report/native-release-smoke.json"
+          jq '{source_revision, source_run, archive_sha256, archive_entries}' \
+            "$report/package-provenance.json"
