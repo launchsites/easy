@@ -26,6 +26,7 @@ ScheduleProposal planWorkspaceDay({
   DateTime? reservationStart,
   SchedulingSettings? settings,
   Set<String>? categories,
+  Set<String>? taskIds,
 }) {
   final cutoff = reservationStart ?? window.start;
   final commitments = <FixedCommitment>[];
@@ -70,6 +71,7 @@ ScheduleProposal planWorkspaceDay({
   final planning = <PlanningTask>[];
   for (final task in tasks) {
     if (task.done ||
+        (taskIds != null && !taskIds.contains(task.id)) ||
         (categories != null && !categories.contains(task.category))) {
       continue;
     }
