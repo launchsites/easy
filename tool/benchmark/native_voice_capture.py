@@ -4,9 +4,9 @@
 import argparse
 from array import array
 from collections import defaultdict
-from contextlib import ExitStack
+from contextlib import ExitStack, closing
 import csv
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import io
 import json
 import math
@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import selectors
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -166,6 +167,21 @@ def audio_evidence(path):
     }
 
 
+def workout_digest(database):
+    uri = f"{database.resolve().as_uri()}?mode=ro"
+    with closing(sqlite3.connect(uri, uri=True)) as connection:
+        return connection.execute(
+            "SELECT gym_sessions FROM revisions ORDER BY revision DESC LIMIT 1"
+        ).fetchone()[0]
+
+
+def resume_workout(screen):
+    # The light label on the fitted button can be missed by sparse OCR.
+    treadmill = until(lambda: screen.find("Treadmill"), "the saved workout card")
+    screen.move(105, treadmill[1] + 48)
+    screen.send("click", 1)
+
+
 def run(args, stage):
     env = {**os.environ, "GDK_BACKEND": "x11", "LIBGL_ALWAYS_SOFTWARE": "1",
            "GSETTINGS_BACKEND": "memory", "OMP_THREAD_LIMIT": "1"}
@@ -176,12 +192,22 @@ def run(args, stage):
     data = Path(env["XDG_DATA_HOME"]) / "app.launchsites.easy"
     data.mkdir()
     initial = workspace(date.today(), 0, 0, 0)
-    (data / "shared_preferences.json").write_text(json.dumps({
+    preferences = {
         "easy.workspace.v1": json.dumps(initial, separators=(",", ":")),
         "easy.voice-transcription.v1": json.dumps({
             "executable": str(args.whisper), "model": str(args.model),
         }),
-    }))
+    }
+    if args.in_workout:
+        exercises = [{
+            "id": "treadmill", "name": "Treadmill", "kind": "cardio", "minutes": 5,
+        }]
+        preferences["easy.gym-sessions.v1"] = [json.dumps({
+            "planned": True, "planId": "voice-fixture", "planName": "Voice test session",
+            "startedAt": (datetime.now() - timedelta(minutes=3)).isoformat(),
+            "exercises": exercises, "plannedExercises": exercises, "entries": [],
+        })]
+    (data / "shared_preferences.json").write_text(json.dumps(preferences))
     database = data / "easy" / "workspace.sqlite3"
     cases = json.loads(Path(__file__).with_name("speech_cases.json").read_text())
     case, = (case for case in cases if case["id"] == "personal_note")
@@ -232,11 +258,16 @@ def run(args, stage):
             screen.tap("Gym")
 
             def gym_heading():
-                location = screen.find("Gym")
+                location = screen.find("Finish" if args.in_workout else "Gym")
                 return location is not None and location[1] < 70
 
+            if args.in_workout:
+                resume_workout(screen)
             until(gym_heading, "the active Gym focus")
             time.sleep(0.5)
+            gym_before = workout_digest(database) if args.in_workout else None
+            capture_x = WIDTH - (44 if args.in_workout else 48)
+            capture_y = HEIGHT - (38 if args.in_workout else 48)
 
             def take(cancel):
                 def wait_for_recording():
@@ -278,7 +309,7 @@ def run(args, stage):
                     time.sleep(0.35)
                     screen.tap("Stop and save")
                 else:
-                    screen.move(WIDTH - 48, HEIGHT - 48)
+                    screen.move(capture_x, capture_y)
                     screen.send("mousedown", 1)
                     try:
                         until(lambda: screen.find("Voice capture"), "the voice capture sheet", seconds=5)
@@ -289,7 +320,7 @@ def run(args, stage):
                             screen.send("windowsize", "--sync", screen.window, 960, HEIGHT)
                             until(lambda: not sources_for_recording(), "the recorder stopping on removal of the plus button")
                         elif cancel:
-                            screen.move(WIDTH - 130, HEIGHT - 48)
+                            screen.move(capture_x - 82, capture_y)
                             until(lambda: screen.find("Release to cancel"), "the slide-to-cancel cue", seconds=5)
                     finally:
                         screen.send("mouseup", 1)
@@ -358,6 +389,13 @@ def run(args, stage):
             reopened = workspace_state(database, include_document=True)
             if reopened != final or audio_evidence(path) != captured:
                 raise RuntimeError("The workspace or audio changed after restarting.")
+            if args.in_workout:
+                if workout_digest(database) != gym_before:
+                    raise RuntimeError("The live workout changed during the cross-focus capture.")
+                screen.tap("Mode")
+                screen.tap("Gym")
+                resume_workout(screen)
+                until(gym_heading, "the same live workout after restart")
 
     return {
         "status": "passed", "run_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -366,6 +404,8 @@ def run(args, stage):
         "host": host_details(sorted(os.sched_getaffinity(0))), "app_cpu": args.cpu,
         "viewport": [WIDTH, HEIGHT], "audio_modules": modules, "only_virtual_audio": True,
         "capture_interaction": args.interaction,
+        "active_workout_entry_point": args.in_workout,
+        "workout_digest_retained": gym_before,
         "app_ip_socket_guard": args.block_ip is not None, "recorded_wav": captured,
         "synthetic_wav_sha256": clean["audio_sha256"], "whisper_sha256": sha256(args.whisper),
         "model_sha256": sha256(args.model), "transcript": transcript, "transcription_ms": latency,
@@ -386,6 +426,7 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--cpu", type=int)
     parser.add_argument("--interaction", choices=("hold", "lock", "button", "resize"), default="hold")
+    parser.add_argument("--in-workout", action="store_true", help="use the held capture control inside a live Gym session")
     parser.add_argument("--espeak", default="espeak-ng")
     parser.add_argument("--espeak-data", type=Path)
     parser.add_argument("--ffmpeg", default="ffmpeg")
@@ -401,6 +442,8 @@ def main():
     parser.add_argument("--failure-image", type=Path, help="preserve the synthetic failure screenshot for diagnosis")
     parser.add_argument("--failure-logs", type=Path, help="save process logs after a failed synthetic run")
     args = parser.parse_args()
+    if args.in_workout and args.interaction != "hold":
+        parser.error("The live workout regression uses --interaction hold.")
     for field in ("binary", "whisper", "model"):
         setattr(args, field, getattr(args, field).resolve(strict=True))
     with tempfile.TemporaryDirectory(prefix="easy-voice-benchmark-") as target:

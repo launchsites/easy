@@ -1,0 +1,63 @@
+{
+  "status": "passed",
+  "run_at_utc": "2026-11-24T05:02:39.510622+00:00",
+  "app_revision": "68fecf80a3c9da48e2d81252322efe4c0e19bbc2",
+  "executable_sha256": "f707e6e3a581e5cc642288df8daf85f3890c1594e420a0937d4e3808bf89648e",
+  "aot_library_sha256": "028d356b855b5577cafc2475c22d4d32ea105f453b16e3ede267af6f621eff9b",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "host_memory_kib": 18440100,
+    "cgroup_cpu_max": "400000 100000",
+    "cgroup_memory_max": "17179869184",
+    "cgroup_memory_events_before": "low 0\nhigh 0\nmax 219776\noom 0\noom_kill 0\noom_group_kill 0"
+  },
+  "app_cpu": 4,
+  "viewport": [
+    390,
+    844
+  ],
+  "audio_modules": [
+    "module-native-protocol-unix",
+    "module-null-sink",
+    "module-remap-source"
+  ],
+  "only_virtual_audio": true,
+  "capture_interaction": "hold",
+  "active_workout_entry_point": true,
+  "workout_digest_retained": "6e5d62adcad363ddae66c5ced5e416a4afae8152cf2cc4489e76d236d0f118ad",
+  "app_ip_socket_guard": true,
+  "recorded_wav": {
+    "sha256": "a428ab17908f0aad76da388452a4a0c220cf568dd3581c7814d2a937db39bfc7",
+    "bytes": 287806,
+    "samples": 143881,
+    "duration_ms": 8992.56,
+    "rms": 1771.59
+  },
+  "synthetic_wav_sha256": "5f1fa0273d8ad00edd33e22d03ee9d66d75cfb14a5292781d7e23d64b0d90ac6",
+  "whisper_sha256": "83dc7b79be42a240583f83ee7f8ebfe7b5e06b527a8f217c18a1d4101d215dff",
+  "model_sha256": "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002",
+  "transcript": "For a personal note, get the \"Weekend\" shopping list.",
+  "transcription_ms": 10403.16,
+  "cancel_preserved_workspace": true,
+  "saved_before_transcription": true,
+  "review_required": true,
+  "active_focus_after_confirmation": "gym",
+  "note_category": "personal",
+  "workspace_revisions": [
+    1,
+    1,
+    2,
+    4
+  ],
+  "workspace_digest_after_restart": "1cb6f6ff0cef5f406ebff4fa1377b54adab6e9079c33cdea958c9654eef19350",
+  "workspace_quick_check": "ok",
+  "seconds": 143.25
+}

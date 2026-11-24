@@ -186,9 +186,13 @@ Whisper Base transcribed the held and locked recordings in 5.39 and 5.35 seconds
 
 The desktop resize regression starts the virtual recording at 390 pixels wide, supplies audio and grows the window to 960 pixels while the original pointer stays down. The previous `3c97419` release kept the recorder open through the 20-second stop check. At `eaa338e` the recorder stopped before pointer release, the workspace stayed at revision 1 and the app stored no audio from the interrupted hold. A second mobile hold in the same process saved and reviewed normally, and its audio and confirmed Personal note survived restart. [Resize regression evidence](benchmark-results/native-voice-capture-resized-epyc-20261124.json)
 
+The `68fecf8` release also recorded from the control inside an active Gym session. Sliding left discarded the first recording without changing the workspace. A second held recording saved before local transcription, displayed the Personal note for review and returned to the existing workout after confirmation. The workout digest, saved note and exact WAV bytes matched after a restart. The app ran on one logical CPU with IP sockets denied and used only the private virtual audio source. [Live workout voice evidence](benchmark-results/native-voice-capture-live-workout-epyc-20261124.json)
+
 With Xvfb, xdotool, ImageMagick, Tesseract and PulseAudio installed, run the native synthetic fixture against the frozen release bundle. The same runner accepts `--interaction lock` or `--interaction button`.
 
 Use an `eaa338e` bundle and `--interaction resize` for the desktop breakpoint regression.
+
+Use a `68fecf8` bundle and `--interaction hold --in-workout` for the active Gym session regression.
 
 ```sh
 cc -std=c17 -O2 -Wall -Wextra -Werror tool/benchmark/deny_ip_sockets.c -o /tmp/easy-deny-ip-sockets

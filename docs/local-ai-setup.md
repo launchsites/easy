@@ -40,6 +40,8 @@ Use these settings in Easy. If you chose a different unused port, enter it in **
 
 The **Local** route accepts literal `127.0.0.1` and `[::1]` HTTP addresses. Easy adds `/chat/completions` to the base URL and sends no API credential. Select **Save settings**. In capture review, enter a short synthetic item and choose **Review with AI**. **Confirm local requests** shows the fields being sent before dispatch. **Include optional context** separately allows fields such as custom category labels and eligible timing history.
 
+**Structured capture replies** requests JSON Schema from compatible local servers such as the pinned llama.cpp build. Existing Local settings leave this option off. It narrows capture replies to the offered fields, and Easy still asks you to review the result and confirm each suggested change. Turn the option off if your server rejects the format.
+
 Local requests use the model server's memory and CPU. **Suggest durations** enables estimate review. **Use spare capacity** opts into preparing estimates while the workspace is open and idle. **Use more foreground time** gives the local scheduler up to six estimate attempts per day. Easy cancels active local inference when the app backgrounds. Stop the separate server with `Ctrl+C` to reclaim its memory.
 
 The supplied Qwen checkpoint accepts text. Meal photo suggestions require a separate compatible vision model. The capture validator can discard model replies that omit evidence or use an unsupported shape. The saved capture remains available for manual review. [Capture and estimate results](local-inference-benchmark.md)
@@ -56,3 +58,5 @@ In two six-minute desktop runs, the same Easy release navigated the same 11,721-
 | With model work, 365.79 s | 46 | 40/40 | 10/10 | 454 MiB |
 
 Both runs retained the exact workspace revision and digest, passed SQLite integrity checks and had zero OOM kills. The containing 483.6-second synthetic model soak completed 66 schema-constrained requests with a 7.59-second median and 11.26-second p95. Twelve replies matched all expected fields. The model load was a separate authenticated local benchmark, and the Easy window ran its normal navigation during the overlap. [Mixed and control evidence](benchmark-results/native-local-contention-epyc-20261124.json)
+
+The production structured capture option was exercised with Qwen2.5 1.5B on two logical CPUs during other workspace activity. The server used a 3 GiB address-space limit, a 4,096-token context and a 160-token response limit. Three of 11 eligible requests returned a valid draft within Easy's 30-second deadline. Two matched the expected metadata and eight requests timed out. The three accepted responses had a 21.76-second median. Eight offline controls made zero provider requests. [Production capture evidence](benchmark-results/provider-metadata-qwen15-production-schema-20261124.json)
