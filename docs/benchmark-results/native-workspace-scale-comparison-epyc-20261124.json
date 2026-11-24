@@ -1,0 +1,1375 @@
+{
+  "order": [
+    "baseline",
+    "agenda",
+    "integrated",
+    "integrated",
+    "agenda",
+    "baseline"
+  ],
+  "shared_load": "Concurrent loopback provider inference and other workspace jobs. Software-rendered X11 and application pinned to one virtual CPU.",
+  "runs": [
+    {
+      "run": "run1-before",
+      "run_at_utc": "2026-11-24T03:38:44.078004+00:00",
+      "app_revision": "8670be647657925862931c2b3b58683656ca2ef7",
+      "executable_sha256": "17ea2f4d7ec1eac78813e45047a26ed157eb2bb37191eb3c493e282ad4ec5d59",
+      "aot_library_sha256": "9dd33c7c56043d49d244f8b9ead29cdf5a500f844f17a2eeccb595ca04d8d11f",
+      "host": {
+        "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+        "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+        "allowed_cpus": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "host_memory_kib": 18440100,
+        "cgroup_cpu_max": "400000 100000",
+        "cgroup_memory_max": "17179869184",
+        "cgroup_memory_events_before": "low 0\nhigh 0\nmax 81124\noom 0\noom_kill 0\noom_group_kill 0",
+        "cgroup_memory_events_after": "low 0\nhigh 0\nmax 81124\noom 0\noom_kill 0\noom_group_kill 0"
+      },
+      "cgroup_cpu_stat_before": "usage_usec 24303877256\nuser_usec 21933275104\nsystem_usec 2370602152\nnice_usec 237107\nnr_periods 142032\nnr_throttled 35105\nthrottled_usec 2844678716\nnr_bursts 0\nburst_usec 0",
+      "profiles": [
+        {
+          "profile": "standard",
+          "fixture_bytes": 3069796,
+          "fixture_counts": {
+            "events": 7320,
+            "tasks": 3100,
+            "notes": 1301
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 553.71,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 930.39,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 608.42,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                53,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 736.46,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                43,
+                54,
+                44
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6"
+            }
+          ],
+          "window_visible_ms": 1819.61,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 4554.95,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "inline",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 4583.16,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "inline",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 404040,
+            "VmRSS": 386100
+          },
+          "workspace_verified": true
+        },
+        {
+          "profile": "large",
+          "fixture_bytes": 21366671,
+          "fixture_counts": {
+            "events": 30000,
+            "tasks": 100000,
+            "notes": 3001
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 785.5,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 17973.87,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "6927560604e2f1e1a798480a37b03a1ac09e5ff229b45b0febd1376776db5696"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 19710.18,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "97d9490c2f5fd23dfde6cb456010e77197042420e36657a23499638464c0a25a"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 11986.46,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "cefea1b78023adbe1783727e74fd3d4431de3f50edd31eddb1b530d7b1e3d5c3"
+            }
+          ],
+          "window_visible_ms": 2198.36,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 21898.62,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "inline",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 22976.44,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "inline",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 1051784,
+            "VmRSS": 1013796
+          },
+          "workspace_verified": true
+        }
+      ],
+      "cgroup_cpu_stat_after": "usage_usec 24628566003\nuser_usec 22228289997\nsystem_usec 2400276005\nnice_usec 261107\nnr_periods 142857\nnr_throttled 35848\nthrottled_usec 2906019154\nnr_bursts 0\nburst_usec 0"
+    },
+    {
+      "run": "run2-agenda",
+      "run_at_utc": "2026-11-24T03:40:06.634593+00:00",
+      "app_revision": "3b0e345e3aa7ff7a389d895bf6e35e3b668386ad",
+      "executable_sha256": "415da690ed2ae2e2eff47e879f67f2ceaccd4e83077e78e0e2923bd2f58ec275",
+      "aot_library_sha256": "ebc5dc9247d1548b1af24119ff5e453aaa3ad410d11c3f227eb22ab6bd9f8b49",
+      "host": {
+        "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+        "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+        "allowed_cpus": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "host_memory_kib": 18440100,
+        "cgroup_cpu_max": "400000 100000",
+        "cgroup_memory_max": "17179869184",
+        "cgroup_memory_events_before": "low 0\nhigh 0\nmax 81124\noom 0\noom_kill 0\noom_group_kill 0",
+        "cgroup_memory_events_after": "low 0\nhigh 0\nmax 81124\noom 0\noom_kill 0\noom_group_kill 0"
+      },
+      "cgroup_cpu_stat_before": "usage_usec 24629184886\nuser_usec 22228886170\nsystem_usec 2400298715\nnice_usec 261107\nnr_periods 142858\nnr_throttled 35849\nthrottled_usec 2906110964\nnr_bursts 0\nburst_usec 0",
+      "profiles": [
+        {
+          "profile": "standard",
+          "fixture_bytes": 3069796,
+          "fixture_counts": {
+            "events": 7320,
+            "tasks": 3100,
+            "notes": 1301
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 658.93,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 1194.0,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 1152.41,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 1361.17,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                53,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6"
+            }
+          ],
+          "window_visible_ms": 2186.48,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 5751.0,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 5789.78,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 394168,
+            "VmRSS": 382068
+          },
+          "workspace_verified": true
+        },
+        {
+          "profile": "large",
+          "fixture_bytes": 21366671,
+          "fixture_counts": {
+            "events": 30000,
+            "tasks": 100000,
+            "notes": 3001
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 659.85,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 2205.91,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "6927560604e2f1e1a798480a37b03a1ac09e5ff229b45b0febd1376776db5696"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 2135.41,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "97d9490c2f5fd23dfde6cb456010e77197042420e36657a23499638464c0a25a"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 1936.77,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "cefea1b78023adbe1783727e74fd3d4431de3f50edd31eddb1b530d7b1e3d5c3"
+            }
+          ],
+          "window_visible_ms": 2289.77,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 17775.56,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 18353.47,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 587468,
+            "VmRSS": 547948
+          },
+          "workspace_verified": true
+        }
+      ],
+      "cgroup_cpu_stat_after": "usage_usec 24779879739\nuser_usec 22368399574\nsystem_usec 2411480165\nnice_usec 281071\nnr_periods 143235\nnr_throttled 36226\nthrottled_usec 2941979489\nnr_bursts 0\nburst_usec 0"
+    },
+    {
+      "run": "run3-integrated",
+      "run_at_utc": "2026-11-24T03:40:44.567526+00:00",
+      "app_revision": "819ab9c9114664794a2b35ee55256451e9c9c353",
+      "executable_sha256": "602e10a331f6f55c457347ab9244759457613853f5b64890389216f5f5b68b3d",
+      "aot_library_sha256": "0d86395f4230e1c709b74537fee2459b917b0dcd5483ccc46754cb63a848e1a2",
+      "host": {
+        "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+        "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+        "allowed_cpus": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "host_memory_kib": 18440100,
+        "cgroup_cpu_max": "400000 100000",
+        "cgroup_memory_max": "17179869184",
+        "cgroup_memory_events_before": "low 0\nhigh 0\nmax 81124\noom 0\noom_kill 0\noom_group_kill 0",
+        "cgroup_memory_events_after": "low 0\nhigh 0\nmax 81124\noom 0\noom_kill 0\noom_group_kill 0"
+      },
+      "cgroup_cpu_stat_before": "usage_usec 24780994585\nuser_usec 22369363771\nsystem_usec 2411630814\nnice_usec 281071\nnr_periods 143238\nnr_throttled 36229\nthrottled_usec 2942243128\nnr_bursts 0\nburst_usec 0",
+      "profiles": [
+        {
+          "profile": "standard",
+          "fixture_bytes": 3069796,
+          "fixture_counts": {
+            "events": 7320,
+            "tasks": 3100,
+            "notes": 1301
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 841.07,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 1451.43,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 795.95,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 1297.8,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6"
+            }
+          ],
+          "window_visible_ms": 2638.35,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 6544.66,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 6601.07,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 402880,
+            "VmRSS": 385788
+          },
+          "workspace_verified": true
+        },
+        {
+          "profile": "large",
+          "fixture_bytes": 21366671,
+          "fixture_counts": {
+            "events": 30000,
+            "tasks": 100000,
+            "notes": 3001
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 1147.9,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 2318.11,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "6927560604e2f1e1a798480a37b03a1ac09e5ff229b45b0febd1376776db5696"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 1531.99,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "97d9490c2f5fd23dfde6cb456010e77197042420e36657a23499638464c0a25a"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 1755.68,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                53,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "cefea1b78023adbe1783727e74fd3d4431de3f50edd31eddb1b530d7b1e3d5c3"
+            }
+          ],
+          "window_visible_ms": 3090.0,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 15365.9,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 15822.31,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 609236,
+            "VmRSS": 543136
+          },
+          "workspace_verified": true
+        }
+      ],
+      "cgroup_cpu_stat_after": "usage_usec 24927025880\nuser_usec 22500899234\nsystem_usec 2426126645\nnice_usec 297011\nnr_periods 143603\nnr_throttled 36594\nthrottled_usec 2977465017\nnr_bursts 0\nburst_usec 0"
+    },
+    {
+      "run": "run4-integrated",
+      "run_at_utc": "2026-11-24T03:41:21.341247+00:00",
+      "app_revision": "819ab9c9114664794a2b35ee55256451e9c9c353",
+      "executable_sha256": "602e10a331f6f55c457347ab9244759457613853f5b64890389216f5f5b68b3d",
+      "aot_library_sha256": "0d86395f4230e1c709b74537fee2459b917b0dcd5483ccc46754cb63a848e1a2",
+      "host": {
+        "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+        "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+        "allowed_cpus": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "host_memory_kib": 18440100,
+        "cgroup_cpu_max": "400000 100000",
+        "cgroup_memory_max": "17179869184",
+        "cgroup_memory_events_before": "low 0\nhigh 0\nmax 81124\noom 0\noom_kill 0\noom_group_kill 0",
+        "cgroup_memory_events_after": "low 0\nhigh 0\nmax 81124\noom 0\noom_kill 0\noom_group_kill 0"
+      },
+      "cgroup_cpu_stat_before": "usage_usec 24928003818\nuser_usec 22501815302\nsystem_usec 2426188515\nnice_usec 297011\nnr_periods 143605\nnr_throttled 36596\nthrottled_usec 2977664560\nnr_bursts 0\nburst_usec 0",
+      "profiles": [
+        {
+          "profile": "standard",
+          "fixture_bytes": 3069796,
+          "fixture_counts": {
+            "events": 7320,
+            "tasks": 3100,
+            "notes": 1301
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 808.04,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 1745.0,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                44,
+                56,
+                46
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 1006.39,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                43,
+                54,
+                44
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 1157.79,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6"
+            }
+          ],
+          "window_visible_ms": 2167.01,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 6301.62,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 6354.43,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 391748,
+            "VmRSS": 382056
+          },
+          "workspace_verified": true
+        },
+        {
+          "profile": "large",
+          "fixture_bytes": 21366671,
+          "fixture_counts": {
+            "events": 30000,
+            "tasks": 100000,
+            "notes": 3001
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 1034.6,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 2483.37,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "6927560604e2f1e1a798480a37b03a1ac09e5ff229b45b0febd1376776db5696"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 1931.07,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "97d9490c2f5fd23dfde6cb456010e77197042420e36657a23499638464c0a25a"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 2081.76,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "cefea1b78023adbe1783727e74fd3d4431de3f50edd31eddb1b530d7b1e3d5c3"
+            }
+          ],
+          "window_visible_ms": 3148.53,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 27090.67,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 28001.63,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 594068,
+            "VmRSS": 560860
+          },
+          "workspace_verified": true
+        }
+      ],
+      "cgroup_cpu_stat_after": "usage_usec 25122461062\nuser_usec 22673588381\nsystem_usec 2448872681\nnice_usec 308911\nnr_periods 144091\nnr_throttled 37082\nthrottled_usec 3025004674\nnr_bursts 0\nburst_usec 0"
+    },
+    {
+      "run": "run5-agenda",
+      "run_at_utc": "2026-11-24T03:42:10.356356+00:00",
+      "app_revision": "3b0e345e3aa7ff7a389d895bf6e35e3b668386ad",
+      "executable_sha256": "415da690ed2ae2e2eff47e879f67f2ceaccd4e83077e78e0e2923bd2f58ec275",
+      "aot_library_sha256": "ebc5dc9247d1548b1af24119ff5e453aaa3ad410d11c3f227eb22ab6bd9f8b49",
+      "host": {
+        "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+        "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+        "allowed_cpus": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "host_memory_kib": 18440100,
+        "cgroup_cpu_max": "400000 100000",
+        "cgroup_memory_max": "17179869184",
+        "cgroup_memory_events_before": "low 0\nhigh 0\nmax 81124\noom 0\noom_kill 0\noom_group_kill 0",
+        "cgroup_memory_events_after": "low 0\nhigh 0\nmax 81124\noom 0\noom_kill 0\noom_group_kill 0"
+      },
+      "cgroup_cpu_stat_before": "usage_usec 25124242992\nuser_usec 22675200052\nsystem_usec 2449042940\nnice_usec 308911\nnr_periods 144096\nnr_throttled 37087\nthrottled_usec 3025475190\nnr_bursts 0\nburst_usec 0",
+      "profiles": [
+        {
+          "profile": "standard",
+          "fixture_bytes": 3069796,
+          "fixture_counts": {
+            "events": 7320,
+            "tasks": 3100,
+            "notes": 1301
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 811.03,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 2622.58,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 2149.32,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 2691.52,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6"
+            }
+          ],
+          "window_visible_ms": 3029.35,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 9819.87,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 9915.81,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 391784,
+            "VmRSS": 378736
+          },
+          "workspace_verified": true
+        },
+        {
+          "profile": "large",
+          "fixture_bytes": 21366671,
+          "fixture_counts": {
+            "events": 30000,
+            "tasks": 100000,
+            "notes": 3001
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 989.68,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 3200.0,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "6927560604e2f1e1a798480a37b03a1ac09e5ff229b45b0febd1376776db5696"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 1820.62,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "97d9490c2f5fd23dfde6cb456010e77197042420e36657a23499638464c0a25a"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 2103.33,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "cefea1b78023adbe1783727e74fd3d4431de3f50edd31eddb1b530d7b1e3d5c3"
+            }
+          ],
+          "window_visible_ms": 4944.89,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 23697.96,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 24274.06,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "chunked",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 605496,
+            "VmRSS": 540688
+          },
+          "workspace_verified": true
+        }
+      ],
+      "cgroup_cpu_stat_after": "usage_usec 25338859492\nuser_usec 22870030954\nsystem_usec 2468828537\nnice_usec 328565\nnr_periods 144632\nnr_throttled 37623\nthrottled_usec 3077711456\nnr_bursts 0\nburst_usec 0"
+    },
+    {
+      "run": "run6-before",
+      "run_at_utc": "2026-11-24T03:43:04.440881+00:00",
+      "app_revision": "8670be647657925862931c2b3b58683656ca2ef7",
+      "executable_sha256": "17ea2f4d7ec1eac78813e45047a26ed157eb2bb37191eb3c493e282ad4ec5d59",
+      "aot_library_sha256": "9dd33c7c56043d49d244f8b9ead29cdf5a500f844f17a2eeccb595ca04d8d11f",
+      "host": {
+        "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+        "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+        "allowed_cpus": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "host_memory_kib": 18440100,
+        "cgroup_cpu_max": "400000 100000",
+        "cgroup_memory_max": "17179869184",
+        "cgroup_memory_events_before": "low 0\nhigh 0\nmax 81124\noom 0\noom_kill 0\noom_group_kill 0",
+        "cgroup_memory_events_after": "low 0\nhigh 0\nmax 94927\noom 0\noom_kill 0\noom_group_kill 0"
+      },
+      "cgroup_cpu_stat_before": "usage_usec 25340565321\nuser_usec 22871679358\nsystem_usec 2468885963\nnice_usec 328565\nnr_periods 144637\nnr_throttled 37628\nthrottled_usec 3078210251\nnr_bursts 0\nburst_usec 0",
+      "profiles": [
+        {
+          "profile": "standard",
+          "fixture_bytes": 3069796,
+          "fixture_counts": {
+            "events": 7320,
+            "tasks": 3100,
+            "notes": 1301
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 1449.71,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 1593.72,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 3115.22,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 2345.63,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6"
+            }
+          ],
+          "window_visible_ms": 3934.01,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 11313.6,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "inline",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 11651.39,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+            "storage_format": "inline",
+            "counts": {
+              "events": 7320,
+              "tasks": 3100,
+              "notes": 1301
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 409248,
+            "VmRSS": 388024
+          },
+          "workspace_verified": true
+        },
+        {
+          "profile": "large",
+          "fixture_bytes": 21366671,
+          "fixture_counts": {
+            "events": 30000,
+            "tasks": 100000,
+            "notes": 3001
+          },
+          "cpu": 4,
+          "routes": [
+            {
+              "name": "Today",
+              "check_ms": 1355.99,
+              "selected": true,
+              "sidebar_pixel_rgb": [
+                42,
+                52,
+                43
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+            },
+            {
+              "name": "Calendar",
+              "check_ms": 32239.07,
+              "selected": false,
+              "sidebar_pixel_rgb": [
+                23,
+                28,
+                24
+              ],
+              "heading_visible": true,
+              "screenshot_sha256": "6927560604e2f1e1a798480a37b03a1ac09e5ff229b45b0febd1376776db5696"
+            },
+            {
+              "name": "Tasks",
+              "check_ms": 40667.63,
+              "selected": false,
+              "sidebar_pixel_rgb": [
+                23,
+                28,
+                24
+              ],
+              "heading_visible": false,
+              "screenshot_sha256": "6927560604e2f1e1a798480a37b03a1ac09e5ff229b45b0febd1376776db5696"
+            },
+            {
+              "name": "Notes",
+              "check_ms": 40911.71,
+              "selected": false,
+              "sidebar_pixel_rgb": [
+                23,
+                28,
+                24
+              ],
+              "heading_visible": false,
+              "screenshot_sha256": "97d9490c2f5fd23dfde6cb456010e77197042420e36657a23499638464c0a25a"
+            }
+          ],
+          "window_visible_ms": 6405.4,
+          "today_initial": {
+            "selected": true,
+            "sidebar_pixel_rgb": [
+              42,
+              52,
+              43
+            ],
+            "heading_visible": true,
+            "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+          },
+          "today_check_ms_from_launch": 41445.29,
+          "workspace_before": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "inline",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "workspace_verified_ms_from_launch": 42897.02,
+          "workspace_after": {
+            "revision": 1,
+            "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+            "storage_format": "inline",
+            "counts": {
+              "events": 30000,
+              "tasks": 100000,
+              "notes": 3001
+            },
+            "quick_check": "ok"
+          },
+          "process_memory_kib": {
+            "VmHWM": 1056008,
+            "VmRSS": 1032844
+          },
+          "workspace_verified": true
+        }
+      ],
+      "cgroup_cpu_stat_after": "usage_usec 26068700841\nuser_usec 23529481682\nsystem_usec 2539219159\nnice_usec 356488\nnr_periods 146457\nnr_throttled 39448\nthrottled_usec 3256822581\nnr_bursts 0\nburst_usec 0"
+    }
+  ]
+}

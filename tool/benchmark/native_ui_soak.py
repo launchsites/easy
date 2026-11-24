@@ -13,6 +13,7 @@ import sqlite3
 import subprocess
 import tempfile
 import time
+import zlib
 
 from local_inference import host_details, host_text, sha256
 from native_ui_trace import process_rss, send_input
@@ -27,14 +28,17 @@ PAGES = (
 )
 
 
-def visible_window(xdotool):
+def visible_window(xdotool, *, env=None):
     windows = subprocess.check_output(
-        [xdotool, "search", "--onlyvisible", "--name", "^Easy$"], text=True, timeout=15
+        [xdotool, "search", "--onlyvisible", "--name", "^Easy$"],
+        env=env, text=True, timeout=15,
     ).splitlines()
     if len(windows) != 1:
         raise RuntimeError("Use an isolated display with one visible Easy window.")
     window = windows[0]
-    pid = int(subprocess.check_output([xdotool, "getwindowpid", window], text=True, timeout=15))
+    pid = int(subprocess.check_output(
+        [xdotool, "getwindowpid", window], env=env, text=True, timeout=15,
+    ))
     return window, pid
 
 
@@ -63,17 +67,19 @@ def pixel_at(window, x, y, x11_capture):
     return list(pixel) if len(pixel) == 3 else None
 
 
-def wait_for_resize(window, wide, x11_capture, timeout=8):
+def wait_for_resize(window, wide, x11_capture, timeout=25):
     deadline = time.monotonic() + timeout
+    pixel = None
     while time.monotonic() < deadline:
-        pixel = pixel_at(window, 15, 82, x11_capture)
+        pixel = pixel_at(window, 191, 101, x11_capture)
         if pixel is not None and (max(pixel) < 100 if wide else min(pixel) > 160):
             return
         time.sleep(0.15)
-    raise RuntimeError("The expected layout did not render after resize.")
+    expected = "desktop" if wide else "mobile"
+    raise RuntimeError(f"The {expected} layout did not render after resize. Last probe RGB was {pixel}.")
 
 
-def check_desktop_route(window, scratch, y, heading, args, timeout=5):
+def check_desktop_route(window, scratch, y, heading, args, timeout=5, heading_timeout=0):
     # Sample the selected surface away from the icon, title and pointer.
     deadline = time.monotonic() + timeout
     while True:
@@ -84,9 +90,7 @@ def check_desktop_route(window, scratch, y, heading, args, timeout=5):
         if selected or time.monotonic() >= deadline:
             break
         time.sleep(0.2)
-    visible = check_heading(
-        window, scratch, heading, "830x210+240+42", args.x11_capture, args.tesseract,
-    )
+    visible = check_visible_page(window, scratch, heading, args, timeout=heading_timeout)
     return {
         "selected": selected,
         "sidebar_pixel_rgb": pixel,
@@ -95,8 +99,8 @@ def check_desktop_route(window, scratch, y, heading, args, timeout=5):
     }
 
 
-def check_visible_page(window, scratch, heading, args, crop="830x210+240+42"):
-    deadline = time.monotonic() + 5
+def check_visible_page(window, scratch, heading, args, crop="830x210+240+42", timeout=5):
+    deadline = time.monotonic() + timeout
     while True:
         checked = check_heading(
             window, scratch, heading, crop, args.x11_capture, args.tesseract,
@@ -106,24 +110,66 @@ def check_visible_page(window, scratch, heading, args, crop="830x210+240+42"):
         time.sleep(0.2)
 
 
-def workspace_state(path):
+def workspace_state(path, *, include_document=False):
     location = f"{path.resolve().as_uri()}?mode=ro"
     with closing(sqlite3.connect(location, uri=True, timeout=3)) as db:
-        record = db.execute("""
-            SELECT revisions.revision, revisions.workspace, documents.body
+        fields = {column[1] for column in db.execute("PRAGMA table_info(documents)")}
+        storage = "documents.chunked" if "chunked" in fields else "0"
+        record = db.execute(f"""
+            SELECT revisions.revision, revisions.workspace, documents.body, {storage}
             FROM revisions JOIN documents ON documents.digest = revisions.workspace
             ORDER BY revisions.revision DESC LIMIT 1
         """).fetchone()
         if record is None:
             raise RuntimeError("The synthetic workspace has no stored revision.")
-        version, digest, raw = record
+        version, digest, body, chunked = record
+        if chunked not in (0, 1) or (chunked == 1 and body != "null"):
+            raise RuntimeError("Invalid workspace document storage format.")
+        raw = chunked_document(db, digest) if chunked == 1 else body.encode()
+        if hashlib.sha256(raw).hexdigest() != digest:
+            raise RuntimeError("The workspace document digest does not match the stored revision.")
         workspace = json.loads(raw)
-        return {
+        state = {
             "revision": version,
             "digest": digest,
+            "storage_format": "chunked" if chunked == 1 else "inline",
             "counts": {name: len(workspace[name]) for name in ("events", "tasks", "notes")},
             "quick_check": db.execute("PRAGMA quick_check(1)").fetchone()[0],
         }
+        if include_document:
+            state["document"] = workspace
+        return state
+
+
+def chunked_document(db, digest):
+    output = bytearray()
+    records = db.execute("""
+        SELECT refs.ordinal, refs.chunk, parts.raw_bytes, parts.compressed
+        FROM document_chunk_refs AS refs
+        LEFT JOIN document_chunks AS parts ON parts.digest = refs.chunk
+        WHERE refs.document = ?
+        ORDER BY refs.ordinal
+    """, (digest,))
+    for index, (ordinal, chunk_digest, size, compressed) in enumerate(records):
+        if ordinal != index or not isinstance(size, int) or not 1 <= size <= 65536:
+            raise RuntimeError("Invalid workspace chunk metadata.")
+        if not isinstance(compressed, bytes) or not 1 <= len(compressed) <= 65664:
+            raise RuntimeError("Invalid compressed workspace chunk.")
+        decoder = zlib.decompressobj()
+        try:
+            raw = decoder.decompress(compressed, size + 1)
+        except zlib.error as error:
+            raise RuntimeError("The workspace chunk cannot be decompressed.") from error
+        if len(raw) != size or not decoder.eof or decoder.unused_data:
+            raise RuntimeError("Invalid workspace chunk contents.")
+        if hashlib.sha256(raw).hexdigest() != chunk_digest:
+            raise RuntimeError("The workspace chunk digest does not match its reference.")
+        if len(output) + size > 144 * 1024 * 1024:
+            raise RuntimeError("The synthetic workspace exceeds the bounded document size.")
+        output.extend(raw)
+    if not output:
+        raise RuntimeError("The chunked workspace has no data.")
+    return output
 
 
 def wait_for_workspace(path, timeout=15):
@@ -244,9 +290,10 @@ def main():
                         "desktop_routes": checks,
                         "mobile_orbit_calendar": orbit,
                     })
-                    print(f"cycle {index + 1} at {elapsed:.0f}s", flush=True)
                     pending = args.output.with_suffix(".partial.json")
-                    pending.write_text(json.dumps(evidence, indent=2) + "\n")
+                    staged = pending.with_suffix(".tmp")
+                    staged.write_text(json.dumps(evidence, indent=2) + "\n")
+                    staged.replace(pending)
         evidence["status"] = "complete"
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
         evidence.update(status="interrupted", error=str(error))

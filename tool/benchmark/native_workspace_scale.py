@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 import time
 
-from local_inference import host_details, sha256
+from local_inference import host_details, host_text, sha256
 from native_ui_fixture import workspace
 from native_ui_soak import PAGES, check_desktop_route, visible_window, wait_for_workspace, workspace_state
 from native_ui_trace import process_rss, send_input
@@ -80,7 +80,7 @@ def run_variant(args, core, stage, label, events, tasks, notes):
                         db = profile / "easy" / "workspace.sqlite3"
                         initial_page = check_desktop_route(
                             window, stage, PAGES[0][1], PAGES[0][2], args,
-                            timeout=args.readiness_timeout,
+                            timeout=args.readiness_timeout, heading_timeout=10,
                         )
                         report["today_initial"] = initial_page
                         report["today_check_ms_from_launch"] = round((time.monotonic() - launched) * 1000, 2)
@@ -90,7 +90,9 @@ def run_variant(args, core, stage, label, events, tasks, notes):
                             started = time.monotonic()
                             send_input(args.xdotool, "mousemove", "--window", window, 76, y, "click", 1)
                             send_input(args.xdotool, "mousemove", "--window", window, 1256, 49)
-                            checked = check_desktop_route(window, stage, y, label, args, timeout=20)
+                            checked = check_desktop_route(
+                                window, stage, y, label, args, timeout=30, heading_timeout=10,
+                            )
                             report["routes"].append({
                                 "name": name,
                                 "check_ms": round((time.monotonic() - started) * 1000, 2),
@@ -129,6 +131,8 @@ def main():
     parser.add_argument("--app-revision", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--today", type=date.fromisoformat, default=date.today())
+    parser.add_argument("--profile", action="append", choices=[row[0] for row in PROFILES])
+    parser.add_argument("--cpu", type=int, help="affinity for the Easy process")
     parser.add_argument("--xvfb", default="Xvfb")
     parser.add_argument("--xdotool", default="xdotool")
     parser.add_argument("--x11-capture", default="import")
@@ -139,28 +143,40 @@ def main():
     if args.readiness_timeout < 1:
         parser.error("--readiness-timeout must be at least one second.")
     cpus = sorted(os.sched_getaffinity(0))
+    if args.cpu is not None and args.cpu not in cpus:
+        parser.error("--cpu must select a permitted CPU.")
+    core = cpus[0] if args.cpu is None else args.cpu
     evidence = {
         "run_at_utc": datetime.now(timezone.utc).isoformat(),
         "app_revision": args.app_revision,
         "executable_sha256": sha256(args.binary),
         "aot_library_sha256": sha256(args.binary.parent / "lib" / "libapp.so"),
         "host": host_details(cpus),
+        "cgroup_cpu_stat_before": host_text("/sys/fs/cgroup/cpu.stat"),
         "profiles": [],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="easy-native-scale-") as target:
         for name, events, tasks, notes in PROFILES:
+            if args.profile and name not in args.profile:
+                continue
             try:
-                report = run_variant(args, cpus[0], Path(target) / name, name, events, tasks, notes)
+                report = run_variant(args, core, Path(target) / name, name, events, tasks, notes)
             except (OSError, RuntimeError, subprocess.SubprocessError, sqlite3.Error) as error:
                 report = {"profile": name, "error": str(error)}
             evidence["profiles"].append(report)
-            print(report["profile"], report.get("today_check_ms_from_launch"), report.get("error"))
+            print(report["profile"], report.get("today_check_ms_from_launch"), report.get("error"), flush=True)
+    evidence["cgroup_cpu_stat_after"] = host_text("/sys/fs/cgroup/cpu.stat")
+    evidence["host"]["cgroup_memory_events_after"] = host_text("/sys/fs/cgroup/memory.events")
     args.output.write_text(json.dumps(evidence, indent=2) + "\n")
+
+    def visible(check):
+        return check.get("selected") and check.get("heading_visible")
+
     return int(any(
         not row.get("workspace_verified")
-        or not row.get("today_initial", {}).get("selected")
-        or any(not route["selected"] for route in row.get("routes", []))
+        or not visible(row.get("today_initial", {}))
+        or any(not visible(route) for route in row.get("routes", []))
         for row in evidence["profiles"]
     ))
 

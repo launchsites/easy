@@ -139,3 +139,18 @@ dbus-run-session -- python3 tool/benchmark/native_workspace_scale.py \
   --app-revision 8670be647657925862931c2b3b58683656ca2ef7 \
   --today 2026-11-24 --output "$easy_ui_dir/workspace-scale.json"
 ```
+
+## Large workspace after lazy agenda rendering
+
+Six fresh sessions compared the baseline, lazy agenda release and integrated lazy-list release in reversed order. Each profile used the same seed data, one virtual CPU and software-rendered X11. Other workspace processes and loopback model inference shared the CPU quota. The app reported the same workspace digest and record counts across all six runs, including both storage representations. [Full ordered comparison](benchmark-results/native-workspace-scale-comparison-epyc-20261124.json)
+
+| Release and 133,001-record fixture | Verified Today from launch | Calendar click | Tasks click | Notes click | Peak RSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Baseline `8670be6`, first run | 21.90 s | 17.97 s | 19.71 s | 11.99 s | 1,027 MiB |
+| Baseline `8670be6`, last run | 41.45 s | Probe missed | Probe missed | Probe missed | 1,031 MiB |
+| Lazy agenda `3b0e345`, both runs | 17.78–23.70 s | 2.21–3.20 s | 1.82–2.14 s | 1.94–2.10 s | 574–591 MiB |
+| Integrated `819ab9c`, both runs | 15.37–27.09 s | 2.32–2.48 s | 1.53–1.93 s | 1.76–2.08 s | 580–595 MiB |
+
+The four updated large profiles passed all 16 route and heading checks. During the last baseline run, Calendar, Tasks and Notes missed the driver’s selected-route deadline. The database still passed its integrity check. The updated profiles consistently navigated faster and used less peak memory in this comparison. Startup ranges overlapped the baseline’s first run, and these build-to-build measurements include migration and other changes alongside UI rendering.
+
+The smaller 11,721-record profile passed all 24 route checks. Its time to verified Today ranged from 4.55 to 11.31 seconds across the six sessions. Variable shared load had a larger visible effect on startup than the selected revision in this profile.
