@@ -1,10 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../categories/category_palette.dart';
-
 import '../ui_theme.dart';
 import 'capture_archive.dart';
 import 'capture_interpreter.dart';
+import 'task_category_hint.dart';
 
 class CaptureReviewRequest {
   const CaptureReviewRequest(this.text);
@@ -521,6 +521,8 @@ class _ProposalTile extends StatelessWidget {
                 WorkspaceCategoryPalette.labelFor(context, category),
               if (featureDisabled) 'Feature turned off',
               if (proposal.requiresSelection) 'AI suggestion',
+              if (draft is CaptureTaskDraft)
+                ?taskSchedulingHoldHint(draft.title)?.message,
               ?detail,
               if (proposal.missingRequired.isNotEmpty)
                 'Needs ${proposal.missingRequired.join(', ')}',

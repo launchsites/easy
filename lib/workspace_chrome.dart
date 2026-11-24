@@ -539,6 +539,8 @@ class _RecordDetails extends StatelessWidget {
       ],
       TaskItem() => [
         (Icons.check_box_outlined, item.done ? 'Completed' : 'Open'),
+        if (item.schedulingHold case final hold? when !item.done)
+          (Icons.schedule_outlined, hold.message),
         if (repeatingTask) (Icons.repeat_rounded, 'Repeating task'),
         if (item.date != null) (Icons.calendar_today_outlined, day(item.date!)),
         (

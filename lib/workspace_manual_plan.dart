@@ -19,6 +19,7 @@ extension _WorkspaceManualPlan on _WorkspaceState {
       _allows(EasyFeature.planning) &&
       record is TaskItem &&
       !record.done &&
+      record.schedulingHold == null &&
       !_taskFeed.ids.contains(record.id);
 
   TaskItem? _scheduleTask(String id, DateTime effectiveDay) =>

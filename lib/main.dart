@@ -41,6 +41,7 @@ import 'capture/capture_interpreter.dart';
 import 'capture/capture_review_sheet.dart';
 import 'capture/hold_capture_button.dart';
 import 'capture/local_transcriber.dart';
+import 'capture/task_category_hint.dart';
 import 'capture/voice_capture_sheet.dart';
 import 'capture/voice_playback_dialog.dart';
 import 'capture/voice_transcription_settings.dart';
@@ -1078,6 +1079,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   AiEnrichmentCandidate? _estimateCandidate(TaskItem task) {
     if (task.done ||
         _taskFeed.ids.contains(task.id) ||
+        task.schedulingHold != null ||
         task.estimatedMinutes != null ||
         task.title.length > 300) {
       return null;
@@ -3406,6 +3408,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                   draft.category ?? _reviewDefaultCategory(proposal) ?? '',
               date:
                   draft.dueDate ?? _captureDefaults.dateFor(source.capturedAt),
+              schedulingHold: taskSchedulingHoldHint(draft.title),
             ),
           );
         case CaptureEventDraft():

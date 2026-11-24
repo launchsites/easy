@@ -158,6 +158,7 @@ class _QuickCaptureState extends State<QuickCapture> {
             title: task.title,
             category: _category,
             date: task.dueDate ?? widget.initialTaskDate,
+            schedulingHold: taskSchedulingHoldHint(task.title),
             done: false,
           ),
         );
