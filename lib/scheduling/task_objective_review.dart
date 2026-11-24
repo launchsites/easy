@@ -1,6 +1,7 @@
 import '../calendar_page.dart';
 import '../task_model.dart';
 import 'planner.dart' show TimeSpan;
+import 'task_objective_availability.dart';
 
 enum ObjectiveReadiness {
   ready,
@@ -96,9 +97,13 @@ TaskObjectiveReview reviewTaskObjectives({
   required DateTime horizonEnd,
   Set<String>? focusCategories,
   TimeSpan? workWindow,
+  TaskObjectiveAvailability? verifiedAvailability,
 }) {
   if (!horizonEnd.isAfter(now)) {
     throw ArgumentError.value(horizonEnd, 'horizonEnd', 'Must follow now.');
+  }
+  if (workWindow != null && verifiedAvailability != null) {
+    throw ArgumentError('Provide one source of available time.');
   }
 
   final indexed = <String, TaskItem>{};
@@ -141,7 +146,11 @@ TaskObjectiveReview reviewTaskObjectives({
           workWindow.end.isAfter(now)
       ? workWindow
       : null;
-  var availableTime = knownWindow?.end.difference(now);
+  final timedCategories =
+      verifiedAvailability?.reviewedAt.isAtSameMomentAs(now) == true
+      ? verifiedAvailability!.byCategory
+      : null;
+  Duration? untilCommitment;
   var activeCommitments = 0;
   final reservationIds = <String>{};
   final duplicateReservations = <String>{};
@@ -150,10 +159,12 @@ TaskObjectiveReview reviewTaskObjectives({
     if (!event.end.isAfter(event.start) || !event.end.isAfter(now)) continue;
     if (!event.start.isAfter(now)) {
       activeCommitments++;
-      availableTime = Duration.zero;
-    } else if (availableTime != null) {
+      untilCommitment = Duration.zero;
+    } else {
       final untilEvent = event.start.difference(now);
-      if (untilEvent < availableTime) availableTime = untilEvent;
+      if (untilCommitment == null || untilEvent < untilCommitment) {
+        untilCommitment = untilEvent;
+      }
     }
   }
   for (final event in events) {
@@ -178,8 +189,15 @@ TaskObjectiveReview reviewTaskObjectives({
   final ready = <TaskObjective>[];
   final needsAttention = <TaskObjective>[];
   final later = <TaskObjective>[];
+  final timesInReview = <Duration?>{};
   for (final node in open.values) {
-    if (!(focusCategories?.contains(node.task.category) ?? true)) continue;
+    final category = node.task.category;
+    if (!(focusCategories?.contains(category) ?? true)) continue;
+    final availableTime = _confirmedGap(
+      timedCategories?[category] ?? knownWindow?.end.difference(now),
+      untilCommitment,
+    );
+    timesInReview.add(availableTime);
     final objective = node.objective(
       now,
       _reservations(reservationSpans[node.task.id], now),
@@ -224,11 +242,17 @@ TaskObjectiveReview reviewTaskObjectives({
 
   return TaskObjectiveReview._(
     reviewedAt: now,
-    availableTime: availableTime,
+    availableTime: timesInReview.length == 1 ? timesInReview.single : null,
     ready: ready..sort(rank),
     needsAttention: needsAttention..sort(rank),
     later: later..sort(rank),
   );
+}
+
+Duration? _confirmedGap(Duration? approved, Duration? untilCommitment) {
+  if (untilCommitment == Duration.zero) return Duration.zero;
+  if (approved == null || untilCommitment == null) return approved;
+  return untilCommitment < approved ? untilCommitment : approved;
 }
 
 final class _ObjectiveNode {

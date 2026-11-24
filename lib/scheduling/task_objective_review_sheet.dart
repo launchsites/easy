@@ -13,7 +13,7 @@ Future<String?> showTaskObjectives(
   title: 'What can I work on?',
   subtitle: switch (review.availableTime) {
     Duration(:final inMicroseconds) when inMicroseconds == 0 =>
-      'Calendar is busy now',
+      'No unbooked time now',
     final gap? => '${_minutes(gap)} available',
     null => '',
   },
