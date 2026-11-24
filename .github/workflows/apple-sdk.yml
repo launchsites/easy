@@ -7,6 +7,10 @@ on:
         description: Launch Easy on an iPhone simulator and capture first-run setup
         type: boolean
         default: false
+      macos_app_smoke:
+        description: Launch the macOS release and verify its private first-run workspace
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -57,6 +61,13 @@ jobs:
           FLUTTER_XCODE_CODE_SIGNING_ALLOWED: 'NO'
           FLUTTER_XCODE_CODE_SIGNING_REQUIRED: 'NO'
         run: flutter build macos --release --no-pub
+
+      - name: Verify macOS release first launch
+        if: ${{ inputs.macos_app_smoke }}
+        timeout-minutes: 5
+        run: |
+          python3 tool/benchmark/macos_release_smoke.py \
+            build/macos/Build/Products/Release/easy.app macos/Runner/Release.entitlements
 
       - name: Verify iPhone simulator first launch
         if: ${{ inputs.ios_simulator_smoke }}
