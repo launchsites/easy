@@ -22,6 +22,7 @@ class MobileHome extends StatelessWidget {
     this.focusedContent,
     this.onPlanDay,
     this.onWhatFitsNow,
+    this.fitsNowTaskId,
     this.modeName,
     this.notesAlreadyFiltered = false,
     this.showTasks,
@@ -39,6 +40,10 @@ class MobileHome extends StatelessWidget {
   final Widget? focusedContent;
   final VoidCallback? onPlanDay;
   final VoidCallback? onWhatFitsNow;
+
+  /// A verified suggestion from the caller's current task scope.
+  final String? fitsNowTaskId;
+
   final bool notesAlreadyFiltered;
   final bool? showTasks;
   final bool? showSchedule;
@@ -76,6 +81,10 @@ class MobileHome extends StatelessWidget {
           (mode != null && (taskDay == null || taskDay.isBefore(tomorrow)))) {
         result.add(task);
       }
+    }
+    if (fitsNowTaskId != null) {
+      final index = result.indexWhere((task) => task.id == fitsNowTaskId);
+      if (index > 0) result.insert(0, result.removeAt(index));
     }
     return [...result, ...completed];
   }
@@ -223,6 +232,10 @@ class MobileHome extends StatelessWidget {
                           return _HomeTask(
                             key: ValueKey(task.id),
                             task: task,
+                            fitsNow:
+                                index == 0 &&
+                                !task.done &&
+                                task.id == fitsNowTaskId,
                             showCategory: activeMode == null,
                             onTap: () => onTaskTap(task),
                             onToggle: () => onTaskToggle(task),
@@ -606,6 +619,7 @@ class _HomeEvent extends StatelessWidget {
 class _HomeTask extends StatelessWidget {
   const _HomeTask({
     required this.task,
+    required this.fitsNow,
     required this.showCategory,
     required this.onTap,
     required this.onToggle,
@@ -613,6 +627,7 @@ class _HomeTask extends StatelessWidget {
   });
 
   final TaskItem task;
+  final bool fitsNow;
   final bool showCategory;
   final VoidCallback onTap;
   final VoidCallback onToggle;
@@ -620,6 +635,9 @@ class _HomeTask extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final category = showCategory && task.category.trim().isNotEmpty
+        ? WorkspaceCategoryPalette.labelFor(context, task.category)
+        : null;
     return Row(
       children: [
         Checkbox(
@@ -653,28 +671,41 @@ class _HomeTask extends StatelessWidget {
                             : null,
                       ),
                     ),
-                    if (showCategory && task.category.trim().isNotEmpty)
-                      Text(
-                        WorkspaceCategoryPalette.labelFor(
-                          context,
-                          task.category,
-                        ),
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.3,
-                          color: readableTint(
-                            Color.lerp(
-                              WorkspaceCategoryPalette.colorFor(
-                                context,
-                                task.category,
+                    if (fitsNow || category != null)
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          if (fitsNow)
+                            Text(
+                              'Fits now',
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.3,
+                                color: colors.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
                               ),
-                              colors.onSurface,
-                              .2,
-                            )!,
-                            surface: colors.surface,
-                            foreground: colors.onSurface,
-                          ),
-                        ),
+                            ),
+                          if (category != null)
+                            Text(
+                              category,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.3,
+                                color: readableTint(
+                                  Color.lerp(
+                                    WorkspaceCategoryPalette.colorFor(
+                                      context,
+                                      task.category,
+                                    ),
+                                    colors.onSurface,
+                                    .2,
+                                  )!,
+                                  surface: colors.surface,
+                                  foreground: colors.onSurface,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                   ],
                 ),

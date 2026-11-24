@@ -16,6 +16,7 @@ class TodayPage extends StatelessWidget {
     required this.onTaskToggle,
     this.onPlanDay,
     this.onWhatFitsNow,
+    this.fitsNowTaskId,
     this.title = 'Today',
     this.showSchedule = true,
     this.showTasks = true,
@@ -31,6 +32,10 @@ class TodayPage extends StatelessWidget {
   final ValueChanged<TaskItem> onTaskToggle;
   final VoidCallback? onPlanDay;
   final VoidCallback? onWhatFitsNow;
+
+  /// A verified suggestion from the caller's current task scope.
+  final String? fitsNowTaskId;
+
   final String title;
   final bool showSchedule;
   final bool showTasks;
@@ -58,6 +63,10 @@ class TodayPage extends StatelessWidget {
           (task.done ? completedTasks : openTasks).add(task);
         }
       }
+    }
+    if (fitsNowTaskId != null) {
+      final index = openTasks.indexWhere((task) => task.id == fitsNowTaskId);
+      if (index > 0) openTasks.insert(0, openTasks.removeAt(index));
     }
     final taskCount = openTasks.length + completedTasks.length;
     final bottom = mobile ? MediaQuery.paddingOf(context).bottom + 110.0 : 52.0;
@@ -170,11 +179,18 @@ class TodayPage extends StatelessWidget {
                       final task = index < openTasks.length
                           ? openTasks[index]
                           : completedTasks[index - openTasks.length];
-                      return framed(
-                        _TodayTask(
-                          task: task,
-                          onToggle: () => onTaskToggle(task),
-                          onTap: () => onTaskTap(task),
+                      return KeyedSubtree(
+                        key: ValueKey(task.id),
+                        child: framed(
+                          _TodayTask(
+                            task: task,
+                            fitsNow:
+                                index == 0 &&
+                                !task.done &&
+                                task.id == fitsNowTaskId,
+                            onToggle: () => onTaskToggle(task),
+                            onTap: () => onTaskTap(task),
+                          ),
                         ),
                       );
                     },
@@ -390,11 +406,13 @@ class _ScheduleItem extends StatelessWidget {
 class _TodayTask extends StatelessWidget {
   const _TodayTask({
     required this.task,
+    required this.fitsNow,
     required this.onToggle,
     required this.onTap,
   });
 
   final TaskItem task;
+  final bool fitsNow;
   final VoidCallback onToggle;
   final VoidCallback onTap;
 
@@ -442,27 +460,41 @@ class _TodayTask extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        WorkspaceCategoryPalette.labelFor(
-                          context,
-                          task.category,
-                        ),
-                        style: TextStyle(
-                          color: readableTint(
-                            Color.lerp(
-                              WorkspaceCategoryPalette.colorFor(
-                                context,
-                                task.category,
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          if (fitsNow)
+                            Text(
+                              'Fits now',
+                              style: TextStyle(
+                                color: colors.onSurfaceVariant,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
-                              colors.onSurface,
-                              .16,
-                            )!,
-                            surface: colors.surface,
-                            foreground: colors.onSurface,
+                            ),
+                          Text(
+                            WorkspaceCategoryPalette.labelFor(
+                              context,
+                              task.category,
+                            ),
+                            style: TextStyle(
+                              color: readableTint(
+                                Color.lerp(
+                                  WorkspaceCategoryPalette.colorFor(
+                                    context,
+                                    task.category,
+                                  ),
+                                  colors.onSurface,
+                                  .16,
+                                )!,
+                                surface: colors.surface,
+                                foreground: colors.onSurface,
+                              ),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        ],
                       ),
                     ],
                   ),
