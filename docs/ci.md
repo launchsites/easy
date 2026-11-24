@@ -20,7 +20,8 @@ The workflows request read-only repository contents and use GitHub's checkout ac
 
 | Hosted check | Revision | Result |
 | --- | --- | --- |
-| Linux | `477594a` | Analyzer, eight Python checks, 886 Flutter tests with seven conditional skips, both DST checks, release compilation and archive extraction passed. [Run](https://github.com/launchsites/easy/actions/runs/45363213755) |
+| Linux | `dd7d40d` | Analysis, Python checks, the full Flutter suite, both DST runs, release compilation, and archive extraction passed. [Run](https://github.com/launchsites/easy/actions/runs/45374941201) |
+| Linux package startup | `dd7d40d` | The downloadable package passed checksum, source, and library checks and launched in disposable X11 profiles for the native smoke suite. [Run](https://github.com/launchsites/easy/actions/runs/45375530947) |
 | Apple SDK | `f8c14fc` | The iOS simulator debug build and unsigned macOS release compiled with Xcode 26.3. [Run](https://github.com/launchsites/easy/actions/runs/45334132108) |
 | iPhone simulator | `b20417a` | Xcode 26.4.1 compiled iOS and macOS. The iPhone 17 simulator on iOS 26.4 launched Easy, verified the private empty workspace, and captured the 1206 × 2622 setup screen. [Run](https://github.com/launchsites/easy/actions/runs/45341653863) |
 | macOS startup | `3f56109` | Easy's ARM64 release launched on macOS 15.8.2 with Xcode 26.3. A runner-local ad hoc copy passed strict signature and release-entitlement checks. The live app created its sandboxed workspace, where a read-only probe verified the empty pending setup, SQLite integrity, and document checksums. [Run](https://github.com/launchsites/easy/actions/runs/45345576521) |
@@ -31,9 +32,9 @@ The workflows request read-only repository contents and use GitHub's checkout ac
 
 ## Review builds
 
-The review builds were built from `477594a` and include SHA-256 checksums. Extract the public Linux archive and run `./easy` from the extracted `easy` directory. The Android ZIPs require GitHub sign-in and contain development-signed APKs.
+The public Linux review build comes from `dd7d40d` and includes a SHA-256 checksum. Extract the archive and run `./easy` from the extracted `easy` directory. The Android ZIPs come from `477594a`, require GitHub sign-in, and contain development-signed APKs.
 
-- [Linux x86-64](https://github.com/launchsites/easy/releases/download/linux-review-477594a/easy-linux-x64.tar.gz) · [SHA-256 checksum](https://github.com/launchsites/easy/releases/download/linux-review-477594a/SHA256SUMS)
+- [Linux x86-64](https://github.com/launchsites/easy/releases/download/linux-review-dd7d40d/easy-linux-x64.tar.gz) · [SHA-256 checksum](https://github.com/launchsites/easy/releases/download/linux-review-dd7d40d/SHA256SUMS)
 - [Android ARM64](https://github.com/launchsites/easy/actions/runs/45363351696/artifacts/14906785512)
 - [Android ARMv7](https://github.com/launchsites/easy/actions/runs/45363351696/artifacts/14906246598)
 - [Android x86-64](https://github.com/launchsites/easy/actions/runs/45363351696/artifacts/14906331419)
