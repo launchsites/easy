@@ -1,0 +1,141 @@
+name: Android review packages
+
+on:
+  push:
+    branches: [proof/android-review-477594a]
+    paths: [.github/workflows/android-review-packages.yml]
+
+permissions:
+  contents: read
+
+env:
+  EASY_SOURCE_SHA: 477594a709487f8f361a993fdb4071dcf86b4502
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  DART_SUPPRESS_ANALYTICS: 'true'
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the pinned application
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ env.EASY_SOURCE_SHA }}
+          persist-credentials: false
+
+      - name: Verify source and prepare Android SDK 36
+        run: |
+          test "$(git rev-parse HEAD)" = "$EASY_SOURCE_SHA"
+          export JAVA_HOME="$JAVA_HOME_21_X64"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          java -version
+          printf 'JAVA_HOME=%s\n' "$JAVA_HOME" >> "$GITHUB_ENV"
+          printf '%s/bin\n' "$JAVA_HOME" >> "$GITHUB_PATH"
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$sdkmanager" --licenses < <(yes)
+          "$sdkmanager" --channel=0 --install \
+            'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
+
+      - name: Install pinned Flutter
+        run: bash .github/scripts/bootstrap-flutter.sh
+
+      - name: Restore locked application dependencies
+        run: |
+          flutter config --jdk-dir="$JAVA_HOME"
+          flutter pub get --enforce-lockfile
+          git diff --exit-code -- pubspec.lock
+
+      - name: Build three development-signed release APKs
+        id: assemble
+        continue-on-error: true
+        run: |
+          flutter build apk --release --split-per-abi --no-pub \
+            --target-platform android-arm,android-arm64,android-x64 2>&1 | \
+            tee "$RUNNER_TEMP/easy-android-assemble.log"
+
+      - name: Retry Maven Central rate limits with an official mirror
+        if: steps.assemble.outcome == 'failure'
+        run: |
+          grep -Eq 'repo\.maven\.apache\.org.*429' "$RUNNER_TEMP/easy-android-assemble.log"
+          gradle_config="${GRADLE_USER_HOME:-$HOME/.gradle}"
+          mkdir -p "$gradle_config/init.d"
+          cat > "$gradle_config/init.d/easy-proof-kotlin-mirror.gradle" <<'GRADLE'
+          def addKotlinMirror = { repositories ->
+              repositories.maven {
+                  name = 'EasyProofKotlinMirror'
+                  url = 'https://maven-central.storage-download.googleapis.com/maven2/'
+                  content { includeGroup 'org.jetbrains.kotlin' }
+              }
+          }
+          gradle.beforeSettings { settings ->
+              addKotlinMirror(settings.pluginManagement.repositories)
+          }
+          gradle.beforeProject { project ->
+              addKotlinMirror(project.buildscript.repositories)
+          }
+          GRADLE
+          flutter build apk --release --split-per-abi --no-pub \
+            --target-platform android-arm,android-arm64,android-x64
+
+      - name: Run Android release lint
+        run: |
+          cd android
+          ./gradlew :app:lintRelease --no-daemon --max-workers=2 \
+            -Ptarget-platform=android-arm,android-arm64,android-x64 -Psplit-per-abi=true
+
+      - name: Verify every APK and write checksums
+        run: |
+          staging="$RUNNER_TEMP/easy-android-review"
+          short="${EASY_SOURCE_SHA:0:7}"
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            mkdir -p "$staging/$abi"
+            install -m 0644 "build/app/outputs/flutter-apk/app-$abi-release.apk" \
+              "$staging/$abi/easy-android-review-$short-$abi.apk"
+          done
+          python3 tool/benchmark/android_release_inspect.py \
+            --build-tools "$ANDROID_HOME/build-tools/36.0.0" \
+            --app-revision "$EASY_SOURCE_SHA" --output "$staging/verification.json" \
+            "$staging"/arm64-v8a/*.apk "$staging"/armeabi-v7a/*.apk "$staging"/x86_64/*.apk
+          test -s build/app/reports/lint-results-release.txt
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp build/app/reports/lint-results-release.txt "$staging/$abi/lint-results-release.txt"
+            cp "$staging/verification.json" "$staging/$abi/verification.json"
+            (
+              cd "$staging/$abi"
+              printf '%s\n' "$EASY_SOURCE_SHA" > source-revision.txt
+              sha256sum -- ./*.apk verification.json lint-results-release.txt source-revision.txt > SHA256SUMS
+            )
+          done
+          printf 'Checked out and packaged source `%s` for ARM64, ARMv7 and x86-64.\n' \
+            "$EASY_SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Store the ARM64 review APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: easy-android-review-477594a-arm64-v8a
+          path: ${{ runner.temp }}/easy-android-review/arm64-v8a
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+      - name: Store the ARMv7 review APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: easy-android-review-477594a-armeabi-v7a
+          path: ${{ runner.temp }}/easy-android-review/armeabi-v7a
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+      - name: Store the x86-64 review APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: easy-android-review-477594a-x86_64
+          path: ${{ runner.temp }}/easy-android-review/x86_64
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
