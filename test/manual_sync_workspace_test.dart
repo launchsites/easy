@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:easy/storage/workspace_store.dart';
 import 'package:easy/sync/manual_sync_contracts.dart';
@@ -769,6 +770,135 @@ void main() {
       independent.workspaceJson,
     );
   });
+
+  test(
+    'near-limit typed pages authenticate, survive restart and converge exactly',
+    () async {
+      const noteCount = 54;
+      const stagedBatch = 24;
+      const bodyBytes = 22700;
+      final notes = [
+        for (var index = 0; index < noteCount; index++)
+          _noteRow(
+            id: 'large-note-$index',
+            title: 'Synthetic note $index',
+            body: '$index:${List.filled(bodyBytes - 3, 'x').join()}',
+          ),
+      ];
+      final (sender, receiver) = await pair();
+      final source = await localStore('source', _snapshot(notes: notes));
+      final destination = await localStore('destination', _snapshot());
+      final exporter = WorkspaceManualSyncProjector(store: source);
+      final importer = WorkspaceManualSyncProjector(store: destination);
+      final keys = [
+        for (final note in notes)
+          (kind: SyncRecordKind.note, id: note['id']! as String),
+      ];
+      for (var index = 0; index < keys.length; index += stagedBatch) {
+        final preview = await exporter.previewOutgoing(sync: sender);
+        final selected = keys.skip(index).take(stagedBatch).toSet();
+        expect(
+          await exporter.stageOutgoing(preview, selected: selected),
+          selected.length,
+        );
+      }
+
+      final first = (await sender.exportFor(receiver.device.fingerprint))!;
+      expect(first.hasMore, isTrue);
+      expect(first.changeCount, lessThan(SyncEnvelopeCodec.maximumChanges));
+      expect(
+        first.bytes.length,
+        inExclusiveRange(
+          SyncEnvelopeCodec.maximumBytes - bodyBytes * 2,
+          SyncEnvelopeCodec.maximumBytes + 1,
+        ),
+      );
+      final tampered = Uint8List.fromList(first.bytes);
+      tampered[tampered.length - 1] ^= 1;
+      await expectLater(
+        receiver.previewIncoming(
+          bytes: tampered,
+          senderId: sender.device.fingerprint,
+        ),
+        throwsA(isA<SyncAuthenticationException>()),
+      );
+      expect((await receiver.status()).changes, 0);
+      final accepted = await receiver.previewIncoming(
+        bytes: first.bytes,
+        senderId: sender.device.fingerprint,
+      );
+      await receiver.commitIncoming(accepted);
+      await receiver.close();
+      await sender.close();
+
+      final reopenedReceiver = await open(receiver.workspaceId, isSecond: true);
+      final reopenedSender = await open(sender.workspaceId);
+      final replay = await reopenedReceiver.previewIncoming(
+        bytes: first.bytes,
+        senderId: reopenedSender.device.fingerprint,
+      );
+      expect(replay.records.every((entry) => entry.isReplay), isTrue);
+      expect(replay.duplicateCount, first.changeCount);
+      final replaySaved = await reopenedReceiver.commitIncoming(replay);
+      final firstReview = await importer.previewIncoming(
+        sync: reopenedReceiver,
+        imported: replay,
+        committed: replaySaved,
+      );
+      expect(firstReview.records, hasLength(first.changeCount));
+      final applied = await importer.applyIncoming(
+        firstReview,
+        selected: firstReview.records.map((row) => row.key).toSet(),
+      );
+      expect(
+        (jsonDecode(applied.snapshot.workspaceJson) as Map)['notes'],
+        hasLength(first.changeCount),
+      );
+
+      final progress = await reopenedReceiver.progressFor(
+        reopenedSender.device.fingerprint,
+      );
+      final last = (await reopenedSender.exportFor(
+        reopenedReceiver.device.fingerprint,
+        peerProgress: progress,
+      ))!;
+      expect(last.hasMore, isFalse);
+      expect(last.changeCount, noteCount - first.changeCount);
+      final tail = await reopenedReceiver.previewIncoming(
+        bytes: last.bytes,
+        senderId: reopenedSender.device.fingerprint,
+      );
+      final tailSaved = await reopenedReceiver.commitIncoming(tail);
+      final lastReview = await importer.previewIncoming(
+        sync: reopenedReceiver,
+        imported: tail,
+        committed: tailSaved,
+      );
+      final complete = await importer.applyIncoming(
+        lastReview,
+        selected: lastReview.records.map((row) => row.key).toSet(),
+      );
+      final finalRows =
+          (jsonDecode(complete.snapshot.workspaceJson) as Map)['notes'] as List;
+      expect(
+        {for (final row in finalRows) row['id']: row},
+        {for (final note in notes) note['id']: note},
+      );
+      final recovery = await destination.previewBackup(
+        (await destination.readRecoveryBackup())!,
+      );
+      expect(recovery.snapshot.workspaceJson, applied.snapshot.workspaceJson);
+      expect(
+        await reopenedSender.exportFor(
+          reopenedReceiver.device.fingerprint,
+          peerProgress: await reopenedReceiver.progressFor(
+            reopenedSender.device.fingerprint,
+          ),
+        ),
+        isNull,
+      );
+    },
+  );
 
   test('journal revision lease excludes competing connections and releases after workspace failure', () async {
     final first = await create();
