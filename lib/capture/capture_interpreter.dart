@@ -33,6 +33,16 @@ final _scopeKindPrefix = RegExp(
   r'^([^:]+?)\s+(task|event|note(?:\s+to\s+self)?|workout|meal):\s*',
   caseSensitive: false,
 );
+final _spokenNoteKindScope = RegExp(
+  r'^(?:(?:add|create)\s+(?:an?\s+)?)?'
+  r'(note(?:\s+to\s+self)?)\s+(?:for|in)\s+([^.;,:\r\n]+?)\s*(?:[.,:]\s*|$)',
+  caseSensitive: false,
+);
+final _spokenNoteScopeKind = RegExp(
+  r'^for\s+(?:(?:an?|the)\s+)?([^.;,:\r\n]+?)\s+'
+  r'(note(?:\s+to\s+self)?)\s*(?:[.,:]\s*|$)',
+  caseSensitive: false,
+);
 final _hashtag = RegExp(r'\s+#([\p{L}\p{M}\p{N}_-]+)\.?$', unicode: true);
 final _spaceSuffix = RegExp(
   r'\s+in\s+(?:the\s+)?([^;\r\n:#]+)\s+(?:space|category|mode)\.?$',
@@ -81,8 +91,8 @@ final _rejectedCommand = RegExp(
   caseSensitive: false,
 );
 final _numericDate = RegExp(
-  r'\b(?:on|by|due(?:\s+on)?)\s+\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b'
-  r'|\s\d{1,2}/\d{1,2}(?:/\d{2,4})?\s*[.!]?$',
+  r'\b(?:on|by|due(?:\s+on)?)\s+(\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b'
+  r'|\s(\d{1,2}/\d{1,2}(?:/\d{2,4})?)\s*[.!]?$',
   caseSensitive: false,
 );
 final _dateCue = RegExp(
@@ -221,9 +231,15 @@ _Scope _readScope(_Slice clause, _CategoryNames names) {
   String? forcedKind;
   final marks = <({String label, CaptureSpan span})>[];
 
-  void addMark(RegExpMatch match, int group) {
+  void addMark(RegExpMatch match, int group, {int? beforeGroup}) {
     final text = match[group]!;
-    final at = body.start + match.start + match[0]!.lastIndexOf(text);
+    final matched = match[0]!;
+    final suffix = beforeGroup == null ? null : match[beforeGroup]!;
+    final limit = suffix == null ? matched.length : matched.lastIndexOf(suffix);
+    final at =
+        body.start +
+        match.start +
+        matched.substring(0, limit).lastIndexOf(text);
     marks.add((label: text, span: CaptureSpan(at, at + text.length)));
   }
 
@@ -234,13 +250,23 @@ _Scope _readScope(_Slice clause, _CategoryNames names) {
       forcedKind ??= match[1];
       addMark(match, 2);
       body = body.skip(match.end);
+    } else if (_spokenNoteKindScope.firstMatch(text) case final match?
+        when names.resolve(match[2]!).isNotEmpty) {
+      forcedKind ??= match[1];
+      addMark(match, 2);
+      body = body.skip(match.end);
+    } else if (_spokenNoteScopeKind.firstMatch(text) case final match?
+        when names.resolve(match[1]!).isNotEmpty) {
+      forcedKind ??= match[2];
+      addMark(match, 1, beforeGroup: 2);
+      body = body.skip(match.end);
     } else if (_scopePrefix.firstMatch(text) case final match?) {
       addMark(match, match[1] == null ? 2 : 1);
       body = body.skip(match.end);
     } else if (_scopeKindPrefix.firstMatch(text) case final match?
         when names.resolve(match[1]!).isNotEmpty) {
       forcedKind ??= match[2];
-      addMark(match, 1);
+      addMark(match, 1, beforeGroup: 2);
       body = body.skip(match.end);
     } else {
       final colon = text.indexOf(':');
@@ -413,8 +439,10 @@ Iterable<_Slice> _split(_Slice source, _CategoryNames names) sync* {
       source.start + from,
       source.start + match.start,
     ).trim();
-    if (match[0]!.startsWith(',') && _commaScope.hasMatch(clause.text)) {
-      continue;
+    if (match[0]!.startsWith(',')) {
+      if (_commaScope.hasMatch(clause.text)) continue;
+      final previous = _readScope(clause, names);
+      if (previous.forcedKind != null && previous.body.text.isEmpty) continue;
     }
     if (nextLead == null) {
       if (noteClause == null) {
@@ -559,7 +587,7 @@ Object _makeProposal(
     case CaptureIntentKind.task:
       final parsed = parseTaskCapture(text, date: anchor, now: anchor);
       var due = parsed.dueDate;
-      if (_unquotedMatch(_numericDate, text) != null ||
+      if (_hasUnresolvedNumericDate(text) ||
           due == null && _unquotedMatch(_dateCue, text) != null) {
         due = null;
         issues.add(_dateIssue(body.span));
@@ -587,7 +615,7 @@ Object _makeProposal(
           parseEventCapture(text, date: _day(anchor, 1), now: anchor).date ==
               parsed.date;
       var date = dateExplicit ? parsed.date : null;
-      if (_unquotedMatch(_numericDate, text) != null) {
+      if (_hasUnresolvedNumericDate(text)) {
         date = null;
         issues.add(_dateIssue(body.span));
       }
@@ -737,6 +765,17 @@ Object _makeProposal(
     suggestedCategory: draft is CaptureCompleteTaskDraft ? null : suggested,
     issues: issues,
   );
+}
+
+bool _hasUnresolvedNumericDate(String text) {
+  final quotes = _Quotes(text);
+  return _numericDate
+      .allMatches(text)
+      .any(
+        (match) =>
+            !quotes.insideAt(match.start) &&
+            parseCaptureNumericDate((match[1] ?? match[2])!) == null,
+      );
 }
 
 CaptureIssue _dateIssue(CaptureSpan span) => CaptureIssue(

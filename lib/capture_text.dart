@@ -109,6 +109,27 @@ DateTime? parseCaptureTime(String input, {required DateTime date}) {
   return value == null ? null : _atMinute(_day(date), value.minutes);
 }
 
+/// Resolves a complete numeric date without assuming a regional date order.
+DateTime? parseCaptureNumericDate(String text) {
+  if (_yearFirstDate.firstMatch(text) case final date?) {
+    return _validatedDay(
+      int.parse(date[1]!),
+      int.parse(date[3]!),
+      int.parse(date[4]!),
+    );
+  }
+  final date = _trailingYearDate.firstMatch(text);
+  if (date == null) return null;
+  final first = int.parse(date[1]!);
+  final second = int.parse(date[2]!);
+  final year = int.parse(date[3]!);
+  if (first == second || second > 12) {
+    return _validatedDay(year, first, second);
+  }
+  if (first > 12) return _validatedDay(year, second, first);
+  return null;
+}
+
 const _invalidDate = 'Enter a valid date, such as tomorrow or 2026-11-24.';
 const _invalidTime = 'Enter a valid time, such as 18:30 or 6:30pm.';
 const _invalidDuration = 'Enter a duration from 1 minute to 24 hours.';
@@ -118,11 +139,12 @@ const _month =
     r'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
 const _dayNumber = r'\d{1,2}(?:st|nd|rd|th)?';
 const _yearSuffix = r'(?:[,]?\s+\d{4})?';
-const _isoPattern = r'\d{4}-\d{1,2}-\d{1,2}';
+const _yearFirstPattern = r'(?:\d{4}-\d{1,2}-\d{1,2}|\d{4}/\d{1,2}/\d{1,2})';
+const _trailingYearPattern = r'\d{1,2}/\d{1,2}/\d{4}';
 const _monthFirstPattern = '(?:$_month)\\.?[ \\t]+$_dayNumber$_yearSuffix';
 const _dayFirstPattern = '$_dayNumber[ \\t]+(?:$_month)\\.?$_yearSuffix';
 const _datePattern =
-    '(?:$_isoPattern|$_monthFirstPattern|$_dayFirstPattern|today|tomorrow|yesterday|(?:next[ \\t]+|this[ \\t]+)?(?:$_weekday)\\.?)';
+    '(?:$_yearFirstPattern|$_trailingYearPattern|$_monthFirstPattern|$_dayFirstPattern|today|tomorrow|yesterday|(?:next[ \\t]+|this[ \\t]+)?(?:$_weekday)\\.?)';
 final _dates = RegExp(
   '(?<![\\w/:-])$_datePattern(?![\\w/:-])',
   caseSensitive: false,
@@ -136,7 +158,8 @@ final _dayFirst = RegExp(
   '^(\\d{1,2})(?:st|nd|rd|th)?[ \\t]+($_month)\\.?(?:[,]?\\s+(\\d{4}))?\$',
   caseSensitive: false,
 );
-final _isoDate = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$');
+final _yearFirstDate = RegExp(r'^(\d{4})([-/])(\d{1,2})\2(\d{1,2})$');
+final _trailingYearDate = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$');
 final _dateQualifier = RegExp(
   r'(?:^|\s)(?:on|by|for|due(?:\s+(?:by|on))?:?)[ \t]+$',
   caseSensitive: false,
@@ -158,7 +181,10 @@ final _doubleQuotes = RegExp(r'"[^"]*"|“[^”]*”');
     final qualifier = _dateQualifier.firstMatch(before);
     final terminal = _schedulePunctuation.hasMatch(after);
     final leading = allowLeading && before.trim().isEmpty;
-    if (terminal || leading || qualifier != null || _isoDate.hasMatch(token)) {
+    if (terminal ||
+        leading ||
+        qualifier != null ||
+        _yearFirstDate.hasMatch(token)) {
       matches.add((
         start: qualifier?.start ?? match.start,
         end: terminal ? text.length : match.end,
@@ -198,13 +224,8 @@ DateTime? _parseDate(String text, DateTime reference) {
       return _plusDays(reference, -1);
   }
 
-  final iso = _isoDate.firstMatch(lower);
-  if (iso != null) {
-    return _validatedDay(
-      int.parse(iso[1]!),
-      int.parse(iso[2]!),
-      int.parse(iso[3]!),
-    );
+  if (_yearFirstDate.hasMatch(lower) || _trailingYearDate.hasMatch(lower)) {
+    return parseCaptureNumericDate(lower);
   }
 
   final monthFirst = _monthFirst.firstMatch(lower);

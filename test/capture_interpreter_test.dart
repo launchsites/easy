@@ -119,6 +119,104 @@ void main() {
     },
   );
 
+  test('spoken note scopes preserve literal text across the active focus', () {
+    const text =
+        'Add a note for Étude. Chapter four uses the same lemma twice.; '
+        'For the Personal note, Call Ana\nKeep her morning free.; '
+        'Note for Étude, Send the reading list; '
+        'For a Note note, File under notes; '
+        'Gym: Add a note for Étude. Check the outline';
+    final input = _input(
+      text,
+      context: _context(
+        categories: {
+          'study': 'Étude',
+          'personal': 'Personal',
+          'notebook': 'Note',
+          'gym': 'Gym',
+        },
+      ),
+    );
+    final review = interpretCapture(input);
+    expect(review.input.text, text);
+    expect(review.issues, isEmpty);
+    expect(
+      review.proposals.map((item) => item.draft.kind),
+      everyElement(CaptureIntentKind.note),
+    );
+    expect(review.proposals.map((item) => item.draft.title), [
+      'Chapter four uses the same lemma twice.',
+      'Call Ana',
+      'Send the reading list',
+      'File under notes',
+      'Check the outline',
+    ]);
+    expect(review.proposals.map((item) => item.draft.category), [
+      'study',
+      'personal',
+      'study',
+      'notebook',
+      null,
+    ]);
+    expect(
+      review.proposals.map((item) => item.suggestedCategory),
+      everyElement(isNull),
+    );
+    expect(
+      (review.proposals[1].draft as CaptureNoteDraft).body,
+      'Keep her morning free.',
+    );
+    expect(
+      review.proposals[0].evidence['category']!.span!.textFrom(text),
+      'Étude',
+    );
+    final repeatedLabel = review.proposals[3].evidence['category']!.span!;
+    expect(repeatedLabel.start, text.indexOf('Note note'));
+    expect(
+      review.proposals.last.issues.single.code,
+      CaptureIssueCode.ambiguousCategory,
+    );
+  });
+
+  test('complete numeric dates resolve only when the order is unambiguous', () {
+    final input = _input(
+      'Task: Send the brief by 25/11/2026; '
+      'Event: Design review on 11/25/2026 10–11am; '
+      'Task: Submit on 2028/02/29; '
+      'Task: Submit on 04/04/2028; '
+      'Task: Submit by 03/04/2028; '
+      'Task: Submit by 31/04/2028; '
+      'Task: Submit by 25/11; '
+      'Task: Submit by 03/04 and 2028-04-10',
+    );
+    final review = interpretCapture(input);
+    expect(review.input.text, input.text);
+    expect(review.issues, isEmpty);
+    expect(review.proposals.take(4).every((item) => item.isReady), true);
+    final task = review.proposals.first.draft as CaptureTaskDraft;
+    expect(task.title, 'Send the brief');
+    expect(task.dueDate, DateTime(2026, 11, 25));
+    final event = review.proposals[1].draft as CaptureEventDraft;
+    expect(event.start, DateTime(2026, 11, 25, 10));
+    expect(event.end, DateTime(2026, 11, 25, 11));
+    expect(
+      (review.proposals[2].draft as CaptureTaskDraft).dueDate,
+      DateTime(2028, 2, 29),
+    );
+    expect(
+      (review.proposals[3].draft as CaptureTaskDraft).dueDate,
+      DateTime(2028, 4, 4),
+    );
+    for (final item in review.proposals.skip(4)) {
+      expect(item.isReady, false);
+      expect((item.draft as CaptureTaskDraft).dueDate, isNull);
+      expect(
+        item.issues.map((issue) => issue.code),
+        contains(CaptureIssueCode.invalidDate),
+      );
+    }
+  });
+
   test('events preserve an explicit time without inventing a date or end', () {
     final review = interpretCapture(
       _input(
