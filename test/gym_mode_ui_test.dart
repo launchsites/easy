@@ -11,6 +11,7 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewPadding);
 
     late StateSetter update;
     String? mode;
@@ -52,6 +53,16 @@ void main() {
     expect(tester.getRect(frameStroke), const Rect.fromLTWH(4, 4, 382, 836));
     await tester.tapAt(const Offset(5, 220));
     expect(taps, 1);
+
+    tester.view.viewPadding = const FakeViewPadding(
+      left: 10,
+      top: 24,
+      bottom: 24,
+    );
+    await tester.pump();
+    expect(tester.getRect(frameStroke), const Rect.fromLTWH(14, 28, 372, 788));
+    expect(tester.element(page), same(pageElement));
+    tester.view.resetViewPadding();
 
     tester.view.physicalSize = const Size(640, 360);
     await tester.pump();

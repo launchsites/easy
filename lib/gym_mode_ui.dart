@@ -20,6 +20,7 @@ class MobileModeFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activeMode = mode?.toLowerCase();
+    final insets = MediaQuery.viewPaddingOf(context);
     final stroke = activeMode == null || MediaQuery.sizeOf(context).width >= 720
         ? null
         : modeColor ??
@@ -31,10 +32,10 @@ class MobileModeFrame extends StatelessWidget {
         child,
         if (stroke != null)
           Positioned.fill(
-            left: 4,
-            top: 4,
-            right: 4,
-            bottom: 4,
+            left: insets.left + 4,
+            top: insets.top + 4,
+            right: insets.right + 4,
+            bottom: insets.bottom + 4,
             child: IgnorePointer(
               child: ExcludeSemantics(
                 child: DecoratedBox(
