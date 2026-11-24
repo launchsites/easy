@@ -30,6 +30,7 @@ class AndroidManifestPrivacyTest(unittest.TestCase):
 
     def test_system_backups_and_transfers_exclude_workspace_storage(self):
         self.assertEqual(self.application.get(ANDROID + "allowBackup"), "false")
+        self.assertEqual(self.application.get(ANDROID + "fullBackupContent"), "false")
         rules = self.resource("dataExtractionRules")
         excluded_domains = {
             "root", "file", "database", "sharedpref", "external", "device_root",

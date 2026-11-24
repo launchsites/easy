@@ -8,6 +8,7 @@
         android:label="Easy"
         android:name="${applicationName}"
         android:allowBackup="false"
+        android:fullBackupContent="false"
         android:dataExtractionRules="@xml/easy_data_extraction_rules"
         android:networkSecurityConfig="@xml/easy_network_security"
         android:icon="@mipmap/ic_launcher">

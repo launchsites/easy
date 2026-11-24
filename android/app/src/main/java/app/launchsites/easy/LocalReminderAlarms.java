@@ -53,7 +53,7 @@ final class LocalReminderAlarms {
         if (Build.VERSION.SDK_INT >= 33 &&
                 context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                         != PackageManager.PERMISSION_GRANTED) return false;
-        if (Build.VERSION.SDK_INT >= 24 && !manager.areNotificationsEnabled()) return false;
+        if (!manager.areNotificationsEnabled()) return false;
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel channel = manager.getNotificationChannel(CHANNEL);
             return channel == null || channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
@@ -85,7 +85,9 @@ final class LocalReminderAlarms {
         try {
             arm(context, request);
         } catch (RuntimeException failure) {
-            stored.edit().putString(request.id, previous).commit();
+            if (!stored.edit().putString(request.id, previous).commit()) {
+                failure.addSuppressed(new IllegalStateException("Could not restore reminder state"));
+            }
             throw failure;
         }
     }
