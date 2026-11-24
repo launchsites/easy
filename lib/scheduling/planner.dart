@@ -184,6 +184,30 @@ class ScheduleProposal {
   final List<String> advisories;
 }
 
+/// Returns the union of attainable time across the supplied availability
+/// windows, after subtracting every fixed commitment and its buffers.
+List<TimeSpan> unoccupiedPlanningWindows({
+  required TimeSpan horizon,
+  required Iterable<PlanningWindow> availability,
+  required Iterable<FixedCommitment> commitments,
+}) {
+  final allowed = _merge([
+    for (final window in availability) ?window.span.intersection(horizon),
+  ]);
+  final occupied = _merge([
+    for (final commitment in commitments) ?_blockedSpan(commitment, horizon),
+  ]);
+  return List.unmodifiable(
+    _freeWindows(
+      allowed,
+      occupied,
+      horizon.start,
+      horizon.end,
+      const Duration(microseconds: 1),
+    ),
+  );
+}
+
 /// Plans only within explicitly supplied availability. Commitments are fixed,
 /// including accepted suggestions and buffers. A task receives its entire
 /// remaining duration or a reason it could not be placed.
