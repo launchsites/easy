@@ -193,12 +193,20 @@ class _WorkspaceSetupPageState extends State<WorkspaceSetupPage> {
   Widget _actions({required bool wide}) {
     final actions = [
       FilledButton(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(64, 48),
+          visualDensity: VisualDensity.standard,
+        ),
         onPressed: _opening
             ? null
             : () => _start(WorkspaceStartingContent.empty),
         child: const Text('Use my workspace', textAlign: TextAlign.center),
       ),
       OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(64, 48),
+          visualDensity: VisualDensity.standard,
+        ),
         onPressed: _opening
             ? null
             : () => _start(WorkspaceStartingContent.samples),

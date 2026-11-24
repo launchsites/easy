@@ -9,6 +9,7 @@ import 'workout_metrics_ui.dart';
 import 'workout_plan.dart';
 
 part 'gym_previous_sets.dart';
+part 'gym_workout_capture.dart';
 
 enum GymProgress { pending, done, skipped }
 
@@ -23,6 +24,8 @@ class GymLogEntry {
     required this.loggedAt,
     this.actual,
     this.exerciseId,
+    this.afterExerciseId,
+    this.captureText,
   });
 
   final String id;
@@ -30,13 +33,17 @@ class GymLogEntry {
   final DateTime loggedAt;
   final String? actual;
   final String? exerciseId;
+  final String? afterExerciseId;
+  final String? captureText;
 
   GymLogEntry._fromJson(Map<String, dynamic> json)
     : id = json['id'] as String,
       title = json['title'] as String,
       loggedAt = DateTime.parse(json['loggedAt'] as String),
       actual = json['actual'] as String?,
-      exerciseId = json['exerciseId'] as String?;
+      exerciseId = json['exerciseId'] as String?,
+      afterExerciseId = json['afterExerciseId'] as String?,
+      captureText = json['captureText'] as String?;
 
   Map<String, Object?> _toJson() => {
     'id': id,
@@ -44,6 +51,8 @@ class GymLogEntry {
     'loggedAt': loggedAt.toIso8601String(),
     'actual': actual,
     'exerciseId': exerciseId,
+    'afterExerciseId': ?afterExerciseId,
+    'captureText': ?captureText,
   };
 }
 
@@ -221,8 +230,12 @@ class GymSession {
 
   GymSession _withEntries(List<GymLogEntry> entries) => _copy(entries: entries);
 
-  GymSession withCapturedEntry(GymLogEntry entry) =>
-      _withEntries([...entries, entry]);
+  GymSession withCapturedEntry(GymLogEntry entry) {
+    final index = entries.lastIndexWhere(
+      (existing) => !existing.loggedAt.isAfter(entry.loggedAt),
+    );
+    return _withEntries(entries.toList()..insert(index + 1, entry));
+  }
 
   GymSession startRest(Duration duration, {DateTime? now}) {
     if (finished ||
@@ -845,6 +858,8 @@ class _GymSessionPageState extends State<GymSessionPage> {
       loggedAt: entry.loggedAt,
       actual: entry.exerciseId == null ? null : value,
       exerciseId: entry.exerciseId,
+      afterExerciseId: entry.afterExerciseId,
+      captureText: entry.captureText,
     );
     _update(
       session._withEntries([
@@ -1468,12 +1483,21 @@ class _GymSessionPageState extends State<GymSessionPage> {
   }
 
   Widget _entryRow(GymLogEntry entry, {required bool editable}) {
+    final after = entry.afterExerciseId;
+    final reference = after == null
+        ? null
+        : _session?.exercises.where((item) => item.id == after).firstOrNull ??
+              _session?.plannedExercise(after);
+    final detail = [
+      if (reference != null) 'After ${reference.name}',
+      ?entry.actual,
+    ];
     return ListTile(
       contentPadding: const EdgeInsetsDirectional.only(start: 13, end: 7),
       title: Text(entry.title, style: contentTitleStyle),
-      subtitle: entry.actual == null
+      subtitle: detail.isEmpty
           ? null
-          : Text(entry.actual!, style: contentMetadataStyle),
+          : Text(detail.join(' · '), style: contentMetadataStyle),
       trailing: editable
           ? IconButton(
               tooltip: 'Edit ${entry.title}',
