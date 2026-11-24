@@ -13,6 +13,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'activities/activities.dart';
+import 'appearance/system_inset_background.dart';
 import 'automation/automation.dart';
 import 'automation/workspace_automation_events.dart';
 import 'ai/ai_device_state.dart';
@@ -181,14 +182,26 @@ class EasyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final android = !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+    final barStyle = _systemBars(darkBackground: android);
+    final theme = easyTheme();
     return MaterialApp(
       title: appName,
       debugShowCheckedModeBanner: false,
-      theme: easyTheme(),
-      builder: (_, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: _systemBars(),
-        child: child ?? const SizedBox.shrink(),
-      ),
+      theme: android
+          ? theme.copyWith(
+              appBarTheme: AppBarThemeData(systemOverlayStyle: barStyle),
+            )
+          : theme,
+      builder: (_, child) {
+        final content = child ?? const SizedBox.shrink();
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: barStyle,
+          child: android
+              ? SystemInsetBackground(color: shell, child: content)
+              : content,
+        );
+      },
       home: _Workspace(
         openStore: openStore,
         calendarAdapter: calendarAdapter,
