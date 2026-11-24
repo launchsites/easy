@@ -14,7 +14,9 @@ Select **Launch Easy on an iPhone simulator and capture first-run setup** to als
 
 Select **Replay a synthetic saved meal photo through two cold starts** to exercise the image picker's saved-result recovery on that emulator after first-launch setup. The check uses a generated 3 × 2 PNG and verifies one local meal draft, the resized attachment checksum, and an unchanged revision on duplicate replay. [Meal recovery script](../tool/benchmark/android_meal_recovery_smoke.py)
 
-The workflows request read-only repository contents and use GitHub's checkout action at its exact release commit. Builds stay in the runner workspace. Flutter comes directly from its upstream repository. [Checkout v6.0.2](https://github.com/actions/checkout/releases/tag/v6.0.2) · [Flutter 3.50.1](https://github.com/flutter/flutter/releases/tag/3.50.1)
+Select **Review the sample workspace with Android touch input and a saved event** to exercise the bottom-corner controls and the Calendar day swipe. The run keeps six PNG checkpoints and the JSON result for seven days. [Touch review script](../tool/benchmark/android_touch_review.py)
+
+The workflows request read-only repository contents and use GitHub's checkout action at its exact release commit. The Linux verification job on `main` retains an extracted-and-checked review archive and its SHA-256 checksum for 14 days. Flutter comes directly from its upstream repository. [Checkout v6.0.2](https://github.com/actions/checkout/releases/tag/v6.0.2) · [Flutter 3.50.1](https://github.com/flutter/flutter/releases/tag/3.50.1)
 
 | Hosted check | Revision | Result |
 | --- | --- | --- |
@@ -25,6 +27,7 @@ The workflows request read-only repository contents and use GitHub's checkout ac
 | Android emulator | `93bdea7` | The non-debuggable x86-64 release launched on AOSP API 36, verified the private workspace, and captured the 1080 × 2400 setup screen. [Run](https://github.com/launchsites/easy/actions/runs/45337863946) |
 | Android setup and meal replay | `975c6e8` | AOSP API 36 verified first launch, 17.27:1 clock and 3.01:1 navigation glyph contrast, one recovered draft at revision 3, and unchanged workspace revision and attachment checksum after replay. [Run](https://github.com/launchsites/easy/actions/runs/45343142083) |
 | Android simplified system theme | `5c4bd85` | The AOSP API 36 first-launch check passed and the photographed clock and navigation glyph contrast matched the previous run. [Run](https://github.com/launchsites/easy/actions/runs/45344251920) |
+| Android touch journey | `3832097` | The Android 36 release completed sample setup, selected Calendar with a held drag, swiped to the next day, and saved a timed event using the two floating controls. [Run](https://github.com/launchsites/easy/actions/runs/45347390357) |
 
 Run the Linux checks from a clone with the build packages in the README.
 

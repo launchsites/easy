@@ -16,6 +16,9 @@ The hosted AOSP API 36 emulator built its own development-signed x86-64 release 
 
 The hosted release at `975c6e8bd4653cad18d8d7dd3ca1d5363672ba62` completed Full setup at revision 2. A synthetic result in the Android image picker's own cache recovered as one local meal draft in revision 3. The managed 3×2 image matched the platform's resized fixture bytes. Replaying the same cached result after another cold launch kept the same revision and workspace digest. The scenario used a disposable emulator with synthetic image-picker state. [Hosted photo recovery run](https://github.com/launchsites/easy/actions/runs/45343142083)
 
+
+A separate AOSP API 36 release completed Full sample setup at 1080 × 2400. A continuous held drag from the bottom-left button selected Calendar. A horizontal touch swipe advanced the day. The bottom-right capture button and touch submit saved one timed event on the new day, moving the private workspace from revision 2 to 3. The other sample records retained their contents, and SQLite passed its integrity check. [Hosted touch run](https://github.com/launchsites/easy/actions/runs/45347390357) · [Verification results](benchmark-results/android-touch-3832097-20261124.json)
+
 ```sh
 flutter build apk --release --split-per-abi
 cd android

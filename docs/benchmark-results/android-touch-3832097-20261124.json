@@ -1,0 +1,32 @@
+{
+  "android_api": 36,
+  "calendar_day_after_swipe": "2026-11-25",
+  "calendar_day_before_swipe": "2026-11-24",
+  "capture_submit": "touch",
+  "device": "disposable AOSP x86-64 emulator",
+  "display_pixels": [
+    1080,
+    2400
+  ],
+  "event": {
+    "end": "2026-11-25T10:25:00.000Z",
+    "start": "2026-11-25T10:05:00.000Z",
+    "title": "Android touch review"
+  },
+  "fixture": "Full workspace with built-in samples",
+  "navigation_input": "held-draganddrop",
+  "saved_revision": 3,
+  "screenshots_sha256": {
+    "01-today.png": "5a3940c9fa0a464f426113a80131c51baa21b144e627775f3d9573a8252b2ca7",
+    "02-orbit.png": "aa96603914d4500a15d53bdd924a40dc9714d29eaf7e3fb6312ea4849bd84f37",
+    "03-calendar.png": "d75f14f872aa98d728821035bc06b360697ec5240f7249a74bce7af2b074c1b8",
+    "04-following-day.png": "85c893709f01c376113c8778984c9b1bee821ba58dfadc0e19d7b2a0326cda01",
+    "05-event-draft.png": "5a0b1bd4902f45225ce0965c09af347e95845bc057bcb764a707e5f8162b011e",
+    "06-saved.png": "bb3ca52c56721ecdab07881d3646513bdc32efc6affa40b87489f1d088efd35d"
+  },
+  "setup_revision": 2,
+  "app_revision": "38320978756b206a5c8ba0401d51e1b2b6742579",
+  "run_id": 45347390357,
+  "run_attempt": 2,
+  "github_artifact_id": 14899187062
+}
