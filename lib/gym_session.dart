@@ -1743,17 +1743,88 @@ class _GymSessionPageState extends State<GymSessionPage> {
     );
   }
 
+  Widget _sessionList(GymSession? session, double side) {
+    final exercises = session?.exercises ?? const <WorkoutExercise>[];
+    final heading = session?.finished == true ? 1 : 0;
+    var pending = const <_Exercise>[];
+    if (session != null && !session.structured && session.planned && _active) {
+      final logged = session.entries.map((entry) => entry.exerciseId).toSet();
+      pending = _legacyExercises
+          .where((exercise) => !logged.contains(exercise.id))
+          .toList();
+    }
+    final trailing = <Widget>[
+      if (session != null) ...[
+        if (session.structured) ...[
+          if (_active)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: _addExercise,
+                icon: const Icon(Icons.add_rounded, size: 19),
+                label: const Text('Add exercise'),
+              ),
+            ),
+          if (session.entries.isNotEmpty) ...[
+            const SizedBox(height: 15),
+            _heading('Session log'),
+            Builder(builder: (_) => _entries(session, editable: _active)),
+          ],
+        ] else if (session.finished) ...[
+          Builder(builder: (_) => _entries(session, editable: false)),
+          const SizedBox(height: 24),
+        ] else ...[
+          if (pending.isNotEmpty) ...[
+            _heading('Plan'),
+            _plan(pending),
+            const SizedBox(height: 23),
+          ],
+          _heading('Session log'),
+          Builder(builder: (_) => _entries(session, editable: true)),
+        ],
+      ],
+      if (!_active && session?.structured != true) ...[
+        if (session != null) _heading('Start another session'),
+        _choice(
+          title: 'Planned session',
+          detail: 'Treadmill and bench press',
+          icon: Icons.checklist_rounded,
+          planned: true,
+        ),
+        const SizedBox(height: 8),
+        _choice(
+          title: 'Freestyle',
+          detail: 'Log exercises as you go',
+          icon: Icons.notes_rounded,
+          planned: false,
+        ),
+      ],
+    ];
+    return ListView.builder(
+      padding: EdgeInsets.fromLTRB(side, 12, side, 22),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      itemCount: heading + exercises.length + trailing.length,
+      findChildIndexCallback: (key) {
+        if (key is! ValueKey<String>) return null;
+        final index = exercises.indexWhere(
+          (exercise) => exercise.id == key.value,
+        );
+        return index < 0 ? null : heading + index;
+      },
+      itemBuilder: (context, index) {
+        if (index < heading) return _heading('Session complete');
+        final exerciseIndex = index - heading;
+        if (exerciseIndex < exercises.length) {
+          return _structuredExercise(exercises[exerciseIndex], exerciseIndex);
+        }
+        return trailing[exerciseIndex - exercises.length];
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = _session;
-    final logged = {
-      for (final entry in session?.entries ?? []) entry.exerciseId,
-    };
-    final pending = session?.planned == true && !session!.structured
-        ? _legacyExercises
-              .where((exercise) => !logged.contains(exercise.id))
-              .toList()
-        : const <_Exercise>[];
     final width = MediaQuery.sizeOf(context).width;
     final side = width < 360 ? 16.0 : (width < 600 ? 20.0 : 30.0);
     return Scaffold(
@@ -1801,64 +1872,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
             constraints: const BoxConstraints(maxWidth: 620),
             child: Column(
               children: [
-                Expanded(
-                  child: ListView(
-                    padding: EdgeInsets.fromLTRB(side, 12, side, 22),
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    children: [
-                      if (session != null) ...[
-                        if (session.finished) ...[_heading('Session complete')],
-                        if (session.structured) ...[
-                          for (final (index, exercise)
-                              in session.exercises.indexed)
-                            _structuredExercise(exercise, index),
-                          if (_active)
-                            Align(
-                              alignment: AlignmentDirectional.centerStart,
-                              child: TextButton.icon(
-                                onPressed: _addExercise,
-                                icon: const Icon(Icons.add_rounded, size: 19),
-                                label: const Text('Add exercise'),
-                              ),
-                            ),
-                          if (session.entries.isNotEmpty) ...[
-                            const SizedBox(height: 15),
-                            _heading('Session log'),
-                            _entries(session, editable: _active),
-                          ],
-                        ] else if (session.finished) ...[
-                          _entries(session, editable: false),
-                          const SizedBox(height: 24),
-                        ] else ...[
-                          if (pending.isNotEmpty) ...[
-                            _heading('Plan'),
-                            _plan(pending),
-                            const SizedBox(height: 23),
-                          ],
-                          _heading('Session log'),
-                          _entries(session, editable: true),
-                        ],
-                      ],
-                      if (!_active && session?.structured != true) ...[
-                        if (session != null) _heading('Start another session'),
-                        _choice(
-                          title: 'Planned session',
-                          detail: 'Treadmill and bench press',
-                          icon: Icons.checklist_rounded,
-                          planned: true,
-                        ),
-                        const SizedBox(height: 8),
-                        _choice(
-                          title: 'Freestyle',
-                          detail: 'Log exercises as you go',
-                          icon: Icons.notes_rounded,
-                          planned: false,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                Expanded(child: _sessionList(session, side)),
                 if (_active) _inputBar(side),
               ],
             ),

@@ -20,3 +20,9 @@ python3 tool/benchmark/native_release_smoke.py \
   --output /tmp/easy-release-smoke-report.json \
   --health-scope --onboarding --live-gym-capture
 ```
+
+## Large workout screens
+
+A Flutter widget probe on one logical CPU opened a synthetic 1,200-exercise workout with six sets per exercise, then marked its first set done. The eager list read all 1,200 exercise names on each action. The lazy list read two. Across three warm runs, the median dropped from 757 to 377 ms when opening and from 647 to 349 ms when marking the set. These intervals include the widget test harness and rendering. [Raw measurements](benchmark-results/workout-viewport-build-epyc-20261124.json)
+
+The regression checks verify that a reordered exercise keeps its set progress and original targets while the list builds nearby cards. Portrait and landscape at 200% text scale tested the capture control and scroll path. The same focused run exercised live, cross-Focus capture and session persistence.

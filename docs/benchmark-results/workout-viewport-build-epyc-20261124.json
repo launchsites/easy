@@ -1,0 +1,78 @@
+{
+  "baseline_revision": "68fecf80a3c9da48e2d81252322efe4c0e19bbc2",
+  "candidate_gym_session_source_sha256": "838c03e2d42243cb2f7fcea50c17ec3324b105919e5dbc42f5e6b693bdee3c05",
+  "runtime": "Flutter widget test with one logical CPU selected using taskset",
+  "host": "AMD EPYC",
+  "fixture": {
+    "exercises": 1200,
+    "sets_per_exercise": 6,
+    "viewport": [
+      390,
+      844
+    ]
+  },
+  "samples": {
+    "baseline": [
+      {
+        "initial_microseconds": 3197314,
+        "initial_exercises_read": 1200,
+        "edit_microseconds": 1295130,
+        "edit_exercises_read": 1200
+      },
+      {
+        "initial_microseconds": 756804,
+        "initial_exercises_read": 1200,
+        "edit_microseconds": 643905,
+        "edit_exercises_read": 1200
+      },
+      {
+        "initial_microseconds": 761116,
+        "initial_exercises_read": 1200,
+        "edit_microseconds": 647497,
+        "edit_exercises_read": 1200
+      },
+      {
+        "initial_microseconds": 351282,
+        "initial_exercises_read": 1200,
+        "edit_microseconds": 879451,
+        "edit_exercises_read": 1200
+      }
+    ],
+    "candidate": [
+      {
+        "initial_microseconds": 1616884,
+        "initial_exercises_read": 2,
+        "edit_microseconds": 537990,
+        "edit_exercises_read": 2
+      },
+      {
+        "initial_microseconds": 413851,
+        "initial_exercises_read": 2,
+        "edit_microseconds": 349425,
+        "edit_exercises_read": 2
+      },
+      {
+        "initial_microseconds": 377335,
+        "initial_exercises_read": 2,
+        "edit_microseconds": 659307,
+        "edit_exercises_read": 2
+      },
+      {
+        "initial_microseconds": 274008,
+        "initial_exercises_read": 2,
+        "edit_microseconds": 227673,
+        "edit_exercises_read": 2
+      }
+    ]
+  },
+  "warm_medians_microseconds": {
+    "baseline": {
+      "initial_microseconds": 756804,
+      "edit_microseconds": 647497
+    },
+    "candidate": {
+      "initial_microseconds": 377335,
+      "edit_microseconds": 349425
+    }
+  }
+}
