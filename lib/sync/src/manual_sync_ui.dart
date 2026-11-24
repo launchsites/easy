@@ -208,34 +208,39 @@ class _TokenDialogState extends State<_TokenDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    constraints: const BoxConstraints(maxWidth: 520),
     scrollable: true,
     title: Text(widget.title),
-    content: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TextField(
-          controller: _token,
-          autofocus: true,
-          autocorrect: false,
-          enableSuggestions: false,
-          maxLength: widget.maximumLength,
-          maxLines: widget.maximumLength < 20 ? 1 : 4,
-          decoration: InputDecoration(
-            labelText: widget.label,
-            counterText: '',
-            errorText: _error,
+    content: SizedBox(
+      width: 472,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _token,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            enableIMEPersonalizedLearning: false,
+            maxLength: widget.maximumLength,
+            maxLines: widget.maximumLength < 20 ? 1 : 4,
+            decoration: InputDecoration(
+              labelText: widget.label,
+              counterText: '',
+              errorText: _error,
+            ),
+            onChanged: (_) => setState(() => _error = null),
+            onSubmitted: (_) => _submit(),
           ),
-          onChanged: (_) => setState(() => _error = null),
-          onSubmitted: (_) => _submit(),
-        ),
-        if (widget.paste != null)
-          TextButton.icon(
-            onPressed: _pasting ? null : _paste,
-            icon: const Icon(Icons.content_paste_rounded, size: 17),
-            label: const Text('Paste from clipboard'),
-          ),
-      ],
+          if (widget.paste != null)
+            TextButton.icon(
+              onPressed: _pasting ? null : _paste,
+              icon: const Icon(Icons.content_paste_rounded, size: 17),
+              label: const Text('Paste from clipboard'),
+            ),
+        ],
+      ),
     ),
     actions: [
       TextButton(
