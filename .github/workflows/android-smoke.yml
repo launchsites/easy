@@ -1,0 +1,89 @@
+name: Android emulator smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  DART_SUPPRESS_ANALYTICS: 'true'
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the requested revision
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Verify the checkout and emulator prerequisites
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -c /dev/kvm
+          if [[ ! -w /dev/kvm ]]; then
+            sudo chown "$(id -u):$(id -g)" /dev/kvm
+            sudo chmod u+rw /dev/kvm
+          fi
+          test -r /dev/kvm && test -w /dev/kvm
+          "$JAVA_HOME_21_X64/bin/java" -version
+          printf 'JAVA_HOME=%s\n' "$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          printf '%s/bin\n' "$JAVA_HOME_21_X64" >> "$GITHUB_PATH"
+          df -h "$RUNNER_TEMP" "$ANDROID_HOME"
+
+      - name: Provision Android SDK 36 and the AOSP system image
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$sdkmanager" --licenses < <(yes)
+          "$sdkmanager" --channel=0 --install \
+            'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358' \
+            emulator 'system-images;android-36;default;x86_64'
+          grep -Eq '^Pkg.Revision[[:space:]]*=[[:space:]]*37\.3\.10[[:space:]]*$' \
+            "$ANDROID_HOME/emulator/source.properties"
+          grep -Eq '^Pkg.Revision[[:space:]]*=[[:space:]]*2[[:space:]]*$' \
+            "$ANDROID_HOME/system-images/android-36/default/x86_64/source.properties"
+          "$ANDROID_HOME/emulator/emulator" -accel-check
+          "$ANDROID_HOME/platform-tools/adb" version
+          df -h "$RUNNER_TEMP" "$ANDROID_HOME"
+
+      - name: Install pinned Flutter
+        run: bash .github/scripts/bootstrap-flutter.sh
+
+      - name: Restore locked Dart dependencies
+        run: |
+          flutter pub get --enforce-lockfile
+          git diff --exit-code -- pubspec.lock
+
+      - name: Build and inspect the x86-64 development release
+        run: |
+          flutter config --jdk-dir="$JAVA_HOME"
+          flutter build apk --release --target-platform android-x64 --split-per-abi --no-pub
+          apk=build/app/outputs/flutter-apk/app-x86_64-release.apk
+          signer=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk")
+          grep -Eq 'certificate DN:.*CN=Android Debug' <<< "$signer"
+          test "$("$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest debuggable "$apk")" = false
+
+      - name: Verify Android first launch
+        timeout-minutes: 10
+        run: |
+          python3 tool/benchmark/android_emulator_smoke.py \
+            build/app/outputs/flutter-apk/app-x86_64-release.apk \
+            "$RUNNER_TEMP/easy-android-smoke/setup.png"
+
+      - name: Upload the first-run screenshot
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: easy-android-setup
+          path: ${{ runner.temp }}/easy-android-smoke/setup.png
+          if-no-files-found: error
+          retention-days: 7

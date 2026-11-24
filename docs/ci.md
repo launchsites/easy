@@ -8,6 +8,8 @@ An active `main` run can finish while the newest push waits. Each new pull reque
 
 Select **Launch Easy on an iPhone simulator and capture first-run setup** to also install and open the built app on a disposable iPhone simulator. The smoke check verifies the app's private SQLite store, its first revision and document checksums, and that setup is pending with an empty workspace. The run saves a first-launch screenshot as `easy-iphone-setup` for seven days. [Simulator smoke script](../tool/benchmark/ios_simulator_smoke.py)
 
+**Android emulator smoke** is a separate manual workflow on GitHub’s Ubuntu 24.04 x64 runner. It validates KVM, builds and checks a development-signed, non-debuggable release APK, and launches it on a disposable Android 36 AOSP emulator. The emulator’s root shell reads copies of the app’s private SQLite database and write-ahead log for the same empty setup verification. The workflow saves `easy-android-setup` for seven days. [Android workflow](../.github/workflows/android-smoke.yml) · [Hardware acceleration](https://github.blog/changelog/2024-04-02-github-actions-hardware-accelerated-android-virtualization-now-available/) · [Android smoke script](../tool/benchmark/android_emulator_smoke.py)
+
 Both workflows request read-only repository contents and use GitHub's checkout action at its exact release commit. Builds stay in the runner workspace. Flutter comes directly from its upstream repository. [Checkout v6.0.2](https://github.com/actions/checkout/releases/tag/v6.0.2) · [Flutter 3.50.1](https://github.com/flutter/flutter/releases/tag/3.50.1)
 
 Run the Linux checks from a clone with the build packages in the README.
