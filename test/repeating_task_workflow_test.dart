@@ -62,19 +62,26 @@ void main() {
     expect(find.text(title), findsOneWidget);
     await tester.tap(find.text(title));
     await tester.pumpAndSettle();
+    final details = find.byKey(const ValueKey('desktop-record-detail'));
     expect(find.text('Repeating task'), findsOneWidget);
     expect(find.text('Repeat rule'), findsOneWidget);
 
     await tester.tap(find.byType(Checkbox).first);
     await tester.pumpAndSettle();
     expect(find.text('Task completed'), findsOneWidget);
-    expect(find.text('Completed'), findsOneWidget);
+    expect(
+      find.descendant(of: details, matching: find.text('Completed')),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Undo'));
     await tester.pumpAndSettle();
     await restart();
     await tester.tap(find.text(title));
     await tester.pumpAndSettle();
-    expect(find.text('Open'), findsOneWidget);
+    expect(
+      find.descendant(of: details, matching: find.text('Open')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();

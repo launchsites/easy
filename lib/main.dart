@@ -2571,10 +2571,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _inspected = _workspaceTasks
           .where((task) => task.id == selected.id)
           .firstOrNull;
+      if (_inspected == null) _clearRecordSelection();
     } else if (_inspected case final NoteItem selected) {
       _inspected =
           data.notes.where((note) => note.id == selected.id).firstOrNull ??
           (_newDesktopNoteIds.contains(selected.id) ? selected : null);
+      if (_inspected == null) _clearRecordSelection();
     }
   }
 
@@ -2932,14 +2934,16 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   void _closeDesktopRecord() {
     _flushDesktopNote();
-    setState(() {
-      if (_inspectedReturnDestination case final destination?) {
-        _destination = destination;
-      }
-      _inspected = null;
-      _inspectedReturnDestination = null;
-    });
+    setState(_clearRecordSelection);
     _queueTodayFit();
+  }
+
+  void _clearRecordSelection() {
+    if (_inspectedReturnDestination case final destination?) {
+      _destination = destination;
+    }
+    _inspected = null;
+    _inspectedReturnDestination = null;
   }
 
   void _flushDesktopNote() {
@@ -3119,7 +3123,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       ),
     );
     if (confirmed != true || !mounted) return;
-    if (_inspected == record) _inspected = null;
+    if (_inspected == record) _clearRecordSelection();
     final id = _recordId(record);
     final detached = {
       if (record is TaskItem)
@@ -3206,7 +3210,11 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }
     return showDialog<Object>(
       context: context,
-      builder: (_) => Dialog(backgroundColor: paper, child: content),
+      builder: (_) => Dialog(
+        backgroundColor: paper,
+        clipBehavior: Clip.antiAlias,
+        child: content,
+      ),
     );
   }
 
