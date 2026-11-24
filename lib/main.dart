@@ -2436,7 +2436,11 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       MaterialPageRoute(
         builder: (_) => MobileModeFrame(
           mode: 'gym',
-          child: GymSessionPage(session: session, onChanged: _saveGymSession),
+          child: GymSessionPage(
+            session: session,
+            previousSessions: sessions,
+            onChanged: _saveGymSession,
+          ),
         ),
       ),
     );

@@ -3,9 +3,12 @@ import 'dart:convert';
 import 'package:flutter/services.dart' show HapticFeedback, LogicalKeyboardKey;
 import 'package:material_ui/material_ui.dart';
 
+import 'gym_rest_timer.dart';
 import 'ui_theme.dart';
 import 'workout_metrics_ui.dart';
 import 'workout_plan.dart';
+
+part 'gym_previous_sets.dart';
 
 enum GymProgress { pending, done, skipped }
 
@@ -52,15 +55,16 @@ class GymSession {
     this.finishedAt,
     this.planId,
     this._planName,
+    DateTime? restEndsAt,
     Iterable<GymLogEntry> entries = const [],
     Iterable<WorkoutExercise>? structuredExercises,
-    List<WorkoutExercise>? plannedExercises,
+    this.plannedExercises,
     Map<String, GymProgress> progress = const {},
   }) : entries = List.unmodifiable(entries),
        _structuredExercises = structuredExercises == null
            ? null
            : List.unmodifiable(structuredExercises),
-       _plannedExercises = plannedExercises,
+       restEndsAt = finishedAt == null ? restEndsAt?.toUtc() : null,
        _progress = Map.unmodifiable(progress);
 
   factory GymSession.start({WorkoutPlan? plan, DateTime? now}) => GymSession._(
@@ -86,24 +90,24 @@ class GymSession {
   final bool planned;
   final DateTime startedAt;
   final DateTime? finishedAt;
+  final DateTime? restEndsAt;
   final List<GymLogEntry> entries;
   final String? planId;
   final String? _planName;
   final List<WorkoutExercise>? _structuredExercises;
-  final List<WorkoutExercise>? _plannedExercises;
+
+  /// Older sessions can have an unknown original plan.
+  final List<WorkoutExercise>? plannedExercises;
   final Map<String, GymProgress> _progress;
 
   late final _plannedById = {
-    for (final exercise in _plannedExercises ?? const <WorkoutExercise>[])
+    for (final exercise in plannedExercises ?? const <WorkoutExercise>[])
       exercise.id: exercise,
   };
 
   bool get finished => finishedAt != null;
   bool get structured => _structuredExercises != null;
   List<WorkoutExercise> get exercises => _structuredExercises ?? const [];
-
-  /// Older sessions can have an unknown original plan.
-  List<WorkoutExercise>? get plannedExercises => _plannedExercises;
 
   WorkoutExercise? plannedExercise(String exerciseId) =>
       _plannedById[exerciseId];
@@ -151,6 +155,7 @@ class GymSession {
         finishedAt: DateTime.tryParse(json['finishedAt'] as String? ?? ''),
         planId: json['planId'] as String?,
         planName: json['planName'] as String?,
+        restEndsAt: DateTime.tryParse(json['restEndsAt'] as String? ?? ''),
         entries: (json['entries'] as List<dynamic>).map(
           (entry) => GymLogEntry._fromJson(entry as Map<String, dynamic>),
         ),
@@ -182,9 +187,11 @@ class GymSession {
     'entries': entries.map((entry) => entry._toJson()).toList(),
     if (planId != null) 'planId': planId,
     if (_planName != null) 'planName': _planName,
+    if (restEndsAt case final deadline?)
+      'restEndsAt': deadline.toIso8601String(),
     if (_structuredExercises case final exercises?)
       'exercises': exercises.map((exercise) => exercise.toJson()).toList(),
-    if (_plannedExercises case final exercises?)
+    if (plannedExercises case final exercises?)
       'plannedExercises': exercises
           .map((exercise) => exercise.toJson())
           .toList(),
@@ -197,6 +204,8 @@ class GymSession {
     List<GymLogEntry>? entries,
     List<WorkoutExercise>? exercises,
     Map<String, GymProgress>? progress,
+    DateTime? restEndsAt,
+    bool clearRest = false,
   }) => GymSession._(
     planned: planned,
     startedAt: startedAt,
@@ -205,14 +214,28 @@ class GymSession {
     planName: _planName,
     entries: entries ?? this.entries,
     structuredExercises: exercises ?? _structuredExercises,
-    plannedExercises: _plannedExercises,
+    plannedExercises: plannedExercises,
     progress: progress ?? _progress,
+    restEndsAt: clearRest ? null : restEndsAt ?? this.restEndsAt,
   );
 
   GymSession _withEntries(List<GymLogEntry> entries) => _copy(entries: entries);
 
   GymSession withCapturedEntry(GymLogEntry entry) =>
       _withEntries([...entries, entry]);
+
+  GymSession startRest(Duration duration, {DateTime? now}) {
+    if (finished ||
+        !structured ||
+        duration <= Duration.zero ||
+        duration > const Duration(minutes: 30)) {
+      return this;
+    }
+    final deadline = (now ?? DateTime.now()).toUtc().add(duration);
+    return _copy(restEndsAt: deadline);
+  }
+
+  GymSession clearRest() => restEndsAt == null ? this : _copy(clearRest: true);
 
   /// Applies a reviewed skip to pending work in this session snapshot.
   GymSession withSkippedExercises(Iterable<String> exerciseIds) {
@@ -276,11 +299,13 @@ class GymSessionPage extends StatefulWidget {
   const GymSessionPage({
     required this.session,
     required this.onChanged,
+    this.previousSessions = const [],
     super.key,
   });
 
   final GymSession? session;
   final ValueChanged<GymSession?> onChanged;
+  final List<GymSession> previousSessions;
 
   @override
   State<GymSessionPage> createState() => _GymSessionPageState();
@@ -321,6 +346,8 @@ class _GymSessionPageState extends State<GymSessionPage> {
   final _input = TextEditingController();
   final _focus = FocusNode();
   late GymSession? _session = widget.session;
+  late Map<(String, String), PreviousWorkoutSet> _previousSets =
+      _readPreviousSets();
   GymLogEntry? _editingEntry;
   _Exercise? _editingExercise;
   _MetricTarget? _editingMetric;
@@ -362,6 +389,19 @@ class _GymSessionPageState extends State<GymSessionPage> {
   void didUpdateWidget(covariant GymSessionPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.session != oldWidget.session) _session = widget.session;
+    if (widget.session != oldWidget.session ||
+        widget.previousSessions != oldWidget.previousSessions) {
+      _previousSets = _readPreviousSets();
+    }
+  }
+
+  Map<(String, String), PreviousWorkoutSet> _readPreviousSets() {
+    final session = _session;
+    return session == null ||
+            session.finished ||
+            widget.previousSessions.isEmpty
+        ? const {}
+        : previousWorkoutSets(session, widget.previousSessions);
   }
 
   @override
@@ -372,7 +412,12 @@ class _GymSessionPageState extends State<GymSessionPage> {
   }
 
   void _update(GymSession session) {
-    setState(() => _session = session);
+    setState(() {
+      final shapeChanged =
+          _session?.exercises.length != session.exercises.length;
+      _session = session;
+      if (shapeChanged) _previousSets = _readPreviousSets();
+    });
     widget.onChanged(session);
   }
 
@@ -997,6 +1042,27 @@ class _GymSessionPageState extends State<GymSessionPage> {
     );
   }
 
+  Widget? _lastSet(WorkoutExercise exercise, WorkoutSet set) {
+    final previous = _previousSets[(exercise.id, set.id)];
+    if (!_active || previous == null) return null;
+    final weight = workoutWeightText(previous.weightKg, _weightUnit);
+    if (previous.reps == set.reps &&
+        weight == workoutWeightText(set.weightKg, _weightUnit)) {
+      return null;
+    }
+    final labels = MaterialLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(6, 2, 7, 5),
+      child: Tooltip(
+        message: labels.formatFullDate(previous.sessionDate.toLocal()),
+        child: Text(
+          'Last workout · $weight ${_weightUnit.symbol} × ${previous.reps}',
+          style: contentMetadataStyle,
+        ),
+      ),
+    );
+  }
+
   Widget _customMetricValues(
     WorkoutExercise exercise, {
     WorkoutSet? set,
@@ -1395,6 +1461,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
           if (set.metrics.isNotEmpty)
             _customMetricValues(exercise, set: set, index: index),
           ?_plannedValues(exercise, set),
+          ?_lastSet(exercise, set),
         ],
       ),
     );
@@ -1450,6 +1517,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
     const radius = BorderRadius.all(Radius.circular(12));
     final addSteppers =
         metric?.metric != null && MediaQuery.sizeOf(context).width < 720;
+    final showRest = !_editing && (_session?.exercises.isNotEmpty ?? false);
     final bar = DecoratedBox(
       decoration: const BoxDecoration(
         color: paper,
@@ -1487,87 +1555,111 @@ class _GymSessionPageState extends State<GymSessionPage> {
                   ),
                 ],
               ),
-            TextField(
-              controller: _input,
-              focusNode: _focus,
-              textCapitalization: TextCapitalization.sentences,
-              keyboardType: metric == null
-                  ? TextInputType.text
-                  : TextInputType.numberWithOptions(
-                      decimal: !(metric.metric?.integer ?? false),
-                      signed:
-                          metric.custom != null ||
-                          metric.metric == _Metric.incline,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _input,
+                    focusNode: _focus,
+                    textCapitalization: TextCapitalization.sentences,
+                    keyboardType: metric == null
+                        ? TextInputType.text
+                        : TextInputType.numberWithOptions(
+                            decimal: !(metric.metric?.integer ?? false),
+                            signed:
+                                metric.custom != null ||
+                                metric.metric == _Metric.incline,
+                          ),
+                    textInputAction: TextInputAction.done,
+                    onEditingComplete: () {},
+                    onSubmitted: (_) => _submit(),
+                    onChanged: (_) {
+                      if (_error != null) setState(() => _error = null);
+                    },
+                    style: contentTitleStyle.copyWith(
+                      fontWeight: FontWeight.w500,
                     ),
-              textInputAction: TextInputAction.done,
-              onEditingComplete: () {},
-              onSubmitted: (_) => _submit(),
-              onChanged: (_) {
-                if (_error != null) setState(() => _error = null);
-              },
-              style: contentTitleStyle.copyWith(fontWeight: FontWeight.w500),
-              decoration: InputDecoration(
-                hintText: metric == null
-                    ? _editing
-                          ? 'Enter actual'
-                          : _session?.structured == true
-                          ? 'Add a note or extra'
-                          : 'Add an exercise or note'
-                    : metric.unit,
-                errorText: _error,
-                errorMaxLines: 3,
-                hintStyle: contentMetadataStyle.copyWith(fontSize: 14),
-                filled: true,
-                fillColor: raisedPaper,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                border: OutlineInputBorder(borderRadius: radius),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: radius,
-                  borderSide: const BorderSide(color: line),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: radius,
-                  borderSide: const BorderSide(color: accent, width: 1.5),
-                ),
-                prefixIcon: addSteppers
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          for (final (direction, label, icon) in [
-                            (-1, 'Decrease', Icons.remove_rounded),
-                            (1, 'Increase', Icons.add_rounded),
-                          ])
-                            IconButton(
-                              tooltip:
-                                  '$label ${metric!.metric!.label.toLowerCase()}',
-                              onPressed: () => _stepMetric(metric, direction),
-                              style: IconButton.styleFrom(
-                                minimumSize: const Size.square(44),
-                                foregroundColor: ink,
-                              ),
-                              icon: Icon(icon, size: 18),
-                            ),
-                        ],
-                      )
-                    : null,
-                suffixIcon: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: IconButton.filled(
-                    tooltip: metric != null
-                        ? 'Save value'
-                        : _editing
-                        ? 'Save entry'
-                        : 'Log entry',
-                    onPressed: _submit,
-                    icon: Icon(
-                      _editing
-                          ? Icons.check_rounded
-                          : Icons.arrow_upward_rounded,
-                      size: 20,
+                    decoration: InputDecoration(
+                      hintText: metric == null
+                          ? _editing
+                                ? 'Enter actual'
+                                : _session?.structured == true
+                                ? 'Add a note or extra'
+                                : 'Add an exercise or note'
+                          : metric.unit,
+                      errorText: _error,
+                      errorMaxLines: 3,
+                      hintStyle: contentMetadataStyle.copyWith(fontSize: 14),
+                      filled: true,
+                      fillColor: raisedPaper,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                      ),
+                      border: OutlineInputBorder(borderRadius: radius),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: radius,
+                        borderSide: const BorderSide(color: line),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: radius,
+                        borderSide: const BorderSide(color: accent, width: 1.5),
+                      ),
+                      prefixIcon: addSteppers
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                for (final (direction, label, icon) in [
+                                  (-1, 'Decrease', Icons.remove_rounded),
+                                  (1, 'Increase', Icons.add_rounded),
+                                ])
+                                  IconButton(
+                                    tooltip:
+                                        '$label ${metric!.metric!.label.toLowerCase()}',
+                                    onPressed: () =>
+                                        _stepMetric(metric, direction),
+                                    style: IconButton.styleFrom(
+                                      minimumSize: const Size.square(44),
+                                      foregroundColor: ink,
+                                    ),
+                                    icon: Icon(icon, size: 18),
+                                  ),
+                              ],
+                            )
+                          : null,
+                      suffixIcon: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: IconButton.filled(
+                          tooltip: metric != null
+                              ? 'Save value'
+                              : _editing
+                              ? 'Save entry'
+                              : 'Log entry',
+                          onPressed: _submit,
+                          icon: Icon(
+                            _editing
+                                ? Icons.check_rounded
+                                : Icons.arrow_upward_rounded,
+                            size: 20,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+                if (showRest) ...[
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: GymRestTimer(
+                      endsAt: _session?.restEndsAt,
+                      onStart: (duration) =>
+                          _update(_session!.startRest(duration)),
+                      onClear: () => _update(_session!.clearRest()),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
         ),

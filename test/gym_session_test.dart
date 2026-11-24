@@ -187,6 +187,79 @@ void main() {
     expect(GymSession.start().plannedExercises, isNull);
   });
 
+  test(
+    'prior workouts use saved completed sets and ignore skips or overlaps',
+    () {
+      final current = GymSession.start(
+        plan: _plan(),
+        now: DateTime(2026, 11, 24, 9),
+      );
+      final first = _historicalBench(
+        DateTime(2026, 11, 18, 9),
+        weight: 60,
+        reps: 6,
+        progress: 'done',
+      );
+      final skipped = _historicalBench(
+        DateTime(2026, 11, 23, 9),
+        weight: 85,
+        reps: 11,
+        progress: 'skipped',
+      );
+      final overlap = _historicalBench(
+        DateTime(2026, 11, 24, 8, 20),
+        weight: 99,
+        reps: 2,
+        progress: 'done',
+      );
+      final last = previousWorkoutSets(current, [overlap, skipped, first]);
+      expect(last.keys, [('bench', 'first')]);
+      expect(last[('bench', 'first')]?.weightKg, 60);
+      expect(last[('bench', 'first')]?.reps, 6);
+      expect(last[('bench', 'first')]?.sessionDate, first.startedAt);
+    },
+  );
+
+  testWidgets(
+    'earlier set actuals and the rest deadline preserve separate data',
+    (tester) async {
+      _phoneViewport(tester);
+      final activeAt = DateTime(2026, 11, 24, 9);
+      final plan = _plan();
+      var snapshot = GymSession.start(plan: plan, now: activeAt);
+      final history = _historicalBench(
+        DateTime(2026, 11, 22, 9),
+        weight: 60,
+        reps: 6,
+        progress: 'done',
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GymSessionPage(
+            session: snapshot,
+            previousSessions: [history],
+            onChanged: (updated) => snapshot = updated!,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Last workout · 60 kg × 6'), findsOneWidget);
+      expect(snapshot.exercises.last.sets.first.weightKg, 50);
+      await _tapTooltip(tester, 'Rest timer');
+      await tester.tap(find.text('1 min'));
+      await tester.pumpAndSettle();
+      expect(snapshot.restEndsAt, isNotNull);
+      final restored = GymSession.decode(snapshot.encode());
+      expect(restored.restEndsAt, snapshot.restEndsAt);
+      expect(restored.clearRest().restEndsAt, isNull);
+      await tester.tap(find.text('Finish'));
+      await tester.pumpAndSettle();
+      expect(snapshot.finished, isTrue);
+      expect(snapshot.restEndsAt, isNull);
+      expect(find.byTooltip('Rest timer'), findsNothing);
+    },
+  );
+
   testWidgets('large text steps edit without opening a keyboard in RTL', (
     tester,
   ) async {
@@ -434,6 +507,32 @@ WorkoutPlan _plan() => WorkoutPlan(
     ),
   ],
 );
+
+GymSession _historicalBench(
+  DateTime at, {
+  required double weight,
+  required int reps,
+  required String progress,
+}) {
+  final template = _plan();
+  final bench = template.exercises.last;
+  final performed = GymSession.start(
+    plan: template.copyWith(
+      exercises: [
+        bench.copyWith(
+          sets: [bench.sets.first.copyWith(weightKg: weight, reps: reps)],
+        ),
+      ],
+    ),
+    now: at,
+  );
+  final value = jsonDecode(performed.encode()) as Map<String, dynamic>;
+  value['finishedAt'] = at.add(const Duration(hours: 1)).toIso8601String();
+  value['progress'] = {
+    jsonEncode(['bench', 'first']): progress,
+  };
+  return GymSession.decode(jsonEncode(value));
+}
 
 Future<void> _tapTooltip(WidgetTester tester, String message) async {
   final button = find.byTooltip(message);
