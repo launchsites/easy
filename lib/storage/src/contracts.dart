@@ -104,6 +104,7 @@ final class WorkspaceRecordCounts {
     required this.notes,
     required this.gymSessions,
     required this.workoutPlans,
+    this.captures = 0,
   });
 
   final int events;
@@ -111,6 +112,7 @@ final class WorkspaceRecordCounts {
   final int notes;
   final int gymSessions;
   final int workoutPlans;
+  final int captures;
 }
 
 final class WorkspaceStoreException implements Exception {

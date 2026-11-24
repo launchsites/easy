@@ -88,6 +88,9 @@ WorkspaceRecordCounts validateSnapshot(WorkspaceSnapshot snapshot) {
   final events = _records(workspace, 'events');
   final tasks = _records(workspace, 'tasks');
   final notes = _records(workspace, 'notes');
+  final captures = workspace['captures'] == null
+      ? const <Map<String, dynamic>>[]
+      : _records(workspace, 'captures');
 
   for (final event in events) {
     stringField(event, 'title');
@@ -96,12 +99,24 @@ WorkspaceRecordCounts validateSnapshot(WorkspaceSnapshot snapshot) {
     _dateField(event, 'end');
     _boolField(event, 'allDay');
     _optionalString(event, 'location');
+    _optionalString(event, 'plannedTaskId');
   }
   for (final task in tasks) {
     stringField(task, 'title');
     stringField(task, 'category');
     _boolField(task, 'done');
     if (task['date'] != null) _dateField(task, 'date');
+    _optionalInt(task, 'estimatedMinutes');
+    _optionalString(task, 'priority');
+    _optionalString(task, 'parentId');
+    _optionalString(task, 'notes');
+    if (task['earliestStart'] != null) _dateField(task, 'earliestStart');
+    if (task['dueAt'] != null) _dateField(task, 'dueAt');
+    if (task['prerequisiteIds'] != null) {
+      _serializedRecords(task, 'prerequisiteIds');
+    }
+    if (task['allowSplit'] != null) _boolField(task, 'allowSplit');
+    _optionalInt(task, 'minimumChunkMinutes');
   }
   for (final note in notes) {
     stringField(note, 'title');
@@ -109,6 +124,12 @@ WorkspaceRecordCounts validateSnapshot(WorkspaceSnapshot snapshot) {
     _dateField(note, 'updated');
     _optionalString(note, 'category');
     if (note['noteToSelf'] != null) _boolField(note, 'noteToSelf');
+  }
+  for (final capture in captures) {
+    stringField(capture, 'text');
+    _dateField(capture, 'capturedAt');
+    _optionalInt(capture, 'revision');
+    if (capture['applied'] != null) _boolField(capture, 'applied');
   }
 
   final sessionStarts = <DateTime>{};
@@ -180,6 +201,7 @@ WorkspaceRecordCounts validateSnapshot(WorkspaceSnapshot snapshot) {
     notes: notes.length,
     gymSessions: snapshot.gymSessionJson.length,
     workoutPlans: snapshot.workoutPlanJson.length,
+    captures: captures.length,
   );
 }
 
@@ -283,6 +305,13 @@ void _optionalString(Map<String, dynamic> record, String name) {
 
 void _boolField(Map<String, dynamic> record, String name) {
   if (record[name] is! bool) throw FormatException('Invalid $name field.');
+}
+
+void _optionalInt(Map<String, dynamic> record, String name) {
+  final value = record[name];
+  if (value != null && value is! int) {
+    throw FormatException('Invalid $name field.');
+  }
 }
 
 DateTime _dateField(Map<String, dynamic> record, String name) {

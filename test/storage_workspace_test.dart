@@ -256,6 +256,52 @@ void main() {
     expect(await store.readRecoveryBackup(), isNull);
   });
 
+  test('backup checks newer metadata and counts saved captures', () async {
+    final store = await open();
+    final workspace = jsonDecode(_workspace('edited')) as Map<String, dynamic>;
+    final capture = <String, Object>{
+      'id': 'capture-1',
+      'text': 'Schedule follow-up',
+      'capturedAt': '2026-01-02T12:00:00',
+      'revision': 2,
+      'applied': false,
+    };
+    final task = <String, Object>{
+      'id': 'task-1',
+      'title': 'Follow-up',
+      'category': 'Work',
+      'done': false,
+      'dueAt': '2026-01-02T12:00:00',
+      'estimatedMinutes': 15,
+      'prerequisiteIds': ['previous-task'],
+    };
+    workspace['captures'] = [capture];
+    workspace['tasks'] = [task];
+    await store.save(WorkspaceMutation.workspace(jsonEncode(workspace)));
+    final original = await store.createBackup();
+    final preview = await store.previewBackup(original);
+    expect(preview.counts.captures, 1);
+    expect(preview.counts.tasks, 1);
+
+    final envelope = jsonDecode(utf8.decode(original)) as Map<String, dynamic>;
+    final payload =
+        jsonDecode(envelope['payload'] as String) as Map<String, dynamic>;
+    Uint8List reencoded() {
+      payload['workspace'] = jsonEncode(workspace);
+      final encoded = jsonEncode(payload);
+      envelope['payload'] = encoded;
+      envelope['sha256'] = sha256.convert(utf8.encode(encoded)).toString();
+      return _bytes(envelope);
+    }
+
+    task['prerequisiteIds'] = [42];
+    await expectLater(store.previewBackup(reencoded()), throwsFormatException);
+    task['prerequisiteIds'] = ['previous-task'];
+    capture['revision'] = '2';
+    await expectLater(store.previewBackup(reencoded()), throwsFormatException);
+    expect((await store.read()).revision, 2);
+  });
+
   test(
     'restore checks freshness and atomically makes a recovery point',
     () async {
