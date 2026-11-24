@@ -21,6 +21,7 @@ class MobileHome extends StatelessWidget {
     required this.onCalendarTap,
     this.focusedContent,
     this.onPlanDay,
+    this.onWhatFitsNow,
     this.modeName,
     this.notesAlreadyFiltered = false,
     this.showTasks,
@@ -37,6 +38,7 @@ class MobileHome extends StatelessWidget {
   final Widget modeControl;
   final Widget? focusedContent;
   final VoidCallback? onPlanDay;
+  final VoidCallback? onWhatFitsNow;
   final bool notesAlreadyFiltered;
   final bool? showTasks;
   final bool? showSchedule;
@@ -134,8 +136,11 @@ class MobileHome extends StatelessWidget {
           ),
       ],
     );
+    final taskAction = onWhatFitsNow ?? onPlanDay;
     final taskHeading = _HomeSection(
-      onPlanDay: onPlanDay,
+      action: taskAction == null
+          ? null
+          : (onWhatFitsNow == null ? 'Plan day' : 'What fits now', taskAction),
       title: activeMode != null
           ? 'Objectives'
           : isToday
@@ -327,12 +332,12 @@ class _HomeSection extends StatelessWidget {
   const _HomeSection({
     required this.title,
     required this.children,
-    this.onPlanDay,
+    this.action,
   });
 
   final String title;
   final List<Widget> children;
-  final VoidCallback? onPlanDay;
+  final (String, VoidCallback)? action;
 
   @override
   Widget build(BuildContext context) {
@@ -348,15 +353,18 @@ class _HomeSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (onPlanDay == null)
-          heading
-        else
-          Row(
+        if (action case (final label, final callback))
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
             children: [
-              Expanded(child: heading),
-              TextButton(onPressed: onPlanDay, child: const Text('Plan day')),
+              heading,
+              TextButton(onPressed: callback, child: Text(label)),
             ],
-          ),
+          )
+        else
+          heading,
         SizedBox(height: MediaQuery.sizeOf(context).width < 360 ? 10 : 12),
         ...children,
       ],
@@ -455,7 +463,13 @@ class _HomeNote extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (showTitle) Text(title, style: titleStyle),
+                      if (showTitle)
+                        Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: titleStyle,
+                        ),
                       if (showTitle && body.isNotEmpty)
                         const SizedBox(height: 3),
                       if (body.isNotEmpty || !showTitle)

@@ -287,6 +287,57 @@ void main() {
     expect(tester.getTopRight(find.text('Mode')).dx, closeTo(760, 1));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'large type keeps a long note bounded and the task action usable',
+    (tester) async {
+      final title = List.filled(16, 'Studio Tokyo العربية résumé').join(' ');
+      final date = DateUtils.dateOnly(DateTime.now());
+      var reviewed = false;
+      var planned = false;
+      await _show(
+        tester,
+        MobileHome(
+          date: date,
+          mode: null,
+          modeControl: const Text('Mode'),
+          note: NoteItem(
+            id: 'note',
+            title: title,
+            body: 'Remember the floor plan.',
+            updated: date,
+            noteToSelf: true,
+          ),
+          events: const [],
+          tasks: const [],
+          onNoteTap: () {},
+          onCalendarTap: () {},
+          onEventTap: (_) {},
+          onTaskTap: (_) {},
+          onTaskToggle: (_) {},
+          onPlanDay: () => planned = true,
+          onWhatFitsNow: () => reviewed = true,
+        ),
+        size: const Size(320, 568),
+        textScale: 2,
+      );
+
+      final preview = tester.widget<Text>(find.text(title));
+      expect(preview.maxLines, 2);
+      expect(preview.overflow, TextOverflow.ellipsis);
+      expect(find.text('Remember the floor plan.'), findsOneWidget);
+      final action = find.widgetWithText(TextButton, 'What fits now');
+      await tester.scrollUntilVisible(action, 120);
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      expect(action.hitTestable(), findsOneWidget);
+      await tester.tap(action);
+      expect(reviewed, isTrue);
+      expect(find.text('Plan day'), findsNothing);
+      expect(planned, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Future<void> _show(
