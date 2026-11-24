@@ -6,7 +6,7 @@
     1280,
     720
   ],
-  "elapsed_seconds": 56.41,
+  "elapsed_seconds": 85.31,
   "checks": {
     "prepaired_synthetic_profiles": 2,
     "native_file_chooser_export_import": true,
@@ -14,6 +14,8 @@
     "workspace_revision_before_apply": 1,
     "workspace_revision_after_apply": 2,
     "source_digest_unchanged": true,
+    "damaged_ciphertext_rejected": true,
+    "rejection_preserved_workspace_and_sealed_head": true,
     "pre_apply_digest_retained": true,
     "destination_restart_digest_matches": true,
     "only_selected_record_applied": true,

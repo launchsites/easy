@@ -59,6 +59,14 @@ def records(profile):
     return workspace_state(profile / "easy" / "workspace.sqlite3", include_document=True)
 
 
+def journal_head(profile):
+    folder = profile / "easy" / "sync"
+    _, workspace_id, _ = json.loads((folder / "installation.json").read_text())
+    database = folder / f"{workspace_id}.sqlite3"
+    with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as db:
+        return db.execute("SELECT revision, bytes, auth FROM sync_head WHERE id = 1").fetchone()
+
+
 def wait_for_records(profile, timeout):
     def ready():
         try:
@@ -170,6 +178,7 @@ def run(args, stage):
             right = apps.enter_context(isolated_app(args, destination[0], destination_env, "import"))
             source_initial = wait_for_records(source[2], args.timeout)
             destination_initial = wait_for_records(destination[2], args.timeout)
+            destination_journal = journal_head(destination[2])
             for screen in (left, right):
                 open_peer_settings(args, screen)
 
@@ -187,15 +196,26 @@ def run(args, stage):
             ciphertext = until(lambda: complete_bundle(bundle), "the encrypted change file",
                                seconds=args.timeout)
 
+            tampered = stage / "damaged-record.easysync"
+            tampered.write_bytes(ciphertext[:-1] + bytes([ciphertext[-1] ^ 1]))
+            tap_label(args, right, "Open change bundle")
+            picker_path(args, right, "Open File", tampered)
+            check(args, right, "The file or code could not be verified for this device", region=PANEL)
+            if (records(destination[2]) != destination_initial or
+                    journal_head(destination[2]) != destination_journal):
+                raise RuntimeError("A damaged bundle changed the saved workspace or sync journal.")
+
             tap_label(args, right, "Open change bundle")
             picker_path(args, right, "Open File", bundle)
             check(args, right, FIXTURE_TITLE, region=PANEL)
-            if records(destination[2]) != destination_initial:
-                raise RuntimeError("Opening the bundle changed workspace records.")
+            if (records(destination[2]) != destination_initial or
+                    journal_head(destination[2]) != destination_journal):
+                raise RuntimeError("Opening the bundle changed saved workspace or journal records.")
             filled_action(args, right, FOOTER)
             check(args, right, "Saved to the sync journal", region=PANEL)
-            if records(destination[2]) != destination_initial:
-                raise RuntimeError("Saving the journal also changed workspace records.")
+            if (records(destination[2]) != destination_initial or
+                    journal_head(destination[2]) == destination_journal):
+                raise RuntimeError("Approving the bundle failed to save only the journal.")
             filled_action(args, right, FOOTER)
             check(args, right, "Choose changes for your workspace", region=PANEL)
             tap_label(args, right, FIXTURE_TITLE)
@@ -230,6 +250,7 @@ def run(args, stage):
     return {"prepaired_synthetic_profiles": 2, "native_file_chooser_export_import": True,
             "encrypted_bundle_bytes": len(ciphertext), "workspace_revision_before_apply": destination_initial["revision"],
             "workspace_revision_after_apply": accepted["revision"], "source_digest_unchanged": True,
+            "damaged_ciphertext_rejected": True, "rejection_preserved_workspace_and_sealed_head": True,
             "pre_apply_digest_retained": True, "destination_restart_digest_matches": True,
             "only_selected_record_applied": True, "destination_sqlite_integrity": "ok"}
 
