@@ -3827,6 +3827,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           _RecordDetails(
             record: record,
             onEdit: () => Navigator.pop(context, 'edit'),
+            onToggleDone: record is TaskItem
+                ? () => Navigator.pop(context, 'toggle-done')
+                : null,
             onDelete: () => Navigator.pop(context, 'delete'),
             noteTargets: record is NoteItem ? _noteTargets() : const [],
             onOpenNoteLink: (link) => Navigator.pop(context, link),
@@ -3872,6 +3875,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     );
     if (!mounted) return;
     if (action == 'edit') await _editRecord(record);
+    if (action == 'toggle-done' && record is TaskItem) _toggleTask(record);
     if (action == 'delete') await _deleteRecord(record);
     if (action is NoteLink) await _openNoteLink(action);
     if (action == 'estimate' && record is TaskItem) {
@@ -4547,6 +4551,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                                               ),
                                               onEdit: () =>
                                                   _editRecord(_inspected!),
+                                              onToggleDone:
+                                                  switch (_inspected) {
+                                                    TaskItem task =>
+                                                      () => _toggleTask(task),
+                                                    _ => null,
+                                                  },
                                               onDelete: () =>
                                                   _deleteRecord(_inspected!),
                                               noteTargets:

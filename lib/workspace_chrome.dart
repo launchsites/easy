@@ -477,6 +477,7 @@ class _RecordDetails extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     this.onClose,
+    this.onToggleDone,
     this.noteTargets = const [],
     this.onOpenNoteLink,
     this.onEstimate,
@@ -499,6 +500,7 @@ class _RecordDetails extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback? onClose;
+  final VoidCallback? onToggleDone;
   final List<NoteTarget> noteTargets;
   final ValueChanged<NoteLink>? onOpenNoteLink;
   final VoidCallback? onEstimate;
@@ -521,8 +523,14 @@ class _RecordDetails extends StatelessWidget {
     final item = record;
     final localizations = MaterialLocalizations.of(context);
     String day(DateTime date) => localizations.formatFullDate(date);
-    String time(DateTime date) =>
-        localizations.formatTimeOfDay(TimeOfDay.fromDateTime(date));
+    String time(DateTime date) => localizations.formatTimeOfDay(
+      TimeOfDay.fromDateTime(date),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+    );
+    final taskDeadline = item is TaskItem ? item.dueAt?.toLocal() : null;
+    final canEdit =
+        (item is! CalendarEvent || !item.isReadOnly) &&
+        (item is! TaskItem || !repeatingTask || !item.done);
     final rows = switch (item) {
       CalendarEvent() => [
         (Icons.calendar_today_outlined, day(item.start)),
@@ -548,7 +556,13 @@ class _RecordDetails extends StatelessWidget {
         if (item.schedulingHold case final hold? when !item.done)
           (Icons.schedule_outlined, hold.message),
         if (repeatingTask) (Icons.repeat_rounded, 'Repeating task'),
-        if (item.date != null) (Icons.calendar_today_outlined, day(item.date!)),
+        if (taskDeadline != null)
+          (
+            Icons.calendar_today_outlined,
+            'Due ${day(taskDeadline)}, ${time(taskDeadline)}',
+          )
+        else if (item.date != null)
+          (Icons.calendar_today_outlined, day(item.date!)),
         (
           Icons.circle_outlined,
           WorkspaceCategoryPalette.labelFor(context, item.category),
@@ -634,8 +648,7 @@ class _RecordDetails extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 children: [
-                  if ((item is! CalendarEvent || !item.isReadOnly) &&
-                      (item is! TaskItem || !repeatingTask || !item.done)) ...[
+                  if (canEdit)
                     FilledButton.tonal(
                       onPressed: onEdit,
                       child: Text(
@@ -644,18 +657,16 @@ class _RecordDetails extends StatelessWidget {
                             : 'Edit',
                       ),
                     ),
+                  if (item is TaskItem && onToggleDone != null)
                     TextButton(
-                      onPressed: onDelete,
-                      style: TextButton.styleFrom(foregroundColor: muted),
-                      child: Text(
-                        repeatingTask ||
-                                item is CalendarEvent &&
-                                    item.recurringSeriesId != null
-                            ? 'Skip'
-                            : 'Delete',
-                      ),
+                      onPressed: onToggleDone,
+                      child: Text(item.done ? 'Reopen' : 'Mark done'),
                     ),
-                  ],
+                  if (onTrackActivity != null)
+                    TextButton(
+                      onPressed: onTrackActivity,
+                      child: const Text('Track time'),
+                    ),
                   if (onEstimate != null)
                     TextButton(
                       onPressed: onEstimate,
@@ -709,17 +720,34 @@ class _RecordDetails extends StatelessWidget {
                       onPressed: onTimingHistory,
                       child: const Text('Timing history'),
                     ),
-                  if (onTrackActivity != null)
-                    TextButton(
-                      onPressed: onTrackActivity,
-                      child: const Text('Track time'),
-                    ),
                   if (onRemoveFutureBlocks != null)
                     TextButton(
                       onPressed: onRemoveFutureBlocks,
                       child: const Text('Review future blocks'),
                     ),
+                  if (canEdit)
+                    TextButton(
+                      onPressed: onDelete,
+                      style: TextButton.styleFrom(foregroundColor: muted),
+                      child: Text(
+                        repeatingTask ||
+                                item is CalendarEvent &&
+                                    item.recurringSeriesId != null
+                            ? 'Skip'
+                            : 'Delete',
+                      ),
+                    ),
                 ],
+              ),
+            ],
+            if (item case TaskItem(notes: final notes?)
+                when notes.trim().isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const Divider(),
+              const SizedBox(height: 14),
+              SelectableText(
+                notes,
+                style: const TextStyle(height: 1.6, fontSize: 14),
               ),
             ],
           ],
