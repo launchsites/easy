@@ -65,7 +65,7 @@ class MobileHome extends StatelessWidget {
     final completed = <TaskItem>[];
     final tomorrow = DateUtils.addDaysToDate(day, 1);
     for (final task in tasks) {
-      final taskDay = task.date?.toLocal();
+      final taskDay = (task.dueAt ?? task.date)?.toLocal();
       final dueToday = DateUtils.isSameDay(taskDay, day);
       if (task.done) {
         if (dueToday) completed.add(task);
@@ -92,12 +92,14 @@ class MobileHome extends StatelessWidget {
             this.note?.category?.toLowerCase() == activeMode.toLowerCase()
         ? this.note
         : null;
-    final dayEvents = _dayEvents(day, now);
-    const eventLimit = 3;
-    final remainingEvents = dayEvents.length - eventLimit;
-    final objectives = _objectives(day);
     final showTaskSection = showTasks ?? focusedContent == null;
     final showScheduleSection = showSchedule ?? focusedContent == null;
+    final dayEvents = showScheduleSection
+        ? _dayEvents(day, now)
+        : const <CalendarEvent>[];
+    const eventLimit = 3;
+    final remainingEvents = dayEvents.length - eventLimit;
+    final objectives = showTaskSection ? _objectives(day) : const <TaskItem>[];
     final schedule = _HomeSection(
       title: isToday ? 'Upcoming today' : 'Schedule',
       children: [
@@ -131,7 +133,7 @@ class MobileHome extends StatelessWidget {
           ),
       ],
     );
-    final taskList = _HomeSection(
+    final taskHeading = _HomeSection(
       onPlanDay: onPlanDay,
       title: activeMode != null
           ? 'Objectives'
@@ -147,16 +149,6 @@ class MobileHome extends StatelessWidget {
                 ? 'No tasks due today.'
                 : 'No tasks due.',
           ),
-        for (final (index, task) in objectives.indexed) ...[
-          _HomeTask(
-            key: ValueKey(task.id),
-            task: task,
-            showCategory: activeMode == null,
-            onTap: () => onTaskTap(task),
-            onToggle: () => onTaskToggle(task),
-          ),
-          if (index < objectives.length - 1) const Divider(indent: 49),
-        ],
       ],
     );
 
@@ -167,43 +159,81 @@ class MobileHome extends StatelessWidget {
           compact ? 20.0 : 28.0,
           (constraints.maxWidth - 620) / 2,
         );
-        return ListView(
+        final gap = SizedBox(height: compact ? 15 : 27);
+        Widget block(Widget child) => SliverToBoxAdapter(child: child);
+        return CustomScrollView(
           key: PageStorageKey(('mobile-home', activeMode)),
-          padding: EdgeInsetsDirectional.fromSTEB(
-            gutter,
-            compact ? 20 : 28,
-            gutter,
-            110 + MediaQuery.paddingOf(context).bottom,
-          ),
-          children: [
-            _HomeHeading(
-              compact: compact,
-              mode: activeMode,
-              modeName: modeName,
-              modeControl: modeControl,
-              dayLabel: dayLabel,
-              fullDate: fullDate,
-            ),
-            SizedBox(height: compact ? 16 : 32),
-            if (note != null || activeMode == null) ...[
-              _HomeSection(
-                title: 'Note to self',
-                children: [
-                  _HomeNote(note: note, onTap: onNoteTap, compact: compact),
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsetsDirectional.fromSTEB(
+                gutter,
+                compact ? 20 : 28,
+                gutter,
+                110 + MediaQuery.paddingOf(context).bottom,
+              ),
+              sliver: SliverMainAxisGroup(
+                slivers: [
+                  block(
+                    _HomeHeading(
+                      compact: compact,
+                      mode: activeMode,
+                      modeName: modeName,
+                      modeControl: modeControl,
+                      dayLabel: dayLabel,
+                      fullDate: fullDate,
+                    ),
+                  ),
+                  block(SizedBox(height: compact ? 16 : 32)),
+                  if (note != null || activeMode == null) ...[
+                    block(
+                      _HomeSection(
+                        title: 'Note to self',
+                        children: [
+                          _HomeNote(
+                            note: note,
+                            onTap: onNoteTap,
+                            compact: compact,
+                          ),
+                        ],
+                      ),
+                    ),
+                    block(SizedBox(height: compact ? 12 : 28)),
+                  ],
+                  if (focusedContent case final content?) ...[
+                    block(content),
+                    block(gap),
+                  ],
+                  if (activeMode == null && showScheduleSection) ...[
+                    block(schedule),
+                    block(gap),
+                  ],
+                  if (showTaskSection) ...[
+                    block(taskHeading),
+                    if (objectives.isNotEmpty)
+                      SliverList.separated(
+                        itemCount: objectives.length,
+                        itemBuilder: (_, index) {
+                          final task = objectives[index];
+                          return _HomeTask(
+                            key: ValueKey(task.id),
+                            task: task,
+                            showCategory: activeMode == null,
+                            onTap: () => onTaskTap(task),
+                            onToggle: () => onTaskToggle(task),
+                          );
+                        },
+                        separatorBuilder: (_, _) => const Divider(indent: 49),
+                      ),
+                    block(gap),
+                  ],
+                  if (activeMode != null &&
+                      showScheduleSection &&
+                      (dayEvents.isNotEmpty || !showTaskSection)) ...[
+                    block(schedule),
+                    block(gap),
+                  ],
                 ],
               ),
-              SizedBox(height: compact ? 12 : 28),
-            ],
-            ...[
-              ?focusedContent,
-              if (activeMode == null && showScheduleSection) schedule,
-              if (showTaskSection) taskList,
-              if (activeMode != null &&
-                  showScheduleSection &&
-                  (dayEvents.isNotEmpty || !showTaskSection))
-                schedule,
-            ].expand(
-              (section) => [section, SizedBox(height: compact ? 15 : 27)],
             ),
           ],
         );

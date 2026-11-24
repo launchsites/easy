@@ -176,6 +176,23 @@ bool _isAppleCalendar(CalendarIdentity id) =>
     id.accountId != _localCalendarAccount &&
     id.accountId != workspaceIcsAccountId;
 
+({WorkspaceData data, List<GymSession>? sessions, List<WorkoutPlan>? plans})
+_decodeWorkspaceSnapshot(WorkspaceSnapshot snapshot) {
+  List<T>? decodeRecords<T>(List<String> saved, T Function(String) decode) {
+    try {
+      return saved.map(decode).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  return (
+    data: WorkspaceData.decode(snapshot.workspaceJson),
+    sessions: decodeRecords(snapshot.gymSessionJson, GymSession.decode),
+    plans: decodeRecords(snapshot.workoutPlanJson, WorkoutPlan.decode),
+  );
+}
+
 class _Workspace extends StatefulWidget {
   const _Workspace({required this.openStore, required this.calendarAdapter});
 
@@ -205,6 +222,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   var _calendarDate = dateOnly(DateTime.now());
   DateTime get _today => dateOnly(DateTime.now());
   var _destination = _Destination.today;
+  final _mountedDestinations = {_Destination.today};
   String? _space;
   Object? _inspected;
   var _loading = true;
@@ -323,9 +341,13 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   Future<void> _loadRevision(WorkspaceRevision revision) async {
     final snapshot = revision.snapshot;
-    final data = WorkspaceData.decode(snapshot.workspaceJson);
-    final sessions = _decodeRecords(snapshot.gymSessionJson, GymSession.decode);
-    final plans = _decodeRecords(snapshot.workoutPlanJson, WorkoutPlan.decode);
+    final large =
+        snapshot.workspaceJson.length > 256 * 1024 ||
+        snapshot.gymSessionJson.length > 512 ||
+        snapshot.workoutPlanJson.length > 128;
+    final (:data, :sessions, :plans) = large
+        ? await compute(_decodeWorkspaceSnapshot, snapshot)
+        : _decodeWorkspaceSnapshot(snapshot);
     if (!mounted) return;
     setState(() {
       _persistedRevision = revision.revision;
@@ -358,14 +380,6 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       gymSessionJson: gym ?? [],
       workoutPlanJson: plans ?? [_sampleWorkoutPlan(_today).encode()],
     );
-  }
-
-  List<T>? _decodeRecords<T>(List<String> saved, T Function(String) decode) {
-    try {
-      return saved.map(decode).toList();
-    } catch (_) {
-      return null;
-    }
   }
 
   Map<String, String> _categories() => {
@@ -2436,6 +2450,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   void _navigate(_Destination destination) {
     setState(() {
       _destination = destination;
+      _mountedDestinations.add(destination);
       _inspected = null;
     });
   }
@@ -4011,30 +4026,39 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
               onTaskTap: _openRecord,
               onTaskToggle: _toggleTask,
             ),
-          Column(
-            children: [
-              if (calendarProblem != null)
-                TextButton(
-                  onPressed: _openCalendarSettings,
-                  child: Text(calendarProblem),
+          if (_mountedDestinations.contains(_Destination.calendar))
+            Column(
+              children: [
+                if (calendarProblem != null)
+                  TextButton(
+                    onPressed: _openCalendarSettings,
+                    child: Text(calendarProblem),
+                  ),
+                Expanded(
+                  child: CalendarPage(
+                    date: _calendarDate,
+                    events: events,
+                    eventsRevision: _visibleEventRevision,
+                    onDateChanged: _changeDate,
+                    onEventTap: _openRecord,
+                  ),
                 ),
-              Expanded(
-                child: CalendarPage(
-                  date: _calendarDate,
-                  events: events,
-                  eventsRevision: _visibleEventRevision,
-                  onDateChanged: _changeDate,
-                  onEventTap: _openRecord,
-                ),
-              ),
-            ],
-          ),
-          TasksPage(
-            tasks: tasks,
-            onToggle: _toggleTask,
-            onTaskTap: _openRecord,
-          ),
-          NotesPage(notes: notes, onNoteTap: _openRecord),
+              ],
+            )
+          else
+            const SizedBox.shrink(),
+          if (_mountedDestinations.contains(_Destination.tasks))
+            TasksPage(
+              tasks: tasks,
+              onToggle: _toggleTask,
+              onTaskTap: _openRecord,
+            )
+          else
+            const SizedBox.shrink(),
+          if (_mountedDestinations.contains(_Destination.notes))
+            NotesPage(notes: notes, onNoteTap: _openRecord)
+          else
+            const SizedBox.shrink(),
         ],
       ),
     );

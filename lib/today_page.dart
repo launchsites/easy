@@ -39,101 +39,141 @@ class TodayPage extends StatelessWidget {
     final mobile = MediaQuery.sizeOf(context).width < 720;
     final localizations = MaterialLocalizations.of(context);
     final tomorrow = plusDays(date, 1);
-    final dayEvents =
-        events
-            .where(
-              (event) =>
-                  event.start.isBefore(tomorrow) &&
-                  (event.end.isAfter(date) || sameDay(event.start, date)),
-            )
-            .toList()
-          ..sort((first, second) => first.start.compareTo(second.start));
-    final dayTasks = tasks.where(
-      (task) => task.date != null && sameDay(task.date!, date),
-    );
+    final dayEvents = [
+      if (showSchedule)
+        for (final event in events)
+          if (event.start.isBefore(tomorrow) &&
+              (event.end.isAfter(date) || sameDay(event.start, date)))
+            event,
+    ]..sort((first, second) => first.start.compareTo(second.start));
+    final openTasks = <TaskItem>[];
+    final completedTasks = <TaskItem>[];
+    if (showTasks) {
+      for (final task in tasks) {
+        final dueDay = (task.dueAt ?? task.date)?.toLocal();
+        if (dueDay != null && sameDay(dueDay, date)) {
+          (task.done ? completedTasks : openTasks).add(task);
+        }
+      }
+    }
+    final taskCount = openTasks.length + completedTasks.length;
     final bottom = mobile ? MediaQuery.paddingOf(context).bottom + 110.0 : 52.0;
 
-    return ListView(
-      key: const PageStorageKey('today'),
-      padding: EdgeInsets.fromLTRB(
-        mobile ? 28 : 48,
-        mobile ? 23 : 50,
-        mobile ? 28 : 48,
-        bottom,
+    Widget framed(Widget child) => Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 970),
+        child: SizedBox(width: double.infinity, child: child),
       ),
-      children: [
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 970),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Semantics(
-                  header: true,
-                  child: Text(
-                    title,
-                    style: workspaceHeadingStyle(mobile)
-                        .copyWith(color: colors.onSurface),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  localizations.formatFullDate(date),
-                  style: TextStyle(
-                    color: colors.onSurfaceVariant,
-                    fontSize: mobile ? 13.5 : 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: mobile ? 32 : 45),
-                if (focusedContent case final content?) ...[
-                  content,
-                  if (showTasks || showSchedule) const SizedBox(height: 33),
-                ],
-                if (showSchedule) ...[
-                  const _SectionHeading('Schedule'),
-                  const SizedBox(height: 14),
-                  if (dayEvents.isEmpty)
-                    const _EmptyMessage('Nothing scheduled for today.'),
-                  for (final event in dayEvents)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _ScheduleItem(
-                        event: event,
-                        date: date,
-                        narrow: mobile,
-                        onTap: () => onEventTap(event),
+    );
+    Widget block(Widget child) => SliverToBoxAdapter(child: framed(child));
+
+    return CustomScrollView(
+      key: const PageStorageKey('today'),
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            mobile ? 28 : 48,
+            mobile ? 23 : 50,
+            mobile ? 28 : 48,
+            bottom,
+          ),
+          sliver: SliverMainAxisGroup(
+            slivers: [
+              block(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        title,
+                        style: workspaceHeadingStyle(mobile)
+                            .copyWith(color: colors.onSurface),
                       ),
                     ),
-                  if (showTasks) SizedBox(height: mobile ? 23 : 33),
-                ],
-                if (showTasks) ...[
-                  Row(
-                    children: [
-                      const Expanded(child: _SectionHeading('Tasks')),
-                      if (onPlanDay != null)
-                        TextButton(
-                          onPressed: onPlanDay,
-                          child: const Text('Plan day'),
+                    const SizedBox(height: 8),
+                    Text(
+                      localizations.formatFullDate(date),
+                      style: TextStyle(
+                        color: colors.onSurfaceVariant,
+                        fontSize: mobile ? 13.5 : 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: mobile ? 32 : 45),
+                    if (focusedContent case final content?) ...[
+                      content,
+                      if (showTasks || showSchedule) const SizedBox(height: 33),
+                    ],
+                    if (showSchedule) ...[
+                      const _SectionHeading('Schedule'),
+                      const SizedBox(height: 14),
+                    ],
+                  ],
+                ),
+              ),
+              if (showSchedule) ...[
+                if (dayEvents.isEmpty)
+                  block(const _EmptyMessage('Nothing scheduled for today.'))
+                else
+                  SliverList.builder(
+                    itemCount: dayEvents.length,
+                    itemBuilder: (_, index) {
+                      final event = dayEvents[index];
+                      return framed(
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _ScheduleItem(
+                            event: event,
+                            date: date,
+                            narrow: mobile,
+                            onTap: () => onEventTap(event),
+                          ),
                         ),
+                      );
+                    },
+                  ),
+                if (showTasks) block(SizedBox(height: mobile ? 23 : 33)),
+              ],
+              if (showTasks) ...[
+                block(
+                  Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(child: _SectionHeading('Tasks')),
+                          if (onPlanDay != null)
+                            TextButton(
+                              onPressed: onPlanDay,
+                              child: const Text('Plan day'),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  if (dayTasks.isEmpty)
-                    const _EmptyMessage('No tasks due today.'),
-                  for (final task in [
-                    ...dayTasks.where((task) => !task.done),
-                    ...dayTasks.where((task) => task.done),
-                  ])
-                    _TodayTask(
-                      task: task,
-                      onToggle: () => onTaskToggle(task),
-                      onTap: () => onTaskTap(task),
-                    ),
-                ],
+                ),
+                if (taskCount == 0)
+                  block(const _EmptyMessage('No tasks due today.'))
+                else
+                  SliverList.builder(
+                    itemCount: taskCount,
+                    itemBuilder: (_, index) {
+                      final task = index < openTasks.length
+                          ? openTasks[index]
+                          : completedTasks[index - openTasks.length];
+                      return framed(
+                        _TodayTask(
+                          task: task,
+                          onToggle: () => onTaskToggle(task),
+                          onTap: () => onTaskTap(task),
+                        ),
+                      );
+                    },
+                  ),
               ],
-            ),
+            ],
           ),
         ),
       ],
