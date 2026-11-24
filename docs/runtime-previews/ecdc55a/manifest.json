@@ -1,0 +1,50 @@
+{
+  "app_revision": "ecdc55a553e83d8b357dc2651011f33f26099677",
+  "extraction_run": "https://github.com/launchsites/easy/actions/runs/45359720230",
+  "source_archives": {
+    "linux": {
+      "run": "https://github.com/launchsites/easy/actions/runs/45357107699",
+      "artifact_id": 14903286313,
+      "sha256": "92371fccb944bd023dd0a995337f56827c7c30cfe3f96dadd005cbff358aa3ed"
+    },
+    "android": {
+      "run": "https://github.com/launchsites/easy/actions/runs/45353884908",
+      "artifact_id": 14901039000,
+      "sha256": "95b69ed9f7151a436d6704888a8aea1a7eea326c1cc4b82f3a49036b4f2f858d"
+    }
+  },
+  "images": [
+    {
+      "name": "desktop-tasks.webp",
+      "platform": "linux",
+      "source_member": "desktop-tasks.png",
+      "source_sha256": "3f5306d610bb004c430d388d8c22bc7f9fdd89a802eb38160744db356a2becdf",
+      "bytes": 9644,
+      "sha256": "cf5442c81e4f3914a9868b6fa606f829c2a77afdb0820542e744841dd1a20d5f"
+    },
+    {
+      "name": "mobile-gym.webp",
+      "platform": "linux",
+      "source_member": "mobile-gym.png",
+      "source_sha256": "f321f5847f84ddf86f596025363b7e1c5c02117fe6fa48a31025c6ea4b82898f",
+      "bytes": 6316,
+      "sha256": "eeb563bc6d6a1766045f4e255aa87026e903526c23e79e8779ad0d014ccbb97b"
+    },
+    {
+      "name": "android-orbit.webp",
+      "platform": "android",
+      "source_member": "02-orbit.png",
+      "source_sha256": "f68be5aeb31a344534de4974b19b6388b4febe25b312fba878f067c47d3929ef",
+      "bytes": 19260,
+      "sha256": "b2b88dfa1ca79719321be97761b06a82ac4c1c081086b5c1295849e6ece61611"
+    },
+    {
+      "name": "android-calendar.webp",
+      "platform": "android",
+      "source_member": "04-following-day.png",
+      "source_sha256": "50b1e9e07d4b103ac831bb6cbede9ba8390c07f5f1c9a9c5f388d79e8709fc0c",
+      "bytes": 8060,
+      "sha256": "4a2616d167b760a71fb9b688eb42eddbcccc1ba1cec99ed8b318898a5ce89c03"
+    }
+  ]
+}
