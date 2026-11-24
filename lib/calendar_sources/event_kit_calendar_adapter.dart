@@ -23,6 +23,7 @@ class ExternalCalendarEvent {
     this.notes,
     this.timeZoneId,
     this.recurring = false,
+    this.status = CalendarEventStatus.unknown,
   });
 
   final String title;
@@ -33,6 +34,7 @@ class ExternalCalendarEvent {
   final String? notes;
   final String? timeZoneId;
   final bool recurring;
+  final CalendarEventStatus status;
 }
 
 class EventKitEventDraft {
@@ -493,6 +495,7 @@ SourcedCalendarEvent<ExternalCalendarEvent> _readEvent(Object? value) {
       location: _optionalString(event, 'location'),
       notes: _optionalString(event, 'notes'),
       timeZoneId: _optionalString(event, 'timeZoneId'),
+      status: CalendarEventStatus.fromSource(event['status']),
     ),
   );
 }

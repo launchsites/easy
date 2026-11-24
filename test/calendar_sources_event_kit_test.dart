@@ -280,6 +280,7 @@ void main() {
             'title': 'Team meeting',
             'allDay': false,
             'recurring': true,
+            'status': 'confirmed',
             'startMilliseconds': start
                 .add(const Duration(hours: 14))
                 .millisecondsSinceEpoch,
@@ -313,11 +314,66 @@ void main() {
       expect(meeting.event.start.isUtc, isTrue);
       expect(meeting.event.location, 'Room A');
       expect(meeting.event.timeZoneId, 'Europe/London');
+      expect(meeting.event.status, CalendarEventStatus.confirmed);
       final holiday = events.last.event;
       expect(holiday.allDay, isTrue);
       expect(holiday.start, DateTime(2026, 11, 25));
       expect(holiday.end, DateTime(2026, 11, 26));
       expect(holiday.start.isUtc, isFalse);
+      expect(holiday.status, CalendarEventStatus.unknown);
+    },
+  );
+
+  test(
+    'reads occurrence status without prompting or changing the source',
+    () async {
+      final cases = <(Object?, CalendarEventStatus)>[
+        ('tentative', CalendarEventStatus.tentative),
+        ('cancelled', CalendarEventStatus.cancelled),
+        ('unknown', CalendarEventStatus.unknown),
+        ('unrecognized', CalendarEventStatus.unknown),
+        (1, CalendarEventStatus.unknown),
+        (null, CalendarEventStatus.unknown),
+      ];
+      final calls = <String>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call.method);
+        expect(call.method, 'events');
+        return [
+          for (final (index, entry) in cases.indexed)
+            {
+              ...source.toJson(),
+              'eventId': 'series',
+              'recurrenceId': '$index',
+              'title': 'Occurrence',
+              'allDay': false,
+              'recurring': true,
+              'status': entry.$1,
+              'startMilliseconds': start.millisecondsSinceEpoch,
+              'endMilliseconds': end.millisecondsSinceEpoch,
+            },
+        ];
+      });
+
+      final events = await adapter.events(
+        start: start,
+        end: end,
+        calendars: [source],
+      );
+
+      expect(calls, ['events']);
+      expect(
+        events.map((row) => row.event.status),
+        cases.map((entry) => entry.$2),
+      );
+      expect(events.map((row) => row.id.recurrenceId), [
+        '0',
+        '1',
+        '2',
+        '3',
+        '4',
+        '5',
+      ]);
     },
   );
 

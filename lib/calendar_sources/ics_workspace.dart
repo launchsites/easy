@@ -69,7 +69,11 @@ typedef IcsWorkspaceWindow = ({
   DateTime end,
 });
 
-typedef IcsWorkspaceEvent = ({CalendarIdentity calendar, CalendarEvent event});
+typedef IcsWorkspaceEvent = ({
+  CalendarIdentity calendar,
+  CalendarEvent event,
+  CalendarEventStatus status,
+});
 
 List<IcsWorkspaceEvent> expandWorkspaceIcs(IcsWorkspaceWindow input) {
   const windowLimit = 20000;
@@ -93,6 +97,7 @@ List<IcsWorkspaceEvent> expandWorkspaceIcs(IcsWorkspaceWindow input) {
       final source = occurrence.event;
       result.add((
         calendar: calendar.identity,
+        status: CalendarEventStatus.fromSource(source.status),
         event: CalendarEvent(
           id: 'ics:${item.localId}',
           title: source.summary.isEmpty ? 'Untitled event' : source.summary,

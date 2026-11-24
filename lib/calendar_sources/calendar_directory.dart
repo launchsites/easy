@@ -38,6 +38,24 @@ class CalendarIdentity {
 
 enum CalendarCapability { read, write }
 
+/// The source's explicit VEVENT status. A missing status is unknown.
+enum CalendarEventStatus {
+  unknown,
+  confirmed,
+  tentative,
+  cancelled;
+
+  static CalendarEventStatus fromSource(Object? value) => switch (value) {
+    final String text => switch (text.toLowerCase()) {
+      'confirmed' => confirmed,
+      'tentative' => tentative,
+      'cancelled' || 'canceled' => cancelled,
+      _ => unknown,
+    },
+    _ => unknown,
+  };
+}
+
 class CalendarSource {
   CalendarSource({
     required this.id,

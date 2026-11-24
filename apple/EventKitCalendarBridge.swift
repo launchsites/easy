@@ -496,6 +496,7 @@ private struct CalendarEventSnapshot: Sendable {
   let allDay: Bool
   let timeZoneID: String?
   let recurring: Bool
+  let status: String
   let location: String?
   let notes: String?
 
@@ -510,6 +511,13 @@ private struct CalendarEventSnapshot: Sendable {
     timeZoneID = event.timeZone?.identifier
     recurring = event.hasRecurrenceRules || event.isDetached || event.occurrenceDate != nil
     recurrenceID = recurring ? String(Self.milliseconds(event.occurrenceDate ?? start)) : nil
+    switch event.status {
+    case .confirmed: status = "confirmed"
+    case .tentative: status = "tentative"
+    case .canceled: status = "cancelled"
+    case .none: status = "unknown"
+    @unknown default: status = "unknown"
+    }
     location = event.location
     notes = event.notes
   }
@@ -521,6 +529,7 @@ private struct CalendarEventSnapshot: Sendable {
     value["title"] = title
     value["allDay"] = allDay
     value["recurring"] = recurring
+    value["status"] = status
     value["timeZoneId"] = timeZoneID
     value["location"] = location
     value["notes"] = notes
