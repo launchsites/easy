@@ -119,6 +119,10 @@ taskset -c 1 python3 tool/benchmark/local_inference.py \
   --output "$easy_bench_dir/qwen4b-soak-results.json"
 ```
 
+### Legacy application provider
+
+The V1 provider at `8670be647657925862931c2b3b58683656ca2ef7` sent 12 synthetic capture requests through the actual Dart client to the Qwen3-4B server. The runtime used four CPUs, a 4,096-token context, a 640-token response ceiling and a 60-second deadline. It started in 8.85 seconds. Six requests returned invalid drafts and six timed out. The app accepted zero model drafts. The deterministic parser matched the intended ready outcomes on nine of 12 cases. These measurements predate the narrower V2 contract. [V1 synthetic cases](../tool/benchmark/provider_capture_cases.json) · [V1 provider results](benchmark-results/provider-capture-v1-qwen4b-20261124.json)
+
 ## Offline speech pilot
 
 The tested whisper.cpp b5907 Linux x86-64 CPU archive has SHA-256 `a6199027fe5b4239c84171d2bca4c0ff44ec86a515494d5a39b237b212d429bd`. The MIT model repository at revision `5359861c739e955e79d9a303bcbc70fb988958b1` supplied English `ggml-tiny.en.bin` at SHA-256 `921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f` and `ggml-base.en.bin` at SHA-256 `a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002`. [whisper.cpp b5907 release](https://github.com/ggml-org/whisper.cpp/releases/tag/b5907) · [Model files](https://huggingface.co/ggerganov/whisper.cpp/tree/5359861c739e955e79d9a303bcbc70fb988958b1) · [OpenAI Whisper license](https://github.com/openai/whisper/blob/main/LICENSE)
@@ -151,6 +155,8 @@ python3 tool/benchmark/local_speech.py \
 The capture interpreter at `3b0e345e3aa7ff7a389d895bf6e35e3b668386ad` processed the 64 existing Tiny and Base transcripts and their eight reference phrases directly. The synthetic contexts deliberately used a different active focus for the work deadline and study note. Two reference phrases produced a ready draft. The others surfaced as unrecognized, including the cancellation request. [Speech-to-review evidence](benchmark-results/speech-capture-replay-20261124.json)
 
 Tiny produced one ready draft from 32 clips. Its noisy deadline dropped the actual due date and changed the task wording. Base produced three ready drafts from 32 clips. Two clean clips yielded the intended coffee time of 10:00–11:00 the next day. A study note replaced “lemma” with “limit” and retained the active Gym suggestion. All eight cancellation recordings produced zero drafts. None of the speech drafts matched the parsed reference in every projected field. The replay stopped at the editable review and performed zero workspace writes.
+
+The explicit note-scope and numeric-date parser update at `e0f8a1d6e5d36c4c310f40db44f876965cdced6f` was compiled from a clean archive and replayed the same 64 transcripts. Tiny produced five ready drafts and matched four parsed references. Base produced seven ready drafts and matched three parsed references. The four personal-note clips per model were now routed to Personal while Gym was active. Base also routed the study note to Study. The speech recognition errors in the noisy deadline and the study note text each remained in a ready draft. The two correct Base coffee time ranges were unchanged, and all eight cancellation clips again produced zero proposals. [Replay after the parser update](benchmark-results/speech-capture-replay-parser-after-20261124.json)
 
 ```sh
 TZ=Europe/London dart run tool/benchmark/speech_capture_replay.dart \

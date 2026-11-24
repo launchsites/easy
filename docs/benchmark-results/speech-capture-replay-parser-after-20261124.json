@@ -1,0 +1,1126 @@
+{
+  "tested_at_utc": "2026-11-24T03:39:00.783185Z",
+  "capture_source_revision": "e0f8a1d6e5d36c4c310f40db44f876965cdced6f",
+  "speech_report_sha256": "16e710b66597355bc1f618f913e524d71c6b23075cbf262837fa887640873a56",
+  "context_anchor": "2026-11-24T15:00:00 Europe/London",
+  "case_focuses": {
+    "work_deadline": "gym",
+    "coffee_range": "work",
+    "timed_appointment": "work",
+    "study_note": "gym",
+    "cardio": "work",
+    "strength": "study",
+    "personal_note": "gym",
+    "destructive_request": "gym"
+  },
+  "reference_text_projections": {
+    "work_deadline": {
+      "proposals": [
+        {
+          "kind": "task",
+          "title": "email jordan the revised estimate",
+          "category": null,
+          "suggested_category": "gym",
+          "missing": [],
+          "issues": [],
+          "date": "2026-11-27T00:00:00.000"
+        }
+      ],
+      "ready": 1,
+      "issues": []
+    },
+    "coffee_range": {
+      "proposals": [],
+      "ready": 0,
+      "issues": [
+        "unrecognizedIntent"
+      ]
+    },
+    "timed_appointment": {
+      "proposals": [],
+      "ready": 0,
+      "issues": [
+        "unrecognizedIntent"
+      ]
+    },
+    "study_note": {
+      "proposals": [
+        {
+          "kind": "note",
+          "title": "chapter four uses the same lemma twice",
+          "category": "study",
+          "suggested_category": null,
+          "missing": [],
+          "issues": [],
+          "body": ""
+        }
+      ],
+      "ready": 1,
+      "issues": []
+    },
+    "cardio": {
+      "proposals": [],
+      "ready": 0,
+      "issues": [
+        "unrecognizedIntent"
+      ]
+    },
+    "strength": {
+      "proposals": [],
+      "ready": 0,
+      "issues": [
+        "unrecognizedIntent"
+      ]
+    },
+    "personal_note": {
+      "proposals": [
+        {
+          "kind": "note",
+          "title": "get the weekend shopping list",
+          "category": "personal",
+          "suggested_category": null,
+          "missing": [],
+          "issues": [],
+          "body": ""
+        }
+      ],
+      "ready": 1,
+      "issues": []
+    },
+    "destructive_request": {
+      "proposals": [],
+      "ready": 0,
+      "issues": [
+        "unrecognizedIntent"
+      ]
+    }
+  },
+  "profiles": [
+    {
+      "model": "ggml-tiny.en.bin",
+      "clips": 32,
+      "with_drafts": 5,
+      "with_ready_drafts": 5,
+      "with_ready_drafts_and_missing_speech_facts": 1,
+      "same_draft_as_reference": 4,
+      "cases": [
+        {
+          "clip": "work_deadline-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "work_deadline-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "task",
+                "title": "email jordan the reminds me of my dry day",
+                "category": null,
+                "suggested_category": "gym",
+                "missing": [],
+                "issues": [],
+                "date": null
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "work_deadline-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "work_deadline-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "coffee_range-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "coffee_range-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "coffee_range-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "coffee_range-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "timed_appointment-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "timed_appointment-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "timed_appointment-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "timed_appointment-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "study_note-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "study_note-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "study_note-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "study_note-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "cardio-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "cardio-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent",
+              "unknownCategory"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "cardio-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent",
+              "unknownCategory"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "cardio-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "strength-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "strength-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "strength-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "strength-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "personal_note-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "note",
+                "title": "get the weekend shopping list",
+                "category": "personal",
+                "suggested_category": null,
+                "missing": [],
+                "issues": [],
+                "body": ""
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": true
+        },
+        {
+          "clip": "personal_note-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "note",
+                "title": "get the weekend shopping list",
+                "category": "personal",
+                "suggested_category": null,
+                "missing": [],
+                "issues": [],
+                "body": ""
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": true
+        },
+        {
+          "clip": "personal_note-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "note",
+                "title": "get the weekend shopping list",
+                "category": "personal",
+                "suggested_category": null,
+                "missing": [],
+                "issues": [],
+                "body": ""
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": true
+        },
+        {
+          "clip": "personal_note-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "note",
+                "title": "get the weekend shopping list",
+                "category": "personal",
+                "suggested_category": null,
+                "missing": [],
+                "issues": [],
+                "body": ""
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": true
+        },
+        {
+          "clip": "destructive_request-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "destructive_request-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "destructive_request-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "destructive_request-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        }
+      ]
+    },
+    {
+      "model": "ggml-base.en.bin",
+      "clips": 32,
+      "with_drafts": 7,
+      "with_ready_drafts": 7,
+      "with_ready_drafts_and_missing_speech_facts": 1,
+      "same_draft_as_reference": 3,
+      "cases": [
+        {
+          "clip": "work_deadline-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "work_deadline-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "work_deadline-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "work_deadline-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "coffee_range-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "event",
+                "title": "coffee with alex",
+                "category": null,
+                "suggested_category": "work",
+                "missing": [],
+                "issues": [],
+                "date": "2026-11-25T00:00:00.000",
+                "start": "2026-11-25T10:00:00.000",
+                "end": "2026-11-25T11:00:00.000",
+                "start_clock": "10:0",
+                "end_clock": "11:0",
+                "duration_min": null,
+                "all_day": false
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "coffee_range-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "coffee_range-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "event",
+                "title": "coffee with alex",
+                "category": null,
+                "suggested_category": "work",
+                "missing": [],
+                "issues": [],
+                "date": "2026-11-25T00:00:00.000",
+                "start": "2026-11-25T10:00:00.000",
+                "end": "2026-11-25T11:00:00.000",
+                "start_clock": "10:0",
+                "end_clock": "11:0",
+                "duration_min": null,
+                "all_day": false
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "coffee_range-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "timed_appointment-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "timed_appointment-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "timed_appointment-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "timed_appointment-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "study_note-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "study_note-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "study_note-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "note",
+                "title": "chapter 4 uses the same limit twice",
+                "category": "study",
+                "suggested_category": null,
+                "missing": [],
+                "issues": [],
+                "body": ""
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "study_note-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "cardio-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "cardio-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "cardio-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "cardio-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "strength-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "strength-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "strength-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "strength-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "personal_note-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "note",
+                "title": "get the weekend shopping list",
+                "category": "personal",
+                "suggested_category": null,
+                "missing": [],
+                "issues": [],
+                "body": ""
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": true
+        },
+        {
+          "clip": "personal_note-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "note",
+                "title": "get the weekend shopping list",
+                "category": "personal",
+                "suggested_category": null,
+                "missing": [],
+                "issues": [],
+                "body": ""
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": true
+        },
+        {
+          "clip": "personal_note-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "note",
+                "title": "get the weekend shopping list",
+                "category": "personal",
+                "suggested_category": null,
+                "missing": [],
+                "issues": [],
+                "body": ""
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": true
+        },
+        {
+          "clip": "personal_note-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [
+              {
+                "kind": "note",
+                "title": "get my weekend shopping list",
+                "category": "personal",
+                "suggested_category": null,
+                "missing": [],
+                "issues": [],
+                "body": ""
+              }
+            ],
+            "ready": 1,
+            "issues": []
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "destructive_request-en-gb-clean",
+          "voice": "en-gb",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "destructive_request-en-gb-noisy",
+          "voice": "en-gb",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "destructive_request-en-us-clean",
+          "voice": "en-us",
+          "condition": "clean",
+          "speech_facts_passed": true,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        },
+        {
+          "clip": "destructive_request-en-us-noisy",
+          "voice": "en-us",
+          "condition": "noisy",
+          "speech_facts_passed": false,
+          "parsed": {
+            "proposals": [],
+            "ready": 0,
+            "issues": [
+              "unrecognizedIntent"
+            ]
+          },
+          "same_draft_as_reference": false
+        }
+      ]
+    }
+  ]
+}

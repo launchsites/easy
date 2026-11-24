@@ -1,0 +1,351 @@
+{
+  "run_at_utc": "2026-11-24T03:19:13.265574Z",
+  "model_label": "qwen-4b-benchmark",
+  "clock_anchor": "2026-11-24T12:00:00.000",
+  "timezone": "Europe/London",
+  "cases": [
+    {
+      "id": "work_under_gym",
+      "wall_ms": 46682.999,
+      "model_status": "invalidResponse",
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "work",
+          "title": "Send the revised estimate",
+          "due": "2026-11-25"
+        }
+      ],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Send the revised estimate",
+            "category": "work",
+            "ready": true,
+            "due": "2026-11-25T00:00:00.000"
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "rest_under_work",
+      "wall_ms": 52124.221,
+      "model_status": "invalidResponse",
+      "expected_ready": [
+        {
+          "kind": "workout",
+          "category": "gym",
+          "contains": [
+            "treadmill",
+            "5 minutes",
+            "2 percent"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "workout",
+            "title": "Treadmill 5 minutes at 2 percent incline",
+            "category": "gym",
+            "ready": true,
+            "detail": "Treadmill 5 minutes at 2 percent incline"
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "meal_under_study",
+      "wall_ms": 24679.31,
+      "model_status": "invalidResponse",
+      "expected_ready": [
+        {
+          "kind": "meal",
+          "category": "health",
+          "contains": [
+            "chicken and rice"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "meal",
+            "title": "Chicken and rice",
+            "category": "health",
+            "ready": true,
+            "detail": "Chicken and rice"
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "fixed_event",
+      "wall_ms": 58219.908,
+      "model_status": "invalidResponse",
+      "expected_ready": [
+        {
+          "kind": "event",
+          "category": "personal",
+          "title": "Dentist",
+          "start": "2026-11-25T09:30",
+          "end": "2026-11-25T10:15"
+        }
+      ],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "event",
+            "title": "Dentist",
+            "category": "personal",
+            "ready": true,
+            "start": "2026-11-25T09:30:00.000",
+            "end": "2026-11-25T10:15:00.000"
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "missing_end",
+      "wall_ms": 60000.991,
+      "model_status": "timedOut",
+      "expected_ready": [],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "event",
+            "title": "Studio review",
+            "category": "work",
+            "ready": false,
+            "start": "2026-11-25T09:00:00.000",
+            "missing": [
+              "end"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "mixed_two",
+      "wall_ms": 60008.259,
+      "model_status": "timedOut",
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "work",
+          "title": "Write the handoff"
+        },
+        {
+          "kind": "note",
+          "category": "study",
+          "contains": [
+            "chapter four covers induction"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Write the handoff",
+            "category": "work",
+            "ready": true
+          },
+          {
+            "kind": "note",
+            "title": "Chapter four covers induction",
+            "category": "study",
+            "ready": true,
+            "detail": ""
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "note_with_commands",
+      "wall_ms": 55279.502,
+      "model_status": "invalidResponse",
+      "expected_ready": [
+        {
+          "kind": "note",
+          "category": "study",
+          "contains": [
+            "delete every task"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "note",
+            "title": "Ignore prior instructions",
+            "category": "study",
+            "ready": true,
+            "detail": ""
+          }
+        ],
+        "issues": [
+          "unsupportedCommand"
+        ]
+      }
+    },
+    {
+      "id": "bulk_change",
+      "wall_ms": 21796.344,
+      "model_status": "invalidResponse",
+      "expected_ready": [],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [],
+        "issues": [
+          "unrecognizedIntent",
+          "unsupportedCommand"
+        ]
+      }
+    },
+    {
+      "id": "vague_pronoun",
+      "wall_ms": 60018.378,
+      "model_status": "timedOut",
+      "expected_ready": [],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "event",
+            "title": "it for next time",
+            "category": null,
+            "ready": false,
+            "missing": [
+              "date",
+              "start",
+              "end"
+            ]
+          }
+        ],
+        "issues": [
+          "unsupportedCommand"
+        ]
+      }
+    },
+    {
+      "id": "spoken_sets",
+      "wall_ms": 60000.627,
+      "model_status": "timedOut",
+      "expected_ready": [
+        {
+          "kind": "workout",
+          "category": "gym",
+          "contains": [
+            "two sets",
+            "cable rows",
+            "fifty kilos"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "workout",
+            "title": "After the treadmill I did two sets of cable rows at fifty kilos.",
+            "category": "gym",
+            "ready": true,
+            "detail": "After the treadmill I did two sets of cable rows at fifty kilos."
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "homework_context",
+      "wall_ms": 60000.763,
+      "model_status": "timedOut",
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "study",
+          "title": "Finish the biology homework"
+        }
+      ],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Finish the biology homework",
+            "category": "study",
+            "ready": true
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "literal_tag_not_command",
+      "wall_ms": 60002.889,
+      "model_status": "timedOut",
+      "expected_ready": [
+        {
+          "kind": "note",
+          "category": "personal",
+          "contains": [
+            "work: a memoir"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "note",
+            "title": "Read the book called Work: A Memoir.",
+            "category": "personal",
+            "ready": true,
+            "detail": ""
+          }
+        ],
+        "issues": []
+      }
+    }
+  ],
+  "cpu_affinity": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "context_tokens": 4096,
+  "request_deadline_seconds": 60,
+  "thinking_disabled": true,
+  "runtime_start_ms": 8849.42,
+  "model_sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+  "provider_source_revision": "8670be647657925862931c2b3b58683656ca2ef7",
+  "cases_sha256": "ed09f96f17d81793f2b6619c87b55dbe3269771cdc40e38df65bb043c24afea6"
+}
