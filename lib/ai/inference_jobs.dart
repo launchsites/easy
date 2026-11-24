@@ -62,21 +62,36 @@ class AiInferenceJob {
 /// A claim authorizes result delivery for a single attempt.
 class AiInferenceClaim {
   AiInferenceClaim._({
+    required this._owner,
     required this.request,
     required this.attempt,
     required this.startedAt,
     this.reservation,
   });
 
+  final AiInferenceQueue _owner;
   final AiInferenceRequest request;
   final int attempt;
   final DateTime startedAt;
   final AiReservation? reservation;
   final _stop = Completer<AiJobStopReason>();
   AiJobStopReason? _stopReason;
+  bool _requestStarted = false;
 
   AiJobStopReason? get stopReason => _stopReason;
   Future<AiJobStopReason> get whenStopped => _stop.future;
+  bool get requestStarted => _requestStarted;
+  bool get isActive =>
+      stopReason == null &&
+      identical(_owner._claims[request.id], this) &&
+      _owner._jobs[request.id]?.state == AiJobState.running;
+
+  /// Claims the single transport operation for this running attempt.
+  bool beginRequest() {
+    if (!isActive || _requestStarted) return false;
+    _requestStarted = true;
+    return true;
+  }
 
   void _requestStop(AiJobStopReason reason) {
     if (_stop.isCompleted) return;
@@ -171,6 +186,7 @@ class AiInferenceQueue {
         final running = job._transition(AiJobState.running, started);
         _jobs[request.id] = running;
         return _claims[request.id] = AiInferenceClaim._(
+          owner: this,
           request: request,
           attempt: running.attempts,
           startedAt: started,
