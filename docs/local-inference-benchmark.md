@@ -188,6 +188,8 @@ The test harness also supplied llama.cpp with an experimental response schema ge
 
 The grammar improved structural validity and reduced median request time on these fixtures. The 0.5B model still assigned Work to multiple captures about other categories. The meanings variant left exact matches unchanged on 0.5B and reduced them by one on 1.5B. The tested outputs continue to require individual review. [0.5B schema](benchmark-results/provider-metadata-v2-qwen05-schema-20261124.json) · [1.5B schema](benchmark-results/provider-metadata-v2-qwen15-schema-20261124.json) · [0.5B meanings](benchmark-results/provider-metadata-v2-qwen05-meanings-20261124.json) · [1.5B meanings](benchmark-results/provider-metadata-v2-qwen15-meanings-20261124.json)
 
+Qwen3-4B produced three exact drafts with the same experimental grammar. Eight of 11 calls timed out at 60 seconds. The accepted responses took 19.75, 31.28 and 54.86 seconds on four virtual CPUs. This run shared the virtual CPU quota with the native agenda comparison and other workspace jobs. Eight deterministic controls made zero requests. A timed-out model call yielded no model proposal, and none of the drafts wrote records. On this shared CPU host the tested 4B profile could offer useful suggestions when it completed, with poor interactive availability. [4B V2 provider results](benchmark-results/provider-metadata-v2-qwen4b-schema-20261124.json)
+
 Run the benchmark against an explicitly started local llama.cpp endpoint. The optional `--json-object`, `--json-schema` and `--json-schema-meanings` flags reproduce the tested formats.
 
 ```sh
