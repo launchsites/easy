@@ -1,18 +1,20 @@
 # Android release verification
 
-Android release assembly and lint passed from a fresh archive of `12730c86ac311e5c473a6810a69cc31ec257f1ff`. Dependency resolution used verified local caches. The toolchain used Android SDK 36, Build Tools 36.0.0, NDK 28.2.13676358, JDK 21, Gradle 9.5.0, and Android Gradle Plugin 9.3.1. [Package verification](benchmark-results/android-release-12730c8-20261124.json)
+Android release assembly and lint passed in 5 minutes 34 seconds from a fresh archive of `5c4bd854f21d864a7eb352b29acfb95358c8e8f8`. Dependency resolution used verified local caches. The toolchain used Android SDK 36, Build Tools 36.0.0, NDK 28.2.13676358, JDK 21, Gradle 9.5.0, and Android Gradle Plugin 9.3.1. [Package verification](benchmark-results/android-release-5c4bd85-20261124.json)
 
 | ABI | Package bytes | SHA-256 |
 | --- | ---: | --- |
-| `arm64-v8a` | 26,797,725 | `3b3874f2217bbceb2945df272feb39823c3e8a0058a031f770a053de3f1c0716` |
-| `armeabi-v7a` | 25,062,583 | `2681560a9af724e2054c7d483219dac116e9257b188bb5553f337ea13694e32f` |
-| `x86_64` | 28,199,894 | `e11cf642906a810d94a19382e4eb1eaf2f934c576baa3dc4bf35a3f2c6439e96` |
+| `arm64-v8a` | 26,797,725 | `f208a1adeb6b9fa2ff77b74fbb2e591578a53e19e9de6e6b5e7d3edf34b8c4ca` |
+| `armeabi-v7a` | 25,128,119 | `18f1d39ab7b153e4373ddd17e6bacbc97ac23311798e74d8a7cf6cc3fdbc7e1d` |
+| `x86_64` | 28,199,894 | `521d9d81f1d5940d6783c019c90839c5eb1ef5b48f6d5a1a13b951aaf608e07e` |
 
 Each package passed Android signature and 16 KiB ZIP alignment checks. All 15 native libraries matched their APK's ABI and 16 KiB load alignment. The compiled manifest declared a non-debuggable app, minimum SDK 24, target SDK 36, and `app.launchsites.easy.MainActivity` as the launcher. Its compiled network policy permits cleartext only on exact IPv4 and IPv6 loopback addresses. Its backup settings disable older Android backup and exclude workspace domains from Android 12 and later cloud backup and device transfer.
 
 Release lint reported no issues. Gradle emitted a separate deprecation summary. The packages use a development signing certificate. These three APKs were checked at package level.
 
-Separately, the hosted AOSP API 36 emulator installed and launched the development-signed x86-64 release built from `93bdea7fdfa1e527203718d2323c7b84d4d75728`. The run verified an empty private SQLite workspace with setup pending and captured the first-launch screen. Physical-device interaction, notification delivery, and Android's enforcement of the compiled policies still require runtime coverage. [Hosted emulator run](https://github.com/launchsites/easy/actions/runs/45337863946)
+The hosted AOSP API 36 emulator built its own development-signed x86-64 release from `5c4bd854f21d864a7eb352b29acfb95358c8e8f8`, installed it, and verified an empty private SQLite workspace with setup pending. The run captured the first-launch screen. Physical-device interaction, notification delivery, and Android's enforcement of the compiled policies still require runtime coverage. [Hosted emulator run](https://github.com/launchsites/easy/actions/runs/45344251920)
+
+The hosted release at `975c6e8bd4653cad18d8d7dd3ca1d5363672ba62` completed Full setup at revision 2. A synthetic result in the Android image picker's own cache recovered as one local meal draft in revision 3. The managed 3×2 image matched the platform's resized fixture bytes. Replaying the same cached result after another cold launch kept the same revision and workspace digest. The scenario used a disposable emulator with synthetic image-picker state. [Hosted photo recovery run](https://github.com/launchsites/easy/actions/runs/45343142083)
 
 ```sh
 flutter build apk --release --split-per-abi
