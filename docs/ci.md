@@ -2,6 +2,8 @@
 
 **Verification** runs on pull requests and pushes to `main`. It checks out the requested revision, verifies Flutter 3.50.1 against its upstream commit, and restores packages from the checked-in `pubspec.lock`. The Linux runner analyzes Dart, runs the native source checks and full Flutter suite, checks daylight-saving transitions in New York and Lord Howe, and compiles the Linux release. [Verification workflow](../.github/workflows/verification.yml) · [SDK bootstrap](../.github/scripts/bootstrap-flutter.sh)
 
+An active `main` run can finish while the newest push waits. Each new pull request revision cancels the previous run for that pull request.
+
 **Apple SDK check** is available from the Actions tab through **Run workflow**. It uses the GitHub-hosted `macos-15` image with Xcode 26.3 to compile a debug build for the iOS simulator and an unsigned macOS release. It is an SDK compile check. Device behavior and distribution signing have separate verification. [Apple workflow](../.github/workflows/apple-sdk.yml) · [Hosted runner SDK inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md)
 
 Both workflows request read-only repository contents and use GitHub's checkout action at its exact release commit. Builds stay in the runner workspace. Flutter comes directly from its upstream repository. [Checkout v6.0.2](https://github.com/actions/checkout/releases/tag/v6.0.2) · [Flutter 3.50.1](https://github.com/flutter/flutter/releases/tag/3.50.1)
