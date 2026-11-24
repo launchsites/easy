@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import platform
 import plistlib
 import re
 import sqlite3
@@ -15,9 +16,15 @@ import uuid
 from initial_workspace_probe import read_pending_workspace
 
 
+def xcrun_command():
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        return ["/usr/bin/arch", "-arm64e", "xcrun"]
+    return ["xcrun"]
+
+
 def simctl(*arguments, check=True, timeout=30):
     return subprocess.run(
-        ["xcrun", "simctl", *arguments], check=check, text=True,
+        [*xcrun_command(), "simctl", *arguments], check=check, text=True,
         stdout=subprocess.PIPE, timeout=timeout,
     )
 
@@ -77,6 +84,18 @@ def simulator_pid(device_id, bundle_id):
 
 
 def print_launch_diagnostics(device_id, bundle_id):
+    if platform.system() == "Darwin":
+        predicate = 'process == "CoreSimulatorService" OR process == "simdiskimaged" OR process == "launchd_sim"'
+        try:
+            host_log = subprocess.run(
+                ["/usr/bin/log", "show", "--last", "4m", "--style", "compact", "--predicate", predicate],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=25,
+            )
+            print("Simulator host diagnostic", flush=True)
+            print("\n".join(host_log.stdout.splitlines()[-35:]), flush=True)
+        except subprocess.TimeoutExpired:
+            print("Simulator host diagnostic timed out.", flush=True)
+
     predicate = f'process == "Runner" OR eventMessage CONTAINS[c] "{bundle_id}"'
     for commands, timeout in (
         (("spawn", device_id, "log", "show", "--last", "4m", "--style", "compact", "--predicate", predicate), 30),
@@ -92,7 +111,7 @@ def print_launch_diagnostics(device_id, bundle_id):
 
 def verify_launch(device_id, bundle_id, database, screenshot):
     launch = subprocess.Popen(
-        ["xcrun", "simctl", "launch", device_id, bundle_id], stdout=subprocess.PIPE,
+        [*xcrun_command(), "simctl", "launch", device_id, bundle_id], stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT, text=True,
     )
     try:
@@ -127,7 +146,7 @@ def check_ios_launch(bundle, screenshot):
     with (bundle / "Info.plist").open("rb") as metadata:
         bundle_id = plistlib.load(metadata)["CFBundleIdentifier"]
     sdk = subprocess.check_output(
-        ["xcrun", "--sdk", "iphonesimulator", "--show-sdk-version"],
+        [*xcrun_command(), "--sdk", "iphonesimulator", "--show-sdk-version"],
         text=True, timeout=30,
     ).strip()
     inventory = json.loads(simctl("list", "--json", "devices", "available").stdout)
@@ -138,8 +157,12 @@ def check_ios_launch(bundle, screenshot):
     try:
         print(simctl("bootstatus", device_id, "-b", timeout=300).stdout.strip(), flush=True)
         print("Installing the built iOS simulator app.", flush=True)
-        simctl("install", device_id, str(bundle), timeout=120)
-        installed = simctl("get_app_container", device_id, bundle_id, "data", timeout=90)
+        try:
+            simctl("install", device_id, str(bundle), timeout=120)
+            installed = simctl("get_app_container", device_id, bundle_id, "data", timeout=90)
+        except subprocess.SubprocessError:
+            print_launch_diagnostics(device_id, bundle_id)
+            raise
         container = Path(installed.stdout.strip())
         if not container.is_absolute() or not container.is_dir():
             raise RuntimeError("The installed app has no valid simulator data container.")
