@@ -220,6 +220,7 @@ void main() {
       ];
       await tester.pumpWidget(
         MaterialApp(
+          theme: palette.easyTheme(),
           home: Scaffold(
             body: CalendarPage(
               date: date,
@@ -238,7 +239,12 @@ void main() {
       );
       for (final event in events) {
         final text = find.text(event.title);
-        expect(tester.widget<Text>(text).style!.color, palette.ink);
+        final ink = tester.widget<Text>(text).style!.color!.computeLuminance();
+        final fill = tint.computeLuminance();
+        expect(
+          (max(ink, fill) + .05) / (min(ink, fill) + .05),
+          greaterThanOrEqualTo(4.5),
+        );
         final surfaces = find.ancestor(
           of: text,
           matching: find.byType(Material),

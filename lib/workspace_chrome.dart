@@ -481,6 +481,7 @@ class _RecordDetails extends StatelessWidget {
     this.onOpenNoteLink,
     this.onEstimate,
     this.onAppleCopy,
+    this.appleActionLabel,
     this.onRepeat,
     this.repeatingTask = false,
     this.onAssignPlace,
@@ -500,6 +501,7 @@ class _RecordDetails extends StatelessWidget {
   final ValueChanged<NoteLink>? onOpenNoteLink;
   final VoidCallback? onEstimate;
   final VoidCallback? onAppleCopy;
+  final String? appleActionLabel;
   final VoidCallback? onRepeat;
   final bool repeatingTask;
   final VoidCallback? onAssignPlace;
@@ -655,7 +657,7 @@ class _RecordDetails extends StatelessWidget {
                   if (onAppleCopy != null)
                     TextButton(
                       onPressed: onAppleCopy,
-                      child: const Text('Copy to Apple Calendar'),
+                      child: Text(appleActionLabel ?? 'Copy to Apple Calendar'),
                     ),
                   if (onRepeat != null)
                     TextButton(

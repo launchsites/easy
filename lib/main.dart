@@ -26,7 +26,9 @@ import 'calendar_sources/event_kit_calendar_adapter.dart'
     show
         EventKitCalendarAccess,
         EventKitCalendarAdapter,
+        EventKitCopyReceipt,
         EventKitEventDraft,
+        EventKitUpdateReview,
         ExternalCalendarEvent;
 import 'calendar_sources/ics_calendar.dart';
 import 'calendar_sources/ics_import_export.dart';
@@ -106,6 +108,7 @@ part 'workspace_reminders.dart';
 part 'workspace_planner.dart';
 part 'workspace_manual_plan.dart';
 part 'workspace_task_context.dart';
+part 'workspace_apple_updates.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -275,7 +278,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   List<FocusMode> _modes = standardFocusModes();
   CalendarSourcePreferences? _calendarPreferences;
   late final _appleFeed = AppleCalendarFeed(adapter: widget.calendarAdapter);
-  final _unsavedAppleCopies = <String, CalendarOccurrenceIdentity>{};
+  final _unsavedAppleCopies = <String, EventKitCopyReceipt>{};
   var _copyingApple = false;
   int _appleCopyRevision = 0;
   final _icsFeed = IcsWorkspaceFeed();
@@ -1163,8 +1166,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       await runtime.discardObsoleteEstimates(_estimateRevision);
       if (!mounted ||
           !identical(_savedWorkspace, _data) ||
-          ModalRoute.of(context)?.isCurrent != true)
+          ModalRoute.of(context)?.isCurrent != true) {
         return;
+      }
     }
     if (!runtime.automaticEstimateOpportunity) return;
     final candidates =
@@ -3643,6 +3647,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       setState(() => _inspected = record);
       return;
     }
+    final appleAction = _appleActionFor(record);
     final action = await showModalBottomSheet<Object>(
       context: context,
       isScrollControlled: true,
@@ -3663,8 +3668,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             onEstimate: _canEstimate(record)
                 ? () => Navigator.pop(context, 'estimate')
                 : null,
-            onAppleCopy: _canCopyToApple(record)
-                ? () => Navigator.pop(context, 'apple-copy')
+            appleActionLabel: appleAction?.label,
+            onAppleCopy: appleAction != null
+                ? () => Navigator.pop(context, appleAction)
                 : null,
             repeatingTask: _repeatingTask(record) != null,
             onRepeat: _canRepeatEvent(record) || _canRepeatTask(record)
@@ -3700,8 +3706,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (action == 'estimate' && record is TaskItem) {
       await _suggestDuration(record);
     }
-    if (action == 'apple-copy' && record is CalendarEvent) {
-      await _copyToApple(record);
+    if (action is _AppleRecordAction && record is CalendarEvent) {
+      await _appleRecordAction(record, action);
     }
     if (action == 'repeat' && record is CalendarEvent) {
       await _setEventRepeat(record);
@@ -3739,7 +3745,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   CalendarOccurrenceIdentity? _appleCopyFor(String localId) {
     final unsaved = _unsavedAppleCopies[localId];
-    if (unsaved != null) return unsaved;
+    if (unsaved != null) return unsaved.id;
     final saved = _data.sections[_appleCopiesKey];
     if (saved is! Map<String, dynamic>) return null;
     final entry = saved[localId];
@@ -3864,22 +3870,13 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         _inform('This event changed. Open its current details to copy it.');
         return;
       }
-      final result = await adapter.createReviewedEvent(review, confirmed: true);
+      final result = await adapter.createReviewedEventWithReceipt(
+        review,
+        confirmed: true,
+      );
       copied = true;
       if (!mounted) return;
-      _unsavedAppleCopies[event.id] = result;
-      _appleCopyRevision++;
-      final previous = _data;
-      final saved = previous.sections[_appleCopiesKey];
-      final copies = <String, Object?>{
-        if (saved is Map<String, dynamic>) ...saved,
-        event.id: {...result.calendar.toJson(), 'eventId': result.eventId},
-      };
-      await _commitReviewedData(
-        previous,
-        previous.withSection(_appleCopiesKey, copies),
-      );
-      _unsavedAppleCopies.remove(event.id);
+      await _persistAppleReceipt(event.id, result);
       if (!mounted) return;
       _inform('Added to ${destination.name}.');
       unawaited(_refreshExternalCalendars(force: true));
@@ -3887,7 +3884,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       if (mounted) {
         _inform(
           copied
-              ? 'Apple Calendar saved this copy. Easy could not save its link.'
+              ? 'Apple Calendar saved this copy. Save its link again in Easy.'
               : 'The copy could not be confirmed. Check Apple Calendar before trying again.',
         );
       }
@@ -4146,6 +4143,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final showSchedule = mode?.sections.contains(FocusSection.schedule) ?? true;
     final showTasks = mode?.sections.contains(FocusSection.tasks) ?? true;
     final focusedContent = _focusedContent(context, mode);
+    final inspectedAppleAction = _appleActionFor(_inspected);
     final visibleCalendars =
         _calendarPreferences?.calendarsFor(space) ?? const <CalendarIdentity>{};
     final calendarProblem =
@@ -4378,11 +4376,14 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                                                       _inspected! as TaskItem,
                                                     )
                                                   : null,
+                                              appleActionLabel:
+                                                  inspectedAppleAction?.label,
                                               onAppleCopy:
-                                                  _canCopyToApple(_inspected)
-                                                  ? () => _copyToApple(
+                                                  inspectedAppleAction != null
+                                                  ? () => _appleRecordAction(
                                                       _inspected!
                                                           as CalendarEvent,
+                                                      inspectedAppleAction,
                                                     )
                                                   : null,
                                               repeatingTask:
