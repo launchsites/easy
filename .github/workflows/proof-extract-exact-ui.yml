@@ -1,0 +1,89 @@
+name: Extract exact synthetic UI previews
+
+on:
+  push:
+    branches: [codex/exact-ui-preview-proof-ecdc55a]
+    paths: [.github/workflows/proof-extract-exact-ui.yml]
+
+permissions:
+  actions: read
+
+jobs:
+  previews:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Download and verify the exact proof archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p preview-source
+          for row in \
+            'linux 14903286313 92371fccb944bd023dd0a995337f56827c7c30cfe3f96dadd005cbff358aa3ed' \
+            'android 14901039000 95b69ed9f7151a436d6704888a8aea1a7eea326c1cc4b82f3a49036b4f2f858d'; do
+            read -r name id sha <<< "$row"
+            curl --fail --silent --show-error --location --retry 2 \
+              --proto '=https' -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/launchsites/easy/actions/artifacts/$id/zip" \
+              --output "preview-source/$name.zip"
+            printf '%s  %s\n' "$sha" "preview-source/$name.zip" | sha256sum --check -
+          done
+      - name: Extract and render bounded previews of synthetic screenshots
+        run: |
+          python3 - <<'PY'
+          from base64 import b64encode
+          from hashlib import sha256
+          from pathlib import Path, PurePosixPath
+          import json
+          import re
+          import struct
+          import subprocess
+          import zipfile
+
+          output = Path('preview-source')
+          choices = {
+              'linux': [('desktop-tasks', 'desktop-tasks.png', 1000), ('mobile-gym', 'mobile-gym.png', 420)],
+              'android': [('android-orbit', '02-orbit.png', 420), ('android-calendar', '04-following-day.png', 420)],
+          }
+          for platform, selection in choices.items():
+              with zipfile.ZipFile(output / (platform + '.zip')) as archive:
+                  members = {}
+                  for item in archive.infolist():
+                      path = PurePosixPath(item.filename)
+                      if item.is_dir() or path.is_absolute() or '..' in path.parts:
+                          continue
+                      if not re.fullmatch(r'[A-Za-z0-9._/-]+', item.filename) or item.file_size > 8_000_000:
+                          continue
+                      members.setdefault(path.name, []).append(item)
+                  def read_unique(name):
+                      found = members.get(name, [])
+                      if len(found) != 1:
+                          raise RuntimeError(f'{platform}: expected one {name}, got {len(found)}')
+                      return archive.read(found[0])
+                  report_name = 'native-release-smoke.json' if platform == 'linux' else 'touch-review.json'
+                  report = json.loads(read_unique(report_name))
+                  hashes = report.get('screenshots_sha256', {}) if platform == 'android' else {
+                      key + '.png': value['screenshot_sha256']
+                      for key, value in report['checks'].items() if 'screenshot_sha256' in value
+                  }
+                  for name, member, width in selection:
+                      png = read_unique(member)
+                      original_hash = sha256(png).hexdigest()
+                      assert hashes.get(member) == original_hash, (platform, member, original_hash)
+                      assert png.startswith(b'\x89PNG\r\n\x1a\n') and png[12:16] == b'IHDR'
+                      source_width, source_height = struct.unpack_from('>II', png, 16)
+                      assert 0 < source_width <= 4096 and 0 < source_height <= 4096
+                      source = output / (name + '.png')
+                      source.write_bytes(png)
+                      destination = output / (name + '.webp')
+                      subprocess.run(['convert', str(source), '-strip', '-resize', f'{width}x>', '-quality', '80',
+                                      str(destination)], check=True)
+                      data = destination.read_bytes()
+                      assert len(data) <= 100_000 and data.startswith(b'RIFF') and data[8:12] == b'WEBP'
+                      print('UI_META', json.dumps({'name': name + '.webp', 'platform': platform,
+                            'source_member': member, 'source_sha256': original_hash, 'bytes': len(data),
+                            'sha256': sha256(data).hexdigest()}), flush=True)
+                      encoded = b64encode(data).decode('ascii')
+                      for index, offset in enumerate(range(0, len(encoded), 4096)):
+                          print('UI_B64', name + '.webp', index, encoded[offset:offset+4096], flush=True)
+          PY
