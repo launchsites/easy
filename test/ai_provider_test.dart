@@ -72,6 +72,113 @@ void main() {
     },
   );
 
+  for (final point in _BudgetRolloverPoint.values) {
+    test(
+      'a paid request releases its reservation on rollover ${point.name}',
+      () async {
+        var now = DateTime.utc(2027, 4, 30, 23, 59, 59);
+        final previousMonth = AiBudgetMonth.of(now);
+        final nextMonth = DateTime.utc(2027, 5);
+        final ledger = AiBudgetLedger(
+          monthlyCapMicros: 10300,
+          currency: 'GBP',
+          clock: () => now,
+        );
+        final fixture = _Fixture(
+          sharedLedger: ledger,
+          onCredentialRead: point == _BudgetRolloverPoint.duringCredentialRead
+              ? () => now = nextMonth
+              : null,
+        );
+        final config = _paid();
+        final claim = fixture.claim(config);
+        if (point == _BudgetRolloverPoint.beforeCredentialRead) now = nextMonth;
+
+        final result = await fixture
+            .provider(
+              _unexpected,
+              persist: (state) async {
+                fixture.saved.add(state);
+                if (point == _BudgetRolloverPoint.duringReservationWrite) {
+                  now = nextMonth;
+                }
+              },
+            )
+            .capture(
+              config: config,
+              claim: claim,
+              input: fixture.input,
+              currentRevision: fixture.currentRevision,
+            );
+        expect(result.failure, AiProviderFailure.budgetMonthChanged);
+        expect(result.accounting!.month, previousMonth);
+        expect(result.accounting!.state, AiReservationState.abandoned);
+        expect(result.accounting!.usageBasis, AiUsageBasis.notDispatched);
+        expect(
+          fixture.vault.references,
+          point == _BudgetRolloverPoint.beforeCredentialRead
+              ? isEmpty
+              : ['test-reference'],
+        );
+        expect(
+          fixture.saved,
+          hasLength(
+            point == _BudgetRolloverPoint.duringReservationWrite ? 2 : 1,
+          ),
+        );
+        final durable = AiBudgetLedger.decode(
+          fixture.saved.last,
+          clock: () => now,
+        );
+        expect(durable.report(month: previousMonth).committedMicros, 0);
+        expect(durable.report().remainingMicros, 10300);
+        expect(durable.report().unknownUsageCalls, 0);
+      },
+    );
+  }
+
+  test(
+    'a paid response after rollover settles its original dispatch month',
+    () async {
+      var now = DateTime.utc(2027, 4, 30, 23, 59, 59);
+      final previousMonth = AiBudgetMonth.of(now);
+      final fixture = _Fixture(
+        sharedLedger: AiBudgetLedger(
+          monthlyCapMicros: 10300,
+          currency: 'GBP',
+          clock: () => now,
+        ),
+      );
+      final config = _paid();
+      final result = await fixture
+          .provider((_) async {
+            expect(fixture.ledger.report().reservedMicros, 10300);
+            now = DateTime.utc(2027, 5);
+            return _completion(
+              _captureOutput(fixture.input),
+              input: 20,
+              outputTokens: 6,
+            );
+          })
+          .capture(
+            config: config,
+            claim: fixture.claim(config),
+            input: fixture.input,
+            currentRevision: fixture.currentRevision,
+          );
+      expect(result.succeeded, isTrue);
+      expect(result.accounting!.month, previousMonth);
+      expect(result.accounting!.usageBasis, AiUsageBasis.actual);
+      final durable = AiBudgetLedger.decode(
+        fixture.saved.last,
+        clock: () => now,
+      );
+      expect(durable.report(month: previousMonth).chargedMicros, 38);
+      expect(durable.report(month: previousMonth).reservedMicros, 0);
+      expect(durable.report().remainingMicros, 10300);
+    },
+  );
+
   test(
     'capture v2 sends eligible clauses and enforces disclosed categories',
     () async {
@@ -1008,16 +1115,25 @@ Map<String, Object> _enrichedOutput(
   ],
 };
 
+enum _BudgetRolloverPoint {
+  beforeCredentialRead,
+  duringCredentialRead,
+  duringReservationWrite,
+}
+
 class _Fixture {
-  _Fixture({String? vaultValue = _fakeKey, AiBudgetLedger? sharedLedger})
-    : vault = _Vault(vaultValue),
-      ledger =
-          sharedLedger ??
-          AiBudgetLedger(
-            monthlyCapMicros: 1000000,
-            currency: 'GBP',
-            clock: _clock,
-          );
+  _Fixture({
+    String? vaultValue = _fakeKey,
+    AiBudgetLedger? sharedLedger,
+    void Function()? onCredentialRead,
+  }) : vault = _Vault(vaultValue, onRead: onCredentialRead),
+       ledger =
+           sharedLedger ??
+           AiBudgetLedger(
+             monthlyCapMicros: 1000000,
+             currency: 'GBP',
+             clock: _clock,
+           );
 
   final _Vault vault;
   final queue = AiInferenceQueue(foreground: true, clock: _clock);
@@ -1085,14 +1201,16 @@ class _Fixture {
 }
 
 class _Vault implements AiCredentialVault {
-  _Vault(this.value);
+  _Vault(this.value, {this.onRead});
 
   final String? value;
+  final void Function()? onRead;
   final references = <String>[];
 
   @override
   Future<String?> read(String reference) async {
     references.add(reference);
+    onRead?.call();
     return value;
   }
 }

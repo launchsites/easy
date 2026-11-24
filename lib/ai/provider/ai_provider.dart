@@ -27,6 +27,7 @@ enum AiProviderFailure {
   invalidRequest,
   duplicateCall,
   budgetReservationRequired,
+  budgetMonthChanged,
   credentialsUnavailable,
   accountingUnavailable,
   stale,
@@ -407,6 +408,9 @@ class AiProviderClient {
 
     String? credential;
     if (paid) {
+      if (!reservation!.isInCurrentMonth) {
+        return stopBeforeDispatch(AiProviderFailure.budgetMonthChanged);
+      }
       try {
         credential = await _vault.read(config.credentialRef!).timeout(_timeout);
       } catch (_) {
@@ -417,6 +421,9 @@ class AiProviderClient {
       }
       if (_fence(claim, currentRevision) case final stopped?) {
         return stopBeforeDispatch(stopped);
+      }
+      if (!reservation.isInCurrentMonth) {
+        return stopBeforeDispatch(AiProviderFailure.budgetMonthChanged);
       }
       if (!await _saveBudget()) {
         return stopBeforeDispatch(AiProviderFailure.accountingUnavailable);
@@ -436,8 +443,12 @@ class AiProviderClient {
       body: bytes,
       claim: claim,
       credential: credential,
+      reservation: reservation,
     );
     credential = null;
+    if (response.failure == AiProviderFailure.budgetMonthChanged) {
+      return stopBeforeDispatch(AiProviderFailure.budgetMonthChanged);
+    }
     AiReservation? accounting;
     if (paid) {
       accounting = _ledger.settle(request.id, actual: response.usage);
@@ -497,6 +508,7 @@ class AiProviderClient {
     required List<int> body,
     required AiInferenceClaim claim,
     required String? credential,
+    required AiReservation? reservation,
   }) async {
     final gate = _ExchangeGate();
     final cancellation = claim.whenStopped.asStream().listen((reason) {
@@ -518,7 +530,10 @@ class AiProviderClient {
           })
           ..bodyBytes = body;
     try {
-      return await Future.any([gate.result.future, _receive(request, gate)]);
+      return await Future.any([
+        gate.result.future,
+        _receive(request, gate, reservation),
+      ]);
     } finally {
       timer.cancel();
       await cancellation.cancel();
@@ -528,8 +543,14 @@ class AiProviderClient {
   Future<_ProviderReply> _receive(
     http.AbortableRequest request,
     _ExchangeGate gate,
+    AiReservation? reservation,
   ) async {
     try {
+      if (reservation != null && !reservation.isInCurrentMonth) {
+        return const _ProviderReply(
+          failure: AiProviderFailure.budgetMonthChanged,
+        );
+      }
       final response = await _transport.send(request);
       if (gate.aborted.isCompleted) {
         _releaseStream(response.stream);

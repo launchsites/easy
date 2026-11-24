@@ -563,7 +563,9 @@ void main() {
             'budget': jsonDecode(ledger.encode()),
           }),
         );
-      final runtime = store.runtime();
+      final runtime = store.runtime(
+        clock: () => _clock().add(const Duration(minutes: 3)),
+      );
       addTearDown(runtime.dispose);
       expect(await runtime.load(), true);
       expect(store.state!.revision, 2);

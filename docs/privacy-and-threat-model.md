@@ -10,6 +10,8 @@ You can give separate permission for foreground duration estimates. That approva
 
 Easy stores API keys through the device credential service where available. On Linux with an unavailable Secret Service, the key lasts for the current session. The device ledger is separate from the workspace and its backups. An API request reserves its configured maximum cost before it leaves Easy. The ledger reconciles accepted usage reports and retains the full reservation when usage is unavailable. The provider controls its actual bill and any separate account spending limits. [Credential and ledger storage](../lib/ai/ai_device_state.dart) · [Budget accounting](../lib/ai/ai_budget.dart)
 
+Opening a second window preserves recent reservations while the first window can still settle them. A later settings reload recovers unresolved reservations as maximum-cost entries after three minutes. Easy rechecks the saved allowance after approval and releases a prepared request if the device’s budget month changes before sending. A reply received after midnight still settles in the month reserved when the request was sent. [Concurrency tests](../test/ai_allowance_concurrency_test.dart) · [Transport tests](../test/ai_provider_test.dart)
+
 ## Calendar access
 
 On Apple devices, Calendar settings can ask for EventKit permission. The calendar picker lists available sources. Event reads use the calendars selected in Easy and the time window the view needs. A revoked permission clears the feed's cached records and verified coverage. Imported iCalendar files can be read locally and selected for individual Focus views. [Calendar settings](../lib/calendar_sources/calendar_settings_page.dart) · [Calendar feed](../lib/calendar_sources/apple_calendar_feed.dart)

@@ -170,6 +170,7 @@ class AiReservation {
   bool get isActive =>
       state == AiReservationState.reserved &&
       identical(_owner._reservations[id], this);
+  bool get isInCurrentMonth => month == AiBudgetMonth.of(_owner._clock());
   bool get exceededReservation => chargedMicros > reservedMicros;
 
   AiReservation _resolved({
@@ -302,6 +303,8 @@ class AiBudgetLedger {
   List<AiReservation> get reservations =>
       List.unmodifiable(_reservations.values);
 
+  AiReservation? reservation(String id) => _reservations[id];
+
   int? maximumCost(AiBudgetRequest request) {
     final (cost, denial) = _quote(request);
     return denial == null ? cost : null;
@@ -405,6 +408,35 @@ class AiBudgetLedger {
       charge: dispatched ? previous.reservedMicros : 0,
     );
     return _reservations[id] = updated;
+  }
+
+  /// Applies an executor's resolution to a newer snapshot with the same
+  /// reservation. Other reservations and the newer allowance stay in place.
+  bool reconcileResolution(AiReservation resolution) {
+    final current = _reservations[resolution.id];
+    final basis = resolution.usageBasis;
+    if (current == null ||
+        basis == null ||
+        current.month != resolution.month ||
+        !current.reservedAt.isAtSameMomentAs(resolution.reservedAt) ||
+        current.reservedMicros != resolution.reservedMicros ||
+        jsonEncode(current.request._toJson()) !=
+            jsonEncode(resolution.request._toJson())) {
+      return false;
+    }
+    if (current.state != AiReservationState.reserved &&
+        !(current.state == AiReservationState.abandoned &&
+            current.usageBasis == AiUsageBasis.reservedMaximum)) {
+      return jsonEncode(current._toJson()) == jsonEncode(resolution._toJson());
+    }
+    _reservations[current.id] = current._resolved(
+      state: resolution.state,
+      basis: basis,
+      charge: resolution.chargedMicros,
+      actualUsage: resolution.actualUsage,
+      exceededTokenLimits: resolution.exceededTokenLimits,
+    );
+    return true;
   }
 
   AiBudgetReport report({AiBudgetMonth? month}) {

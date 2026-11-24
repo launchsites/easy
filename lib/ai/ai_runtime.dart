@@ -36,6 +36,11 @@ typedef AiAuthorize = Future<bool> Function(AiTransmissionPreview preview);
 typedef AiAuthorizeAutomatic = Future<bool> Function(
   AiAutomaticPreview preview,
 );
+typedef _AiDurableState = ({
+  AiRuntimeSettings settings,
+  AiBudgetLedger ledger,
+  AiEnrichmentState enrichment,
+});
 
 enum AiSettingsSaveStatus {
   saved,
@@ -135,6 +140,9 @@ class AiRuntime extends ChangeNotifier {
   final http.Client _transport;
   final bool _ownsTransport;
   final DateTime Function() _clock;
+  final String _requestNonce = base64Url.encode(
+    List<int>.generate(12, (_) => _requestRandom.nextInt(256)),
+  );
   AiRuntimeSettings _settings = const AiRuntimeSettings();
   AiEnrichmentState _enrichment = AiEnrichmentState();
   late AiBudgetLedger _ledger = _emptyLedger();
@@ -212,45 +220,14 @@ class AiRuntime extends ChangeNotifier {
     if (_loaded && !refresh) return _storageReady;
     try {
       final stored = await _read().timeout(const Duration(seconds: 5));
-      var next = const AiRuntimeSettings();
-      var ledger = _emptyLedger();
-      var enrichment = AiEnrichmentState();
-      if (stored != null) {
-        if (stored.revision < 1) {
-          throw const FormatException('Invalid state revision.');
-        }
-        final parsed = jsonDecode(stored.value) as Map<String, dynamic>;
-        if (parsed['version'] is! int || parsed['version'] != 1) {
-          throw const FormatException('Invalid AI state version.');
-        }
-        next = AiRuntimeSettings.fromJson(
-          parsed['settings'] as Map<String, dynamic>,
-        );
-        ledger = AiBudgetLedger.decode(
-          jsonEncode(parsed['budget']),
-          clock: _clock,
-        );
-        if (parsed['enrichment'] case final Map<String, dynamic> data) {
-          enrichment = AiEnrichmentState.fromJson(data);
-        } else if (parsed['enrichment'] != null) {
-          throw const FormatException('Invalid enrichment state.');
-        }
-        if (!next.valid ||
-            ledger.currency != 'GBP' ||
-            ledger.monthlyCapMicros != next.monthlyCapMicros) {
-          throw const FormatException('Invalid AI state.');
-        }
-      }
-      _settings = next;
-      _ledger = ledger;
-      _enrichment = enrichment;
-      _provider = _providerFor(ledger);
-      _revision = stored?.revision ?? 0;
-      _durableValue = stored?.value;
-      _storageReady = true;
+      final next = _decodeState(stored);
+      _adoptState(next, stored);
+      final ledger = next.ledger;
+      final cutoff = _clock().subtract(_reservationRecoveryDelay);
       var hasUnresolved = false;
       for (final entry in ledger.reservations) {
-        if (entry.state == AiReservationState.reserved) {
+        if (entry.state == AiReservationState.reserved &&
+            !entry.reservedAt.isAfter(cutoff)) {
           ledger.abandon(
             entry.id,
             dispatched: entry.request.execution == AiExecution.paidApi,
@@ -258,7 +235,7 @@ class AiRuntime extends ChangeNotifier {
           hasUnresolved = true;
         }
       }
-      if (hasUnresolved) await _commit(next, ledger);
+      if (hasUnresolved) await _commit(next.settings, ledger);
     } catch (_) {
       _storageReady = false;
     }
@@ -266,6 +243,51 @@ class AiRuntime extends ChangeNotifier {
     _notify();
     return _storageReady;
   });
+
+  _AiDurableState _decodeState(AiStoredState? stored) {
+    if (stored == null) {
+      return (
+        settings: const AiRuntimeSettings(),
+        ledger: _emptyLedger(),
+        enrichment: AiEnrichmentState(),
+      );
+    }
+    if (stored.revision < 1) {
+      throw const FormatException('Invalid state revision.');
+    }
+    final parsed = jsonDecode(stored.value) as Map<String, dynamic>;
+    if (parsed['version'] is! int || parsed['version'] != 1) {
+      throw const FormatException('Invalid AI state version.');
+    }
+    final settings = AiRuntimeSettings.fromJson(
+      parsed['settings'] as Map<String, dynamic>,
+    );
+    final ledger = AiBudgetLedger.decode(
+      jsonEncode(parsed['budget']),
+      clock: _clock,
+    );
+    final enrichment = switch (parsed['enrichment']) {
+      final Map<String, dynamic> data => AiEnrichmentState.fromJson(data),
+      null => AiEnrichmentState(),
+      _ => throw const FormatException('Invalid enrichment state.'),
+    };
+    if (!settings.valid ||
+        ledger.currency != 'GBP' ||
+        ledger.monthlyCapMicros != settings.monthlyCapMicros) {
+      throw const FormatException('Invalid AI state.');
+    }
+    return (settings: settings, ledger: ledger, enrichment: enrichment);
+  }
+
+  void _adoptState(_AiDurableState state, AiStoredState? stored) {
+    _settings = state.settings;
+    _ledger = state.ledger;
+    _enrichment = state.enrichment;
+    _provider = _providerFor(state.ledger);
+    _revision = stored?.revision ?? 0;
+    _durableValue = stored?.value;
+    _storageReady = true;
+  }
 
   Future<AiSettingsSaveStatus> saveSettings(
     AiRuntimeSettings next, {
@@ -792,6 +814,15 @@ class AiRuntime extends ChangeNotifier {
         activeSettings,
         includeEstimateRange,
       );
+      if (!identical(activeSettings, _settings) &&
+          jsonEncode(activeSettings.toJson()) !=
+              jsonEncode(_settings.toJson())) {
+        queue.fail(
+          claim,
+          currentRevision: (id) => _lookup(currentRevision, id),
+        );
+        return status(AiRunStatus.stale);
+      }
       if (reply.succeeded &&
           queue.complete(
             claim,
@@ -842,12 +873,11 @@ class AiRuntime extends ChangeNotifier {
     try {
       final recorded = await _read().timeout(const Duration(seconds: 5));
       if (recorded?.value != _durableValue ||
-          (recorded?.revision ?? 0) < _revision) {
+          (recorded?.revision ?? 0) != _revision) {
         _storageReady = false;
         _notify();
         return false;
       }
-      _revision = recorded?.revision ?? 0;
       return true;
     } catch (_) {
       _storageReady = false;
@@ -861,13 +891,8 @@ class AiRuntime extends ChangeNotifier {
     AiBudgetLedger ledger, {
     AiEnrichmentState? enrichment,
   }) async {
-    final data = jsonEncode({
-      'version': 1,
-      'settings': settings.toJson(),
-      'budget': jsonDecode(ledger.encode()),
-      'enrichment': (enrichment ?? _enrichment).toJson(),
-    });
-    if (data == _durableValue) return true;
+    final data = _encodeState(settings, ledger, enrichment ?? _enrichment);
+    if (data == _durableValue) return _readHead();
     try {
       final revision = await _compareAndSwap(_revision, data);
       if (revision == null || revision <= _revision) {
@@ -881,6 +906,44 @@ class AiRuntime extends ChangeNotifier {
       _storageReady = false;
     }
     _notify();
+    return false;
+  }
+
+  String _encodeState(
+    AiRuntimeSettings settings,
+    AiBudgetLedger ledger,
+    AiEnrichmentState enrichment,
+  ) => jsonEncode({
+    'version': 1,
+    'settings': settings.toJson(),
+    'budget': jsonDecode(ledger.encode()),
+    'enrichment': enrichment.toJson(),
+  });
+
+  Future<bool> _reconcileProviderResolution(AiReservation resolution) async {
+    if (resolution.state == AiReservationState.reserved) return false;
+    try {
+      for (var attempt = 0; attempt < 3; attempt++) {
+        final stored = await _read().timeout(const Duration(seconds: 5));
+        if (stored == null || stored.revision < _revision) return false;
+        final next = _decodeState(stored);
+        if (!next.ledger.reconcileResolution(resolution)) return false;
+        final data = _encodeState(next.settings, next.ledger, next.enrichment);
+        final revision = data == stored.value
+            ? stored.revision
+            : await _compareAndSwap(
+                stored.revision,
+                data,
+              ).timeout(const Duration(seconds: 5));
+        if (revision != null &&
+            (revision > stored.revision || data == stored.value)) {
+          _adoptState(next, AiStoredState(revision: revision, value: data));
+          return true;
+        }
+      }
+    } on Object {
+      return false;
+    }
     return false;
   }
 
@@ -903,11 +966,10 @@ class AiRuntime extends ChangeNotifier {
 
   String _requestId() {
     final stamp = _clock().microsecondsSinceEpoch;
-    final existing = _ledger.reservations.map((entry) => entry.id).toSet();
     String id;
     do {
-      id = '$stamp-ai-${_serial++}';
-    } while (existing.contains(id));
+      id = '$stamp-ai-$_requestNonce-${_serial++}';
+    } while (_ledger.reservation(id) != null);
     return id;
   }
 
@@ -916,12 +978,21 @@ class AiRuntime extends ChangeNotifier {
     vault: _vault,
     ledger: ledger,
     persistBudget: (_) => _writeLane(() async {
-      if (!_storageReady ||
-          !identical(ledger, _ledger) ||
-          !await _commit(_settings, ledger)) {
-        throw StateError('AI budget state unavailable.');
+      if (identical(ledger, _ledger)) {
+        if (_storageReady && await _commit(_settings, ledger)) {
+          _notify();
+          return;
+        }
+        final id = _runningId;
+        final resolution = id == null ? null : ledger.reservation(id);
+        if (resolution != null) {
+          if (await _reconcileProviderResolution(resolution)) {
+            _notify();
+            return;
+          }
+        }
       }
-      _notify();
+      throw StateError('AI budget state unavailable.');
     }),
   );
 
@@ -950,6 +1021,9 @@ class AiRuntime extends ChangeNotifier {
     super.dispose();
   }
 }
+
+const _reservationRecoveryDelay = Duration(minutes: 3);
+final _requestRandom = Random.secure();
 
 AiEstimateInput _estimateInput(
   AiEstimateInput input,
