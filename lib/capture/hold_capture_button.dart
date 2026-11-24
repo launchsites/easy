@@ -6,10 +6,20 @@ import 'voice_capture_sheet.dart';
 
 /// A single thumb control with independent tap, held recording, and lock.
 class HoldCaptureButton extends StatefulWidget {
-  const HoldCaptureButton({required this.onTap, this.onHeldRecord, super.key});
+  const HoldCaptureButton({
+    required this.onTap,
+    this.onHeldRecord,
+    this.label = 'Add item',
+    this.icon = Icons.add_rounded,
+    this.heroTag = 'capture',
+    super.key,
+  });
 
   final VoidCallback onTap;
   final Future<void> Function(ValueNotifier<HeldVoiceAction>)? onHeldRecord;
+  final String label;
+  final IconData icon;
+  final Object? heroTag;
 
   @override
   State<HoldCaptureButton> createState() => _HoldCaptureButtonState();
@@ -85,10 +95,10 @@ class _HoldCaptureButtonState extends State<HoldCaptureButton> {
       onLongPressEnd: allowVoice ? _end : null,
       onLongPressCancel: allowVoice ? _cancel : null,
       child: Tooltip(
-        message: 'Add item',
+        message: widget.label,
         triggerMode: TooltipTriggerMode.manual,
         child: FloatingActionButton(
-          heroTag: 'capture',
+          heroTag: widget.heroTag,
           onPressed: widget.onTap,
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
@@ -96,7 +106,7 @@ class _HoldCaptureButtonState extends State<HoldCaptureButton> {
           elevation: 3,
           highlightElevation: 1,
           hoverElevation: 5,
-          child: const Icon(Icons.add_rounded, size: 27),
+          child: Icon(widget.icon, size: 26),
         ),
       ),
     );

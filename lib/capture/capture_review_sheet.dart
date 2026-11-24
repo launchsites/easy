@@ -13,6 +13,12 @@ class CaptureReviewRequest {
   final String text;
 }
 
+class CaptureReviewVoiceRequest {
+  const CaptureReviewVoiceRequest(this.text);
+
+  final String text;
+}
+
 typedef ReviewCaptureText = Future<CaptureReview> Function({
   String? draftId,
   required String text,
@@ -51,6 +57,7 @@ class CaptureReviewSheet extends StatefulWidget {
     this.defaultTaskDate,
     this.defaultCategory,
     this.onInspectWorkout,
+    this.offerVoice = false,
     this.disabledKinds = const {},
     super.key,
   });
@@ -70,6 +77,7 @@ class CaptureReviewSheet extends StatefulWidget {
   final CaptureWorkoutPreview? Function(CaptureReview, CaptureProposal)?
   onInspectWorkout;
   final Set<CaptureIntentKind> disabledKinds;
+  final bool offerVoice;
 
   @override
   State<CaptureReviewSheet> createState() => _CaptureReviewSheetState();
@@ -281,6 +289,19 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
                           ),
                         ),
                       ),
+                      if (widget.offerVoice && selectedDraft == null)
+                        IconButton(
+                          tooltip: 'Record voice',
+                          onPressed: _working
+                              ? null
+                              : () => Navigator.pop(
+                                  context,
+                                  CaptureReviewVoiceRequest(
+                                    _controller.text.trim(),
+                                  ),
+                                ),
+                          icon: const Icon(Icons.mic_none_rounded),
+                        ),
                       IconButton(
                         tooltip: 'Close capture review',
                         onPressed: _working

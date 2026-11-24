@@ -1,6 +1,35 @@
 part of 'main.dart';
 
 extension _WorkspaceWorkoutCapture on _WorkspaceState {
+  Widget _gymCaptureControl(
+    DateTime startedAt,
+    ValueChanged<GymSession> onReviewed,
+  ) {
+    Future<void> capture(ValueNotifier<HeldVoiceAction>? action) async {
+      if (_reviewSaving) return;
+      if (action == null) {
+        await _openCaptureReview('', offerVoice: true);
+      } else {
+        await _openVoiceCapture(heldAction: action);
+      }
+      if (!mounted) return;
+      final saved = _gymSessions
+          ?.where((session) => session.startedAt.isAtSameMomentAs(startedAt))
+          .firstOrNull;
+      if (saved != null) onReviewed(saved);
+    }
+
+    return HoldCaptureButton(
+      label: 'Capture workout or task',
+      icon: Icons.graphic_eq_rounded,
+      heroTag: null,
+      onTap: () => capture(null),
+      onHeldRecord: !kIsWeb && _allows(EasyFeature.captureMedia)
+          ? capture
+          : null,
+    );
+  }
+
   GymSession? _liveWorkoutFor(DateTime date, Iterable<GymSession> sessions) =>
       sessions
           .where(

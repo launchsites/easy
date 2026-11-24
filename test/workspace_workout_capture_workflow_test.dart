@@ -1,3 +1,4 @@
+import 'package:easy/capture/capture_review_sheet.dart';
 import 'package:easy/gym_session.dart';
 import 'package:easy/main.dart';
 import 'package:easy/mobile_home.dart';
@@ -11,9 +12,13 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
-  for (final explicitCompletion in [false, true]) {
+  for (final (explicitCompletion, inWorkout) in [
+    (false, false),
+    (true, false),
+    (true, true),
+  ]) {
     testWidgets(
-      'Capture reviews literal set results in another Focus ($explicitCompletion)',
+      'Capture reviews literal sets with explicit completion $explicitCompletion and live screen $inWorkout',
       (tester) async {
         final previous = SharedPreferencesAsyncPlatform.instance;
         SharedPreferencesAsyncPlatform.instance =
@@ -60,22 +65,39 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('Mode'));
         await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(MenuItemButton, 'Work'));
+        await tester.tap(
+          find.widgetWithText(MenuItemButton, inWorkout ? 'Gym' : 'Work'),
+        );
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Add item'));
+        if (inWorkout) {
+          await tester.tap(find.text('Resume'));
+          await tester.pumpAndSettle();
+          expect(find.byType(GymSessionPage), findsOneWidget);
+          await tester.tap(find.byTooltip('Capture workout or task'));
+        } else {
+          await tester.tap(find.byTooltip('Add item'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip('Open capture review'));
+        }
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Open capture review'));
-        await tester.pumpAndSettle();
+        final sheet = find.byType(CaptureReviewSheet);
+        expect(
+          find.byTooltip('Record voice'),
+          inWorkout ? findsOneWidget : findsNothing,
+        );
 
         final bench =
             '${explicitCompletion ? 'I did ' : ''}bench press 60kg x8,8,6';
         await tester.enterText(
-          find.byType(TextField),
+          find.descendant(of: sheet, matching: find.byType(TextField)),
           'Work: task: Write session handoff; After treadmill, I stretched; $bench',
         );
         await tester.tap(find.widgetWithText(FilledButton, 'Review'));
         await tester.pumpAndSettle();
-        expect(find.text('Bench press'), findsOneWidget);
+        expect(
+          find.descendant(of: sheet, matching: find.text('Bench press')),
+          findsOneWidget,
+        );
         expect(find.textContaining('60 kg × 8, 8, 6'), findsOneWidget);
         expect(find.textContaining('After Treadmill'), findsOneWidget);
         final mark = find.widgetWithText(
@@ -94,7 +116,25 @@ void main() {
         await tester.ensureVisible(add);
         await tester.tap(add);
         await tester.pumpAndSettle();
-        expect(tester.widget<MobileHome>(find.byType(MobileHome)).mode, 'work');
+        if (inWorkout) {
+          expect(find.byType(GymSessionPage), findsOneWidget);
+          await tester.scrollUntilVisible(
+            find.text('Stretched'),
+            220,
+            scrollable: find
+                .descendant(
+                  of: find.byType(GymSessionPage),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          expect(find.text('Stretched'), findsOneWidget);
+        } else {
+          expect(
+            tester.widget<MobileHome>(find.byType(MobileHome)).mode,
+            'work',
+          );
+        }
 
         final store = await openPreferenceWorkspaceStore(
           preferences: prefs,
@@ -102,6 +142,7 @@ void main() {
               throw StateError('Expected the existing workspace'),
         );
         final saved = await store.read();
+        expect(saved.revision, 3);
         final data = WorkspaceData.decode(saved.snapshot.workspaceJson);
         final session = GymSession.decode(saved.snapshot.gymSessionJson.single);
         expect(

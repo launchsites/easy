@@ -2585,6 +2585,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             session: session,
             previousSessions: sessions,
             onChanged: _saveGymSession,
+            buildCaptureControl: (onReviewed) =>
+                _gymCaptureControl(session.startedAt, onReviewed),
           ),
         ),
       ),
@@ -3297,6 +3299,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   Future<void> _openCaptureReview(
     String text, {
     CaptureArchiveEntry? draft,
+    bool offerVoice = false,
   }) async {
     final runtime = _ai;
     final aiAvailable =
@@ -3313,6 +3316,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       defaultCategory: _reviewDefaultCategory,
       onInspectWorkout: _inspectWorkoutCapture,
       initialDraft: draft,
+      offerVoice: offerVoice && mediaAvailable && !kIsWeb,
       onPlayDraft: mediaAvailable ? _playVoiceDraft : null,
       onAiReview: aiAvailable ? _reviewCaptureWithAi : null,
       onCancelAi: aiAvailable ? runtime.cancelCurrent : null,
@@ -3325,22 +3329,23 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         if (!_allows(EasyFeature.workouts)) CaptureIntentKind.workout,
       },
     );
-    if (MediaQuery.sizeOf(context).width < 720) {
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        isDismissible: false,
-        enableDrag: false,
-        backgroundColor: paper,
-        builder: (_) => sheet,
-      );
-    } else {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => Dialog(backgroundColor: paper, child: sheet),
-      );
+    final request = MediaQuery.sizeOf(context).width < 720
+        ? await showModalBottomSheet<CaptureReviewVoiceRequest>(
+            context: context,
+            isScrollControlled: true,
+            useSafeArea: true,
+            isDismissible: false,
+            enableDrag: false,
+            backgroundColor: paper,
+            builder: (_) => sheet,
+          )
+        : await showDialog<CaptureReviewVoiceRequest>(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => Dialog(backgroundColor: paper, child: sheet),
+          );
+    if (request != null && mounted) {
+      await _openVoiceCapture(initialText: request.text);
     }
   }
 
