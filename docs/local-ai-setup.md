@@ -46,6 +46,20 @@ Local requests use the model server's memory and CPU. **Suggest durations** enab
 
 The supplied Qwen checkpoint accepts text. Meal photo suggestions require a separate compatible vision model. The capture validator can discard model replies that omit evidence or use an unsupported shape. The saved capture remains available for manual review. [Capture and estimate results](local-inference-benchmark.md)
 
+## Native lifecycle evidence
+
+A Linux release frozen at `5883bb6` used a disposable Xfwm/X11 desktop and a synthetic HTTP responder listening on an ephemeral IPv4 loopback port. The run saved Local settings through the UI, declined one capture disclosure without sending a request, and closed an approved request's connection when the window was minimized. Restoring the window allowed a fresh reviewed category proposal. The workspace still had its original single task.
+
+The same run opted into automatic estimates and minimized the window for 130 seconds. No automatic request began during that interval. After restoring the window, one automatic request ran once the workspace was idle. Its 35-minute result remained a proposal until it was accepted in Settings. The test observed exactly two approved capture calls and one estimate call. The requests carried no credential, and SQLite integrity checks passed after confirmation. [Native lifecycle evidence](benchmark-results/native-local-ai-lifecycle-epyc-20261124.json)
+
+Run the fixture with Xvfb, Xfwm, xdotool, ImageMagick, Tesseract and Pillow installed. It uses a private display, profile and session bus.
+
+```sh
+dbus-run-session -- python3 tool/benchmark/native_local_ai_lifecycle.py \
+  --binary "$easy_bundle/easy" --app-revision 5883bb666c7146d058f56127581efb7873e15be5 \
+  --output /tmp/easy-local-ai-lifecycle.json
+```
+
 ## CPU and memory observations
 
 The controlled profiles used real CPU inference on a shared Linux VM. At a 512-token context, Qwen2.5 0.5B peaked around 602 MiB RSS on one logical CPU with a 1.5 GiB address-space limit and failed to initialize under 1 GiB. Qwen2.5 1.5B peaked around 1.74 GiB RSS in its one-CPU profile. Qwen3 4B could not map under a 2 GiB address-space ceiling. Its successful one-CPU profile peaked around 4.1 GiB. Memory grows with the runtime settings and model size. [CPU and memory profiles](local-inference-benchmark.md#measured-results)

@@ -1,0 +1,74 @@
+{
+  "status": "passed",
+  "app_revision": "5883bb666c7146d058f56127581efb7873e15be5",
+  "run_at_utc": "2026-11-24T05:12:46.918262+00:00",
+  "executable_sha256": "ce01e5280e7c948844d099f3d288a507438c00fbc95518ff5d96a4b5eeb005c2",
+  "aot_library_sha256": "d2e988e6c3c64134c34a33da606a3b11b84c6deda6af0be78289063e245ec085",
+  "configured": true,
+  "declined_no_request": true,
+  "active_capture_cancelled_on_background": true,
+  "review_only": true,
+  "background_idle_no_request": true,
+  "background_idle_seconds": 130.16,
+  "estimate_review_only": true,
+  "workspace": {
+    "revision": 3,
+    "digest": "d73396ca4b52892083dd8495f80528bac6bf2804ee1da9e3fc3e0fdf4c22fba1",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 0,
+      "tasks": 1,
+      "notes": 0
+    },
+    "quick_check": "ok"
+  },
+  "requests": [
+    {
+      "at_utc": "2026-11-24T05:13:07.595102+00:00",
+      "kind": "capture",
+      "path": "/v1/chat/completions",
+      "api_credential": false,
+      "model_matched": true,
+      "fields": [
+        "captureId",
+        "categoryIds",
+        "clauses",
+        "contextRevision",
+        "sourceRevision",
+        "version"
+      ],
+      "expected_input": true
+    },
+    {
+      "at_utc": "2026-11-24T05:13:09.524205+00:00",
+      "kind": "capture",
+      "path": "/v1/chat/completions",
+      "api_credential": false,
+      "model_matched": true,
+      "fields": [
+        "captureId",
+        "categoryIds",
+        "clauses",
+        "contextRevision",
+        "sourceRevision",
+        "version"
+      ],
+      "expected_input": true
+    },
+    {
+      "at_utc": "2026-11-24T05:17:31.970103+00:00",
+      "kind": "estimate",
+      "path": "/v1/chat/completions",
+      "api_credential": false,
+      "model_matched": true,
+      "fields": [
+        "captureId",
+        "contextRevision",
+        "sourceRevision",
+        "title"
+      ],
+      "expected_input": true
+    }
+  ],
+  "final_minutes": 35
+}
