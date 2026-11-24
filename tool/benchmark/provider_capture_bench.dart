@@ -15,15 +15,39 @@ class _NoCredentials implements AiCredentialVault {
 }
 
 Future<void> main(List<String> args) async {
-  final option = args.length == 5 ? args.last : '';
+  final options = args.skip(4).toList();
+  final modes = options
+      .where(
+        const {
+          '--json-object',
+          '--json-schema',
+          '--json-schema-meanings',
+        }.contains,
+      )
+      .toList();
+  const tokenFlag = '--max-output-tokens=';
+  final limits = options
+      .where((option) => option.startsWith(tokenFlag))
+      .toList();
+  final limit = limits.length == 1
+      ? int.tryParse(limits.single.substring(tokenFlag.length))
+      : 640;
+  final option = modes.length == 1 ? modes.single : '';
   final jsonObject = option == '--json-object';
   final meanings = option == '--json-schema-meanings';
   final jsonSchema = option == '--json-schema' || meanings;
-  if (args.length != 4 && !jsonObject && !jsonSchema) {
+  if (args.length < 4 ||
+      modes.length > 1 ||
+      limits.length > 1 ||
+      modes.length + limits.length != options.length ||
+      limit == null ||
+      limit < 80 ||
+      limit > 1024) {
     stderr.writeln(
       'Usage: dart run tool/benchmark/provider_capture_bench.dart '
       'http://127.0.0.1:PORT/v1 MODEL CASES_JSON OUTPUT_JSON '
-      '[--json-object | --json-schema | --json-schema-meanings]',
+      '[--json-object | --json-schema | --json-schema-meanings] '
+      '[--max-output-tokens=80…1024]',
     );
     exitCode = 2;
     return;
@@ -32,7 +56,7 @@ Future<void> main(List<String> args) async {
     baseUri: Uri.parse(args[0]),
     model: args[1],
     maxInputTokens: 8192,
-    maxOutputTokens: 640,
+    maxOutputTokens: limit,
     jsonObjectMode: jsonObject,
   );
   if (config.completionsEndpoint == null) {
@@ -125,6 +149,7 @@ Future<void> main(List<String> args) async {
     'json_object_mode': jsonObject,
     'experimental_json_schema': jsonSchema,
     'experimental_category_meanings': meanings,
+    'maximum_output_tokens': limit,
     'clock_anchor': anchor.toIso8601String(),
     'timezone': 'Europe/London',
     'cases': results,

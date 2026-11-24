@@ -190,6 +190,8 @@ The grammar improved structural validity and reduced median request time on thes
 
 Qwen3-4B produced three exact drafts with the same experimental grammar. Eight of 11 calls timed out at 60 seconds. The accepted responses took 19.75, 31.28 and 54.86 seconds on four virtual CPUs. This run shared the virtual CPU quota with the native agenda comparison and other workspace jobs. Eight deterministic controls made zero requests. A timed-out model call yielded no model proposal, and none of the drafts wrote records. On this shared CPU host the tested 4B profile could offer useful suggestions when it completed, with poor interactive availability. [4B V2 provider results](benchmark-results/provider-metadata-v2-qwen4b-schema-20261124.json)
 
+A second 4B run limited output to 160 tokens and used two virtual CPUs. All 11 calls produced structurally accepted drafts, seven matched the fixture exactly, and median request time was 17.67 seconds. The slowest reply took 32.22 seconds. Three disagreements were category assignments and one changed a note into a task. This test used a different shared-load period and CPU allocation from the first run. It demonstrates that the shorter envelope can carry the tested one- and two-item drafts. [160-token provider results](benchmark-results/provider-metadata-v2-qwen4b-schema-bounded-20261124.json)
+
 Run the benchmark against an explicitly started local llama.cpp endpoint. The optional `--json-object`, `--json-schema` and `--json-schema-meanings` flags reproduce the tested formats.
 
 ```sh
