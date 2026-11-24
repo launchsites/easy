@@ -335,6 +335,62 @@ void main() {
     );
     expect(scratch.listSync(), isEmpty);
   });
+
+  testWidgets(
+    'temporary media files stay until the cleanup review is confirmed',
+    (tester) async {
+      await openStore();
+      _phone(tester);
+      final (scratch, discarded) = (await tester.runAsync(() async {
+        final scratch = await Directory.systemTemp.createTemp(
+          'easy-cleanup-page-',
+        );
+        final discarded = await Directory.fromUri(
+          scratch.uri.resolve(
+            '.easy-discarded-stage-backups-1-previous-cleanup',
+          ),
+        ).create();
+        final content = await Directory.fromUri(
+          discarded.uri.resolve('content'),
+        ).create();
+        await File.fromUri(content.uri.resolve('source'))
+            .writeAsBytes([1, 2, 3]);
+        return (scratch, discarded);
+      }))!;
+      addTearDown(() => scratch.delete(recursive: true));
+      await display(
+        tester,
+        pick: () async => null,
+        media: WorkspaceMediaBackupUiSupport(
+          scratchDirectory: scratch.path,
+          loadAttachments: () async => null,
+          pickBackupFile: () async => null,
+          saveMediaArchive: (_) async {},
+        ),
+      );
+      Future<void> review() async {
+        final action = find.text('Temporary media files');
+        await tester.ensureVisible(action);
+        await tester.tap(action);
+        await _untilVisible(tester, 'Clear temporary media files?');
+        expect(
+          find.text('1 interrupted operation left 3 B of temporary files.'),
+          findsOneWidget,
+        );
+        expect(discarded.existsSync(), isTrue);
+      }
+
+      await review();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(discarded.existsSync(), isTrue);
+      await review();
+      await tester.tap(find.text('Clear temporary files'));
+      await _untilVisible(tester, '1 temporary folder cleared (3 B).');
+      expect(discarded.existsSync(), isFalse);
+      expect((await store.read()).revision, 1);
+    },
+  );
 }
 
 final _photo = base64Decode(

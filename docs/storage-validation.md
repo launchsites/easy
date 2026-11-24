@@ -4,7 +4,7 @@ Run the focused suites and the scale workload from the repository root.
 
 ```sh
 flutter test test/storage_workspace_test.dart test/storage_history_test.dart test/storage_history_page_test.dart test/storage_encrypted_backup_test.dart test/storage_attachment_test.dart test/sync_journal_test.dart test/workspace_sync_test.dart
-flutter test test/storage_media_backup_test.dart test/storage_backup_page_test.dart
+flutter test test/storage_media_backup_test.dart test/storage_media_staging_test.dart test/storage_backup_page_test.dart
 flutter test tool/benchmark/storage_scale_test.dart --reporter expanded
 EASY_STORAGE_EDITS=10000 taskset -c 4 flutter test tool/benchmark/storage_churn_test.dart --reporter expanded
 bash tool/benchmark/check_storage_crash.sh
@@ -52,3 +52,21 @@ The media archive authenticates 64 KiB frames with AES-GCM. An Argon2id passphra
 The review holds an encrypted archive in a private temporary directory. Format validation creates and removes one temporary original at a time. Confirming restore checks the reviewed revision and publishes verified originals by content ID before the workspace transaction. The transaction records the prior workspace and can be retried with the same operation ID. Interrupted publication can leave verified unreferenced originals for a later retry. [Restore implementation](../lib/storage/src/open_media_backup_native.dart)
 
 Tests verified exact original bytes with a 24 MiB streamed recording, shared references, early rejection of bad passphrases, invalid manifests, truncation, changed tags, altered review data, and partial publication followed by retry. The restore tests also check recovery and SQLite foreign keys. The 320px page test exercises export, preview, cancellation and confirmation without buffering an entire attachment bundle inside the page. [Archive tests](../test/storage_media_backup_test.dart) · [Backup page tests](../test/storage_backup_page_test.dart)
+
+An AOT frame workload verified 64 MiB of synthetic bytes by SHA-256. The scratch harness used the frame codec from commit `74aa8d0` with its relative imports retargeted and the unchanged 192 MiB record-format limit inlined for standalone Dart. The workload includes key derivation, frame I/O and verification. It excludes native pickers, SQLite and attachment parsing.
+
+| CPU affinity | Seal and write | Read and verify | Process peak RSS |
+| --- | --- | --- | --- |
+| One logical CPU, first run | 14.40 s | 13.29 s | 121.7 MiB |
+| Five logical CPUs | 8.52 s | 7.86 s | 123.9 MiB |
+| One logical CPU, second run | 14.58 s | 7.09 s | 144.6 MiB |
+
+The measurements share the Linux host with other development work. CPU affinity is a resource constraint for the whole benchmark process, including the encryption worker. The spread between one-core reads reflects shared-host variation. [Frame codec](../lib/storage/src/media_backup_frames.dart)
+
+## Temporary media files
+
+SQLite keeps the current workspace and automatic or named history in its revision tables. The last recovery point is a separate logical backup. Each can resolve the same original capture or meal photo through its SHA-256 content ID. Attachment publication can also precede the workspace commit, so an original with no current reference can still belong to a pending save. [Workspace store](../lib/storage/src/sqlite_store.dart) · [Attachment store](../lib/storage/src/open_attachment_native.dart)
+
+The cleanup review targets marked staging folders from interrupted imports and backups. Published SHA-256 folders lie outside that namespace, protecting originals reachable from any recoverable version. Each active stage holds a file lease. The review checks owner process and lease state, then records bounded file metadata. Confirmation checks the reviewed candidates again and clears at most 32 stages from each storage area. A renamed folder left by interrupted cleanup can be reviewed on the next attempt. [Staging implementation](../lib/storage/src/media_staging_native.dart)
+
+The native test starts and kills a synthetic Dart process with a live import lease. It verifies that the active stage stays out of the review and that the abandoned bytes can be cleared after exit. The test also reopens exact originals linked to the working revision, a named history point and recovery. The page test verifies both cancellation and explicit confirmation. [Staging tests](../test/storage_media_staging_test.dart) · [Backup page tests](../test/storage_backup_page_test.dart)

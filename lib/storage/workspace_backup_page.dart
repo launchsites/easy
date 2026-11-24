@@ -58,6 +58,10 @@ class WorkspaceBackupPage extends StatefulWidget {
 enum _Activity {
   export('Creating backup…', 'The backup could not be exported.'),
   preview('Reading backup…', 'The backup could not be opened.'),
+  cleanup(
+    'Checking temporary files…',
+    'The temporary files could not be reviewed.',
+  ),
   recovery(
     'Reading recovery point…',
     'The recovery point could not be opened.',
@@ -287,6 +291,75 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
     await _showSelection(preview, expected, _BackupSource.recovery);
   });
 
+  Future<void> _cleanupTemporaryFiles(
+    WorkspaceMediaBackupUiSupport support,
+  ) => _run(_Activity.cleanup, () async {
+    final attachmentStore = await support.loadAttachments();
+    final imports = attachmentStore is InterruptedAttachmentImports
+        ? attachmentStore as InterruptedAttachmentImports
+        : null;
+    final attachments = await imports?.previewInterruptedImports();
+    final backups = await previewInterruptedBackupFiles(
+      scratchDirectory: support.scratchDirectory,
+    );
+    final count = (attachments?.stageCount ?? 0) + backups.stageCount;
+    final bytes = (attachments?.bytes ?? 0) + backups.bytes;
+    final partialReview = (attachments?.hasMore ?? false) || backups.hasMore;
+    if (!mounted) return;
+    if (count == 0) {
+      _inform(
+        partialReview
+            ? 'No interrupted media operations found in this review.'
+            : 'No interrupted media operations found.',
+      );
+      return;
+    }
+    final approved = await _prompt<bool>(
+      (context) => AlertDialog(
+        title: const Text('Clear temporary media files?'),
+        content: Text(
+          '$count interrupted ${count == 1 ? 'operation' : 'operations'} '
+          'left ${_storageSize(bytes)} of temporary files.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Clear temporary files'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || approved != true) return;
+    final removedImports =
+        imports != null && attachments != null && attachments.stageCount > 0
+        ? await imports.removeInterruptedImports(attachments)
+        : null;
+    final removedBackups = backups.stageCount == 0
+        ? null
+        : await removeInterruptedBackupFiles(
+            backups,
+            scratchDirectory: support.scratchDirectory,
+          );
+    final removed =
+        (removedImports?.removedStages ?? 0) +
+        (removedBackups?.removedStages ?? 0);
+    final reclaimed =
+        (removedImports?.removedBytes ?? 0) +
+        (removedBackups?.removedBytes ?? 0);
+    final skipped =
+        (removedImports?.skippedStages ?? 0) +
+        (removedBackups?.skippedStages ?? 0);
+    final canReviewMore = skipped > 0 || partialReview;
+    _inform(
+      '$removed temporary ${removed == 1 ? 'folder' : 'folders'} cleared '
+      '(${_storageSize(reclaimed)}).${canReviewMore ? ' Review again for remaining files.' : ''}',
+    );
+  });
+
   Future<void> _openHistory(WorkspaceHistoryStore store) =>
       Navigator.of(context).push<void>(
         MaterialPageRoute(
@@ -451,6 +524,18 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
                               icon: Icons.bookmarks_outlined,
                               onTap: enabled
                                   ? () => _openHistory(history)
+                                  : null,
+                            ),
+                          ],
+                          if (widget.media case final support?) ...[
+                            const Divider(),
+                            _BackupAction(
+                              title: 'Temporary media files',
+                              description:
+                                  'Review interrupted imports and backups.',
+                              icon: Icons.cleaning_services_outlined,
+                              onTap: enabled
+                                  ? () => _cleanupTemporaryFiles(support)
                                   : null,
                             ),
                           ],
@@ -790,4 +875,10 @@ String _backupFilename(DateTime date) {
   String two(int number) => number.toString().padLeft(2, '0');
   return 'Easy-backup-${date.year}-${two(date.month)}-${two(date.day)}'
       '-${two(date.hour)}${two(date.minute)}${two(date.second)}.easybackup';
+}
+
+String _storageSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KiB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MiB';
 }

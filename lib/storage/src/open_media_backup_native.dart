@@ -15,6 +15,8 @@ import 'contracts.dart';
 import 'media_backup_contracts.dart';
 import 'media_backup_frames.dart';
 import 'media_backup_manifest.dart';
+import 'media_staging_contracts.dart';
+import 'media_staging_native.dart';
 import 'snapshot_codec.dart';
 
 var _jobs = 0;
@@ -39,7 +41,7 @@ Future<WorkspaceMediaBackupFile> createMediaBackup({
   var retained = false;
   try {
     final filename = _mediaBackupFilename(DateTime.now());
-    final output = _within(stage, filename);
+    final output = _within(stage.content, filename);
     final writer = await MediaFrameWriter.open(output, passphrase);
     try {
       final size = ByteData(4)..setUint32(0, encodedManifest.length);
@@ -66,7 +68,7 @@ Future<WorkspaceMediaBackupFile> createMediaBackup({
     retained = true;
     return result;
   } finally {
-    if (!retained) await _delete(stage);
+    if (!retained) await stage.close();
   }
 });
 
@@ -83,7 +85,7 @@ Future<WorkspaceMediaBackupPreview> previewMediaBackup({
   final stage = await _scratch(scratchDirectory);
   var retained = false;
   try {
-    final encrypted = _within(stage, 'source');
+    final encrypted = _within(stage.content, 'source');
     final reader = await MediaFrameReader.open(
       _retainEncryptedInput(source, encrypted, mediaArchiveLengthLimit(limits)),
       passphrase,
@@ -112,7 +114,7 @@ Future<WorkspaceMediaBackupPreview> previewMediaBackup({
         limits,
       );
       for (final attachment in manifest.attachments) {
-        await _validateAttachment(reader, stage, attachment);
+        await _validateAttachment(reader, stage.content, attachment);
       }
       await reader.expectEnd();
     } finally {
@@ -132,7 +134,7 @@ Future<WorkspaceMediaBackupPreview> previewMediaBackup({
     retained = true;
     return result;
   } finally {
-    if (!retained) await _delete(stage);
+    if (!retained) await stage.close();
   }
 });
 
@@ -254,20 +256,33 @@ Future<T> _job<T>(Future<T> Function() work) async {
   }
 }
 
-Future<Directory> _scratch(String? override) async {
-  final folder = override == null
-      ? await getTemporaryDirectory()
-      : Directory(override);
+Future<MediaFileStage> _scratch(String? override) async {
+  final folder = await _scratchRoot(override);
   await folder.create(recursive: true);
-  return folder.createTemp('easy-media-backup-');
+  return MediaFileStage.create(folder, MediaStageKind.backups);
 }
+
+Future<Directory> _scratchRoot(String? override) async =>
+    override == null ? getTemporaryDirectory() : Directory(override);
+
+Future<MediaStagingCleanupPreview> previewInterruptedBackupFiles({
+  String? scratchDirectory,
+}) async => previewMediaStages(
+  await _scratchRoot(scratchDirectory),
+  MediaStageKind.backups,
+);
+
+Future<MediaStagingCleanupResult> removeInterruptedBackupFiles(
+  MediaStagingCleanupPreview preview, {
+  String? scratchDirectory,
+}) async => removeMediaStages(
+  await _scratchRoot(scratchDirectory),
+  MediaStageKind.backups,
+  preview,
+);
 
 File _within(Directory stage, String filename) =>
     File.fromUri(stage.uri.resolve(filename));
-
-Future<void> _delete(Directory stage) async {
-  if (await stage.exists()) await stage.delete(recursive: true);
-}
 
 Future<(Uint8List, MediaBackupManifest)> _encodeSnapshot(
   WorkspaceRevision revision,
@@ -434,7 +449,7 @@ final class _MediaBackupFile implements WorkspaceMediaBackupFile {
     this.suggestedName,
   );
 
-  final Directory _stage;
+  final MediaFileStage _stage;
   final File _file;
   Future<void>? _closed;
 
@@ -458,7 +473,7 @@ final class _MediaBackupFile implements WorkspaceMediaBackupFile {
   }
 
   @override
-  Future<void> close() => _closed ??= _delete(_stage);
+  Future<void> close() => _closed ??= _stage.close();
 }
 
 final class _MediaBackupPreview implements WorkspaceMediaBackupPreview {
@@ -475,7 +490,7 @@ final class _MediaBackupPreview implements WorkspaceMediaBackupPreview {
   );
 
   final WorkspaceStore _store;
-  final Directory _stage;
+  final MediaFileStage _stage;
   final File _archive;
   final MediaBackupManifest _manifest;
   final String _identity;
@@ -517,7 +532,7 @@ final class _MediaBackupPreview implements WorkspaceMediaBackupPreview {
   Future<void> _close() async {
     await _active?.future;
     _passphrase = null;
-    await _delete(_stage);
+    await _stage.close();
   }
 }
 

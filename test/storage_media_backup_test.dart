@@ -374,7 +374,9 @@ void main() {
         .toList();
     final candidates = [
       for (final directory in directories)
-        File(Uri.directory(directory.path).resolve('source').toFilePath()),
+        File(
+          Uri.directory(directory.path).resolve('content/source').toFilePath(),
+        ),
     ];
     final body = candidates.singleWhere((file) => file.existsSync());
     expect(await body.parent.list().length, 1);

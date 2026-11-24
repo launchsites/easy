@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 
 import 'attachment_contracts.dart';
 import 'attachment_media.dart';
+import 'media_staging_contracts.dart';
+import 'media_staging_native.dart';
 
 const _payloadName = 'payload';
 const _blockBytes = 64 * 1024;
@@ -33,7 +35,8 @@ Future<AttachmentStore> openDefaultAttachmentStore({
   }
 }
 
-class _FileAttachmentStore implements StreamingAttachmentStore {
+class _FileAttachmentStore
+    implements StreamingAttachmentStore, InterruptedAttachmentImports {
   _FileAttachmentStore(this._root, this._limits);
 
   final String _root;
@@ -99,6 +102,18 @@ class _FileAttachmentStore implements StreamingAttachmentStore {
     validateAttachmentId(id);
     return _readInWorker(_root, id, _limits);
   });
+
+  @override
+  Future<MediaStagingCleanupPreview> previewInterruptedImports() => _submit(
+    () => previewMediaStages(Directory(_root), MediaStageKind.imports),
+  );
+
+  @override
+  Future<MediaStagingCleanupResult> removeInterruptedImports(
+    MediaStagingCleanupPreview preview,
+  ) => _submit(
+    () => removeMediaStages(Directory(_root), MediaStageKind.imports, preview),
+  );
 
   @override
   Stream<Uint8List> readStream(AttachmentRef expected) async* {
@@ -218,14 +233,17 @@ Future<AttachmentRef> _ingest(
   _checkMimeLength(declaredMimeType);
   if (expectedLength != null) _checkLength(expectedLength, limit);
   if (expectedContentId != null) validateAttachmentId(expectedContentId);
-  final Directory stage;
+  final MediaFileStage stage;
   try {
     // The staging directory is private and on the destination filesystem.
-    stage = await Directory(root).createTemp('.incoming-');
+    stage = await MediaFileStage.create(
+      Directory(root),
+      MediaStageKind.imports,
+    );
   } on FileSystemException {
     throw const AttachmentStoreException('The attachment could not be staged.');
   }
-  final payload = File.fromUri(stage.uri.resolve(_payloadName));
+  final payload = File.fromUri(stage.content.uri.resolve(_payloadName));
   final digest = _DigestSink();
   final inputDigest = sha256.startChunkedConversion(digest);
   var size = 0;
@@ -264,7 +282,7 @@ Future<AttachmentRef> _ingest(
         'The attachment does not match its content ID.',
       );
     }
-    final stagedPath = stage.path;
+    final stagedPath = stage.content.path;
     return runInWorker
         ? await _publishInWorker(
             root,
@@ -279,9 +297,7 @@ Future<AttachmentRef> _ingest(
   } on FileSystemException {
     throw const AttachmentStoreException('The attachment could not be saved.');
   } finally {
-    // A successful rename removes this unique staging path. Existing content
-    // is never deleted when importing a duplicate or rejecting a file.
-    if (await stage.exists()) await stage.delete(recursive: true);
+    await stage.close();
   }
 }
 

@@ -13,6 +13,7 @@ export 'src/attachment_contracts.dart'
         AttachmentStoreException,
         StreamingAttachmentStore,
         StoredAttachment;
+export 'src/media_staging_contracts.dart';
 
 /// Opens app-managed local attachment storage. A null result means the
 /// platform cannot persist these files. Browsers can still use text capture.
