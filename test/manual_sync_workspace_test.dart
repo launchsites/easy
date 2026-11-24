@@ -204,6 +204,220 @@ void main() {
     );
   });
 
+  test('four paired journals converge after partition, conflict, replay, and restart', () async {
+    final author = await create();
+    final editor = await create(isSecond: true, id: author.workspaceId);
+    final offlineCredentials = SyncDeviceCredentials(_TrialVault());
+    final lateCredentials = SyncDeviceCredentials(_TrialVault());
+
+    Future<ManualSyncWorkspace> addPeer(
+      SyncDeviceCredentials credentials,
+      String filename, {
+      bool reopen = false,
+    }) async {
+      final database = temporary.uri.resolve(filename).toFilePath();
+      final openPeer = reopen
+          ? ManualSyncWorkspace.open
+          : ManualSyncWorkspace.create;
+      final peer = await openPeer(
+        credentials: credentials,
+        workspaceId: author.workspaceId,
+        databasePath: database,
+      );
+      workspaces.add(peer);
+      return peer;
+    }
+
+    Future<void> pair(
+      ManualSyncWorkspace left,
+      ManualSyncWorkspace right,
+    ) async {
+      final (local, remote) = await review(left, right);
+      try {
+        await left.approvePair(
+          local,
+          expectedRevision: (await left.status()).revision,
+        );
+        await right.approvePair(
+          remote,
+          expectedRevision: (await right.status()).revision,
+        );
+      } finally {
+        local.discard();
+        remote.discard();
+      }
+    }
+
+    Future<SyncJournalExport?> nextBundle(
+      ManualSyncWorkspace sender,
+      ManualSyncWorkspace recipient,
+    ) async => sender.exportFor(
+      recipient.device.fingerprint,
+      peerProgress: await recipient.progressFor(sender.device.fingerprint),
+    );
+
+    Future<SyncImportPreview> previewBundle(
+      ManualSyncWorkspace sender,
+      ManualSyncWorkspace recipient,
+      SyncJournalExport bundle,
+    ) => recipient.previewIncoming(
+      bytes: bundle.bytes,
+      senderId: sender.device.fingerprint,
+    );
+
+    Future<void> deliver(
+      ManualSyncWorkspace sender,
+      ManualSyncWorkspace recipient,
+    ) async {
+      final bundle = await nextBundle(sender, recipient);
+      if (bundle == null) return;
+      final preview = await previewBundle(sender, recipient, bundle);
+      expect(preview.missing.counters, isEmpty);
+      await recipient.commitIncoming(
+        preview,
+        approveDestructiveChanges: true,
+        approveConflicts: true,
+      );
+    }
+
+    var offline = await addPeer(offlineCredentials, 'offline.db');
+    final late = await addPeer(lateCredentials, 'late.db');
+    await pair(author, editor);
+    await pair(author, offline);
+    await pair(editor, offline);
+    await pair(author, late);
+    await pair(editor, late);
+    await author.writeLocalChange(
+      record: _note,
+      kind: SyncChangeKind.patch,
+      fields: {'title': 'Original', 'body': 'Keep this text'},
+    );
+    for (final recipient in [editor, offline, late]) {
+      await deliver(author, recipient);
+    }
+
+    // Both edits and the deletion observe only the original version.
+    await author.writeLocalChange(
+      record: _note,
+      kind: SyncChangeKind.patch,
+      fields: {'title': 'Author edition'},
+    );
+    await editor.writeLocalChange(
+      record: _note,
+      kind: SyncChangeKind.patch,
+      fields: {'title': 'Editor edition'},
+    );
+    await offline.writeLocalChange(record: _note, kind: SyncChangeKind.delete);
+    await late.writeLocalChange(
+      record: _task,
+      kind: SyncChangeKind.patch,
+      fields: {'title': 'Independent late task'},
+    );
+    await deliver(offline, editor);
+    final relayedDeletion = (await nextBundle(editor, late))!;
+    final beforeUnapproved = (await late.status()).revision;
+    await expectLater(
+      previewBundle(editor, late, relayedDeletion),
+      throwsA(isA<SyncTrustException>()),
+    );
+    expect((await late.status()).revision, beforeUnapproved);
+    expect((await late.readRecord(_note))?.state, SyncRecordState.active);
+
+    await pair(offline, late);
+    final relayed = await previewBundle(editor, late, relayedDeletion);
+    await expectLater(
+      late.commitIncoming(relayed),
+      throwsA(isA<SyncImportApprovalRequired>()),
+    );
+    await expectLater(
+      late.commitIncoming(relayed, approveDestructiveChanges: true),
+      throwsA(isA<SyncImportApprovalRequired>()),
+    );
+    await late.commitIncoming(
+      relayed,
+      approveDestructiveChanges: true,
+      approveConflicts: true,
+    );
+    final editorToOffline = (await nextBundle(editor, offline))!;
+    final stalePreview = await previewBundle(editor, offline, editorToOffline);
+    final originalOffline = offline;
+    await originalOffline.close();
+    offline = await addPeer(offlineCredentials, 'offline.db', reopen: true);
+    expect(offline.device.fingerprint, originalOffline.device.fingerprint);
+    await expectLater(
+      offline.commitIncoming(stalePreview),
+      throwsA(isA<SyncJournalException>()),
+    );
+    await deliver(editor, offline);
+
+    await deliver(late, author);
+    await deliver(author, offline);
+    await deliver(offline, editor);
+    await deliver(editor, late);
+    final peers = [author, editor, offline, late];
+    final fullWatermark = (await author.status()).watermark.counters;
+    for (final peer in peers) {
+      expect((await peer.status()).watermark.counters, fullWatermark);
+      final conflict = (await peer.readRecord(_note))!;
+      expect(conflict.state, SyncRecordState.deleteConflict);
+      expect(conflict.fields['body']?.single.value, 'Keep this text');
+      expect(
+        conflict.fields['title']?.map((version) => version.value).toSet(),
+        {'Author edition', 'Editor edition'},
+      );
+      expect(
+        (await peer.readRecord(_task))?.fields['title']?.single.value,
+        'Independent late task',
+      );
+    }
+
+    final repeated = await previewBundle(editor, late, relayedDeletion);
+    final alreadySeen = (await late.status()).revision;
+    expect(repeated.changeCount, 0);
+    expect(repeated.duplicateCount, relayedDeletion.changeCount);
+    expect((await late.commitIncoming(repeated)).revision, alreadySeen);
+
+    await author.writeLocalChange(
+      record: _note,
+      kind: SyncChangeKind.restore,
+      fields: {'title': 'Reviewed resolution'},
+    );
+    for (final peer in peers.skip(1).toList().reversed) {
+      await deliver(author, peer);
+    }
+    for (final peer in peers) {
+      final resolved = (await peer.readRecord(_note))!;
+      expect(resolved.state, SyncRecordState.active);
+      expect(resolved.hasConflicts, isFalse);
+      expect(resolved.fields['body']?.single.value, 'Keep this text');
+      expect(resolved.fields['title']?.single.value, 'Reviewed resolution');
+    }
+
+    await offline.writeLocalChange(
+      record: _event,
+      kind: SyncChangeKind.patch,
+      fields: {'title': 'New offline record'},
+    );
+    final formerlyTrusted = (await nextBundle(offline, late))!;
+    final revocation = await late.reviewRevocation(offline.device.fingerprint);
+    await late.confirmRevocation(revocation);
+    await expectLater(
+      previewBundle(offline, late, formerlyTrusted),
+      throwsA(isA<SyncTrustException>()),
+    );
+    await deliver(offline, author);
+    final indirect = (await nextBundle(author, late))!;
+    await expectLater(
+      previewBundle(author, late, indirect),
+      throwsA(isA<SyncTrustException>()),
+    );
+    expect(await late.readRecord(_event), isNull);
+    expect(
+      (await late.readRecord(_note))?.fields['title']?.single.value,
+      'Reviewed resolution',
+    );
+  });
+
   test('explicit revocation invalidates stale previews and blocks access even with a locked vault', () async {
     final first = await create();
     final second = await create(isSecond: true, id: first.workspaceId);
