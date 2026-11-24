@@ -306,7 +306,7 @@ def run(args, stage):
             "native_journal_integrity": "ok", "workspace_unchanged": True}
 
 
-def probe_arguments(description, *, accept_interruption=False):
+def probe_arguments(description, *, accept_interruption=False, seed_profiles=False):
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--revision", required=True)
@@ -320,6 +320,8 @@ def probe_arguments(description, *, accept_interruption=False):
     parser.add_argument("--timeout", type=float, default=35)
     if accept_interruption:
         parser.add_argument("--interrupt-first", action="store_true")
+    if seed_profiles:
+        parser.add_argument("--flutter", default="flutter")
     args = parser.parse_args()
     args.binary = args.binary.resolve(strict=True)
     if re.fullmatch(r"[0-9a-f]{40}", args.revision) is None or args.timeout <= 0:

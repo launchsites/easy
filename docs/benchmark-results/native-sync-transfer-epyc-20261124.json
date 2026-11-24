@@ -1,0 +1,22 @@
+{
+  "source_revision": "deee4ba0499fee801a2fffad239c89403b11785c",
+  "executable_sha256": "372ea3842656ed4ccce36e9341d3ea1f123497ef7215422be4dae830a1b2b08b",
+  "aot_sha256": "33ce4c8ef3d02d4a934c19828cf9976f26ac448bbab2c53e9085f0890c5511d8",
+  "viewport": [
+    1280,
+    720
+  ],
+  "elapsed_seconds": 56.41,
+  "checks": {
+    "prepaired_synthetic_profiles": 2,
+    "native_file_chooser_export_import": true,
+    "encrypted_bundle_bytes": 587,
+    "workspace_revision_before_apply": 1,
+    "workspace_revision_after_apply": 2,
+    "source_digest_unchanged": true,
+    "pre_apply_digest_retained": true,
+    "destination_restart_digest_matches": true,
+    "only_selected_record_applied": true,
+    "destination_sqlite_integrity": "ok"
+  }
+}
