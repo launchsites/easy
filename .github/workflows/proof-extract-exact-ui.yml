@@ -30,14 +30,20 @@ jobs:
           done
       - name: Extract and render bounded previews of synthetic screenshots
         run: |
-          python3 - <<'PY'
+          if ! python3 -m pip --version; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends python3-pip
+          fi
+          python3 -m pip install --disable-pip-version-check --only-binary=:all: \
+            --target "$RUNNER_TEMP/easy-ui-pillow" Pillow==11.3.0
+          PYTHONPATH="$RUNNER_TEMP/easy-ui-pillow" python3 - <<'PY'
           from base64 import b64encode
           from hashlib import sha256
           from pathlib import Path, PurePosixPath
           import json
           import re
           import struct
-          import subprocess
+          from PIL import Image
           import zipfile
 
           output = Path('preview-source')
@@ -76,9 +82,9 @@ jobs:
                       source = output / (name + '.png')
                       source.write_bytes(png)
                       destination = output / (name + '.webp')
-                      subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-i', str(source),
-                                      '-frames:v', '1', '-vf', f'scale={min(width, source_width)}:-1',
-                                      '-c:v', 'libwebp', '-quality', '80', str(destination)], check=True)
+                      with Image.open(source) as image:
+                          image.thumbnail((width, 4096), Image.Resampling.LANCZOS)
+                          image.save(destination, format='WEBP', quality=80, method=5)
                       data = destination.read_bytes()
                       assert len(data) <= 100_000 and data.startswith(b'RIFF') and data[8:12] == b'WEBP'
                       print('UI_META', json.dumps({'name': name + '.webp', 'platform': platform,
