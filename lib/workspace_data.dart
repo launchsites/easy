@@ -235,8 +235,14 @@ class WorkspaceData {
           CalendarEvent(
             id: event['id'] as String,
             title: event['title'] as String,
-            start: DateTime.parse(event['start'] as String),
-            end: DateTime.parse(event['end'] as String),
+            start: _readEventTime(
+              event['start'] as String,
+              event['allDay'] as bool,
+            ),
+            end: _readEventTime(
+              event['end'] as String,
+              event['allDay'] as bool,
+            ),
             category: event['category'] as String,
             allDay: event['allDay'] as bool,
             location: event['location'] as String?,
@@ -303,8 +309,8 @@ class WorkspaceData {
         {
           'id': event.id,
           'title': event.title,
-          'start': event.start.toIso8601String(),
-          'end': event.end.toIso8601String(),
+          'start': _writeEventTime(event.start, event.allDay),
+          'end': _writeEventTime(event.end, event.allDay),
           'category': event.category,
           'allDay': event.allDay,
           'location': event.location,
@@ -352,3 +358,11 @@ class WorkspaceData {
     'notes': [for (final note in notes) note.toJson()],
   });
 }
+
+DateTime _readEventTime(String value, bool allDay) {
+  final time = DateTime.parse(value);
+  return allDay ? time : time.toLocal();
+}
+
+String _writeEventTime(DateTime value, bool allDay) =>
+    (allDay ? value : value.toUtc()).toIso8601String();

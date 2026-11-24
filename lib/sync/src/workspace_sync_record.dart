@@ -105,16 +105,12 @@ final class WorkspaceSyncRecord {
   ].join(' · ');
 
   Map<String, Object?> toSaved() {
-    if (key.kind == SyncRecordKind.calendarEvent) {
-      final allDay = document['allDay'] == true;
+    if (key.kind == SyncRecordKind.calendarEvent &&
+        document['allDay'] == true) {
       return {
         ...document,
         for (final field in ['start', 'end'])
-          field: allDay
-              ? '${document[field]}T00:00:00.000'
-              : DateTime.parse(document[field]! as String)
-                    .toLocal()
-                    .toIso8601String(),
+          field: '${document[field]}T00:00:00.000',
       };
     }
     if (key.kind == SyncRecordKind.task) {
