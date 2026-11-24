@@ -255,6 +255,55 @@ void main() {
   );
 
   test(
+    'interactive dispatch rechecks policy after delayed SQLite acknowledgement',
+    () async {
+      final reserved = Completer<void>();
+      final ack = Completer<void>();
+      final input = _captureSource();
+      var holdAck = false;
+      var sends = 0;
+      final first = _runtime(
+        firstStore,
+        (_) async {
+          sends++;
+          expect((await _settings(secondStore)).route, AiRoute.offline);
+          return _reply(input);
+        },
+        compareAndSwap: (revision, value) async {
+          final saved = await firstStore.compareAndSwap(revision, value);
+          if (holdAck &&
+              saved != null &&
+              _ledgerFrom(value).report().reservedMicros == _maximum) {
+            reserved.complete();
+            await ack.future;
+          }
+          return saved;
+        },
+      );
+      expect(
+        await first.saveSettings(_paid(), apiKey: _key),
+        AiSettingsSaveStatus.saved,
+      );
+      holdAck = true;
+      final running = _capture(first, input);
+      try {
+        await reserved.future.timeout(_gateTimeout);
+        final second = _runtime(secondStore, _unexpected);
+        expect(await second.load(), isTrue);
+        expect(
+          await second.saveSettings(const AiRuntimeSettings()),
+          AiSettingsSaveStatus.saved,
+        );
+      } finally {
+        ack.complete();
+      }
+      await running;
+      expect(sends, 0);
+      expect((await _ledger(secondStore)).report().committedMicros, 0);
+    },
+  );
+
+  test(
     'failed transport retains the reservation through a lower remembered limit',
     () async {
       var sends = 0;

@@ -44,7 +44,9 @@ The **Local** route accepts literal `127.0.0.1` and `[::1]` HTTP addresses. Easy
 
 Local requests use the model server's memory and CPU. **Suggest durations** enables estimate review. **Use spare capacity** opts into preparing estimates while the workspace is open and idle. **Group estimates while active** spaces local attempts at least 20 minutes apart, up to six a day. Easy cancels active local inference when the app backgrounds. Stop the separate server with `Ctrl+C` to reclaim its memory.
 
-Duration suggestions show the task context sent to the model and any validated planning range it returned. Adaptive automatic estimates can request a range in the same call when the route can sustain multiple daily attempts and the prompt and reply fit the request limits. Explicit paid estimates can also request a range within their existing reservation. **Use estimate** saves the reviewed point value to the task.
+Local duration requests ask for a point estimate and show the task context sent to the model. **Use estimate** saves the reviewed point value. **Timing history** can offer a median from recent comparable completed work and shows the observed range using records on the device. The paired CPU tests received some usable points from both Qwen checkpoints and zero model ranges. [Paired tests](local-inference-benchmark.md#optional-planning-ranges)
+
+On the paid API route, explicit duration requests and adaptive automatic estimates with capacity for multiple daily attempts can request a planning range within the existing reservation. Easy validates any returned range and shows it alongside the proposed point.
 
 The supplied Qwen checkpoint accepts text. Meal photo suggestions require a separate compatible vision model. The capture validator can discard model replies that omit evidence or use an unsupported shape. The saved capture remains available for manual review. [Capture and estimate results](local-inference-benchmark.md)
 

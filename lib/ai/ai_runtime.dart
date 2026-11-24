@@ -688,10 +688,9 @@ class AiRuntime extends ChangeNotifier {
       final fields = payload(activeSettings);
       final includeEstimateRange =
           discretionary &&
+          activeSettings.route == AiRoute.api &&
           config.maxOutputTokens >= _minimumDetailedEstimateOutputTokens &&
-          (automatic == null
-              ? activeSettings.route == AiRoute.api
-              : pace!.adaptive && pace.dailyAttempts > 1) &&
+          (automatic == null || (pace!.adaptive && pace.dailyAttempts > 1)) &&
           _provider.fitsRequest(
             config,
             fields,
@@ -979,12 +978,15 @@ class AiRuntime extends ChangeNotifier {
     ledger: ledger,
     persistBudget: (_) => _writeLane(() async {
       if (identical(ledger, _ledger)) {
-        if (_storageReady && await _commit(_settings, ledger)) {
+        final id = _runningId;
+        final resolution = id == null ? null : ledger.reservation(id);
+        if (_storageReady &&
+            await _commit(_settings, ledger) &&
+            (resolution?.state != AiReservationState.reserved ||
+                await _readHead())) {
           _notify();
           return;
         }
-        final id = _runningId;
-        final resolution = id == null ? null : ledger.reservation(id);
         if (resolution != null) {
           if (await _reconcileProviderResolution(resolution)) {
             _notify();

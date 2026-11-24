@@ -840,7 +840,52 @@ void main() {
   );
 
   test(
-    'local range review survives reopen and older records keep their point',
+    'local adaptive estimates request a point and preserve disclosed evidence',
+    () async {
+      final store = _Store();
+      var sends = 0;
+      final runtime = store.runtime(
+        send: (request) async {
+          sends++;
+          final body = jsonDecode((request as http.Request).body) as Map;
+          final system =
+              ((body['messages'] as List).first as Map)['content'] as String;
+          expect(system, isNot(contains('lowerMinutes')));
+          expect(system, isNot(contains('upperMinutes')));
+          expect(request.headers.containsKey('authorization'), false);
+          final payload = _userPayload(request);
+          expect(payload['sampleDurationsMinutes'], [20, 40]);
+          return _estimateAnswer(payload);
+        },
+      );
+      addTearDown(runtime.dispose);
+      expect(
+        await runtime.saveSettings(
+          _automaticLocal(metadata: true, adaptive: true),
+          authorizeAutomatic: (_) async => true,
+        ),
+        AiSettingsSaveStatus.saved,
+      );
+      final result = await runtime.runAutomaticEstimate(
+        candidate: _candidate('private-workspace-id-local'),
+        currentRevision: _candidateRevision,
+      );
+      expect(result.status, AiRunStatus.ready);
+      expect(sends, 1);
+      expect(runtime.budget.chargedMicros, 0);
+      final pending = runtime.pendingEstimates.single;
+      expect(pending.durationMinutes, 35);
+      expect(pending.details!.disclosedDurations, 2);
+      expect(pending.details!.range, isNull);
+      expect(
+        pending.details!.reviewDescription,
+        'Model received the task title and timing evidence from 2 recorded durations.',
+      );
+    },
+  );
+
+  test(
+    'paid range review survives reopen and older records keep their point',
     () async {
       final store = _Store();
       final runtime = store.runtime(
@@ -852,7 +897,8 @@ void main() {
       );
       addTearDown(runtime.dispose);
       await runtime.saveSettings(
-        _automaticLocal(metadata: true, adaptive: true),
+        _paid(automatic: true, adaptive: true, metadata: true),
+        apiKey: _testKey,
         authorizeAutomatic: (_) async => true,
       );
       final result = await runtime.runAutomaticEstimate(
@@ -860,7 +906,7 @@ void main() {
         currentRevision: _candidateRevision,
       );
       expect(result.status, AiRunStatus.ready);
-      expect(runtime.budget.chargedMicros, 0);
+      expect(runtime.budget.chargedMicros, 9216);
       expect(store.state!.value, isNot(contains('Draft reviewed estimate')));
       expect(store.state!.value, isNot(contains('sampleDurationsMinutes')));
       final restored = store.runtime();
@@ -906,7 +952,8 @@ void main() {
       );
       addTearDown(runtime.dispose);
       await runtime.saveSettings(
-        _automaticLocal(adaptive: true),
+        _paid(automatic: true, adaptive: true),
+        apiKey: _testKey,
         authorizeAutomatic: (_) async => true,
       );
       final candidate = _candidate('private-workspace-id-range');
@@ -1125,6 +1172,99 @@ void main() {
     expect(runtime.settings.adaptiveEstimatePacing, true);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('paid allowance can be lowered and reloaded in 320px RTL', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 500);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetViewInsets);
+    final original = _paid(cap: 40000000);
+    final ledger = AiBudgetLedger(
+      monthlyCapMicros: original.monthlyCapMicros,
+      currency: 'GBP',
+      clock: _clock,
+    );
+    final quote = original.provider!.budgetRequest(
+      'unreported-fixture-request',
+      work: AiWorkKind.interactive,
+    );
+    expect(ledger.reserve(quote).approved, isTrue);
+    final originalUsage = ledger.settle(quote.id)!.chargedMicros;
+    expect(originalUsage, 9216);
+    final store = _Store()
+      ..state = AiStoredState(
+        revision: 1,
+        value: jsonEncode({
+          'version': 1,
+          'settings': original.toJson(),
+          'budget': jsonDecode(ledger.encode()),
+        }),
+      );
+    final runtime = store.runtime();
+    addTearDown(runtime.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(2)),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: child!,
+          ),
+        ),
+        home: AiSettingsPage(runtime: runtime),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(formatPoundsMicros(originalUsage)), findsOneWidget);
+    expect(find.textContaining('1 request with unknown usage'), findsOneWidget);
+
+    Future<void> reveal(Finder finder) async {
+      final scroll = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(finder, 110, scrollable: scroll);
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+    }
+
+    final amount = find.widgetWithText(TextField, 'Monthly API limit');
+    await reveal(amount);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 170);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(amount);
+    await tester.enterText(amount, '0.001');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
+    final save = find.widgetWithText(FilledButton, 'Save settings');
+    await reveal(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(runtime.budget.monthlyCapMicros, 1000);
+    expect(runtime.budget.chargedMicros, originalUsage);
+    expect(runtime.budget.remainingMicros, 0);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    final other = store.runtime();
+    addTearDown(other.dispose);
+    expect(
+      await other.saveSettings(_paid(cap: 2000000)),
+      AiSettingsSaveStatus.saved,
+    );
+    await reveal(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(find.text('AI settings could not be loaded.'), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Reload'));
+    await tester.pumpAndSettle();
+    expect(runtime.settings.monthlyCapMicros, 2000000);
+    expect(runtime.budget.remainingMicros, 2000000 - originalUsage);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 const _testKey = 'synthetic-key-for-tests';
@@ -1153,6 +1293,7 @@ AiRuntimeSettings _paid({
   bool automatic = false,
   bool adaptive = false,
   bool allowEstimates = false,
+  bool metadata = false,
   int maxInputTokens = 8192,
   int maxOutputTokens = 512,
 }) => AiRuntimeSettings(
@@ -1167,6 +1308,7 @@ AiRuntimeSettings _paid({
   allowEstimates: automatic || allowEstimates,
   automaticEstimates: automatic,
   adaptiveEstimatePacing: adaptive,
+  includeOptionalMetadata: metadata,
 );
 
 AiRuntimeSettings _automaticLocal({
