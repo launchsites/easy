@@ -77,7 +77,7 @@ Future<bool> showAiAutomaticDialog(
             const Text('Fields sent', style: sectionHeadingStyle),
             const Text('Task title and temporary request ID'),
             if (preview.includeOptionalMetadata)
-              const Text('Selected prior durations in minutes'),
+              const Text('Prior durations and grouped timing ranges'),
             if (preview.reserveMicros case final reserve?) ...[
               const SizedBox(height: 10),
               Text('Reserve ${formatPoundsMicros(reserve)} per request'),
@@ -528,7 +528,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             value: _metadata,
             title: const Text('Include optional context'),
             subtitle: const Text(
-              'Timezone, custom categories and duration samples',
+              'Timezone, custom categories and timing history',
             ),
             onChanged: (value) => setState(() => _metadata = value),
           ),

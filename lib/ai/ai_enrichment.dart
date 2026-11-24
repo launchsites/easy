@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../task_context/task_context_models.dart';
 import 'ai_budget.dart';
 import 'ai_runtime_settings.dart';
 import 'inference_jobs.dart';
@@ -11,6 +12,7 @@ class AiEnrichmentCandidate {
     required this.sourceRevision,
     required this.contextRevision,
     List<int> sampleDurationsMinutes = const [],
+    this.durationHistory,
   }) : sampleDurationsMinutes = List.unmodifiable(sampleDurationsMinutes);
 
   final String taskId;
@@ -18,6 +20,7 @@ class AiEnrichmentCandidate {
   final int sourceRevision;
   final int contextRevision;
   final List<int> sampleDurationsMinutes;
+  final TaskDurationEvidence? durationHistory;
 
   AiCaptureRevision get revision =>
       (sourceRevision: sourceRevision, contextRevision: contextRevision);
@@ -159,6 +162,19 @@ class AiEnrichmentState {
               other,
         ],
       );
+
+  AiEnrichmentState withoutObsoleteEstimates(AiRevisionLookup current) {
+    final kept = pending
+        .where((estimate) => estimate.isCurrent(current))
+        .toList();
+    if (kept.length == pending.length) return this;
+    return AiEnrichmentState(
+      lastMinute: lastMinute,
+      attemptsOnLastDay: attemptsOnLastDay,
+      attempted: attempted,
+      pending: kept,
+    );
+  }
 
   Map<String, Object?> toJson() => {
     'lastHour': lastMinute == null ? null : lastMinute! ~/ 60,

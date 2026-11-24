@@ -492,6 +492,7 @@ class AiRuntime extends ChangeNotifier {
     final input = AiEstimateInput(
       title: candidate.title,
       sampleDurationsMinutes: candidate.sampleDurationsMinutes,
+      durationHistory: candidate.durationHistory,
     );
     AiCaptureRevision? live(String id) =>
         id == source.id &&
@@ -538,6 +539,16 @@ class AiRuntime extends ChangeNotifier {
       _writeLane(() async {
         final next = _enrichment.withoutEstimate(estimate);
         if (next.pending.length == _enrichment.pending.length) return false;
+        return _writeEnrichment(next);
+      });
+
+  Future<bool> discardObsoleteEstimates(AiRevisionLookup current) =>
+      _writeLane(() async {
+        if (_busy || !_storageReady) return false;
+        final next = _enrichment.withoutObsoleteEstimates(
+          (id) => _lookup(current, id),
+        );
+        if (identical(next, _enrichment)) return false;
         return _writeEnrichment(next);
       });
 
@@ -897,6 +908,9 @@ AiEstimateInput _estimateInput(
   sampleDurationsMinutes: settings.includeOptionalMetadata
       ? _samples(input)
       : [],
+  durationHistory: settings.includeOptionalMetadata
+      ? input.durationHistory
+      : null,
 );
 
 List<int> _samples(AiEstimateInput input) => [

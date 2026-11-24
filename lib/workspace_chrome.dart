@@ -489,6 +489,7 @@ class _RecordDetails extends StatelessWidget {
     this.onReminder,
     this.reminderSet = false,
     this.onSchedule,
+    this.onTimingHistory,
   });
 
   final Object record;
@@ -507,6 +508,7 @@ class _RecordDetails extends StatelessWidget {
   final VoidCallback? onReminder;
   final bool reminderSet;
   final VoidCallback? onSchedule;
+  final VoidCallback? onTimingHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -690,6 +692,11 @@ class _RecordDetails extends StatelessWidget {
                     TextButton(
                       onPressed: onSchedule,
                       child: const Text('Schedule'),
+                    ),
+                  if (onTimingHistory != null)
+                    TextButton(
+                      onPressed: onTimingHistory,
+                      child: const Text('Timing history'),
                     ),
                 ],
               ),

@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../../capture/capture_interpreter.dart';
+import '../../task_context/task_context_models.dart';
 import '../ai_budget.dart';
 import '../inference_jobs.dart';
 import '../vision/meal_vision.dart';
@@ -55,10 +56,12 @@ class AiEstimateInput {
   AiEstimateInput({
     required this.title,
     List<int> sampleDurationsMinutes = const [],
+    this.durationHistory,
   }) : sampleDurationsMinutes = List.unmodifiable(sampleDurationsMinutes);
 
   final String title;
   final List<int> sampleDurationsMinutes;
+  final TaskDurationEvidence? durationHistory;
 }
 
 class AiEstimateSuggestion {
@@ -629,7 +632,28 @@ Map<String, Object?> aiEstimatePayload(
   'title': input.title,
   if (input.sampleDurationsMinutes.isNotEmpty)
     'sampleDurationsMinutes': input.sampleDurationsMinutes,
+  'durationHistory': ?_estimateHistoryFields(input.durationHistory),
 };
+
+Map<String, Object?>? _estimateHistoryFields(TaskDurationEvidence? history) {
+  if (history == null ||
+      history.sampleCount < 1 ||
+      history.sampleCount > 32 ||
+      history.sampleCount > history.matchingSamples ||
+      history.last90DaysCount < 0 ||
+      history.last90DaysCount > history.sampleCount ||
+      history.minimum <= Duration.zero ||
+      history.minimum > history.lower ||
+      history.lower > history.median ||
+      history.median > history.upper ||
+      history.upper > history.maximum ||
+      history.maximum > const Duration(days: 30) ||
+      history.newestAge.isNegative ||
+      history.oldestAge < history.newestAge) {
+    return null;
+  }
+  return history.optionalMetadata();
+}
 
 final _budgetWriters = Expando<_BudgetWriteLane>();
 

@@ -83,6 +83,7 @@ import 'storage/attachment_store.dart';
 import 'storage/media_backup.dart';
 import 'storage/workspace_backup_page.dart';
 import 'storage/workspace_store.dart';
+import 'task_context/task_context.dart';
 import 'tasks/recurring_task.dart';
 import 'tasks/task_breakdown.dart';
 import 'tasks/task_breakdown_review.dart';
@@ -103,6 +104,7 @@ part 'workspace_task_actions.dart';
 part 'workspace_reminders.dart';
 part 'workspace_planner.dart';
 part 'workspace_manual_plan.dart';
+part 'workspace_task_context.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -255,6 +257,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   var _reviewingMealPhoto = false;
   Future<void> _pendingSave = Future.value();
   late WorkspaceData _data;
+  WorkspaceData? _savedWorkspace;
   int _contentRevision = 0;
   List<GymSession>? _gymSessions;
   List<WorkoutPlan>? _workoutPlans;
@@ -312,6 +315,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   Timer? _estimateTimer;
   int? _lastEstimateCheck;
   DateTime _lastWorkspaceInput = DateTime.now();
+  int _taskHistoryRevision = 0;
+  Object? _taskHistoryCacheKey;
+  TaskContextIndex? _taskHistoryCache;
+  Future<TaskContextIndex>? _buildingTaskHistory;
   final _voiceTranscriber = LocalTranscriber();
   VoiceTranscriptionConfig? _voiceConfig;
 
@@ -422,7 +429,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     setState(() {
       _persistedRevision = revision.revision;
       _data = data;
+      _savedWorkspace = data;
       _contentRevision++;
+      _taskHistoryRevision++;
       _gymSessions = sessions;
       _workoutPlans = plans;
       _inspected = null;
@@ -1073,11 +1082,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         task.title.length > 300) {
       return null;
     }
-    final samples =
-        (_ai?.settings.includeOptionalMetadata ?? false) &&
-            _allows(EasyFeature.activity)
-        ? _durationSamples(task)
-        : const <int>[];
+    if (_needsEstimateHistory && !_taskHistoryReady) return null;
+    final history = _needsEstimateHistory ? _timingFor(task)?.duration : null;
+    final samples = history?.compatibleMinutes ?? const <int>[];
     return AiEnrichmentCandidate(
       taskId: task.id,
       title: task.title,
@@ -1090,8 +1097,22 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         task.minimumChunkMinutes,
         task.allowSplit,
       ]),
-      contextRevision: _stableRevision(samples),
+      contextRevision: _stableRevision(
+        history == null
+            ? samples
+            : [
+                samples,
+                history.cohort.name,
+                history.sampleCount,
+                history.matchingSamples,
+                history.latestCompletion.toIso8601String(),
+                history.median.inSeconds,
+                history.lower.inSeconds,
+                history.upper.inSeconds,
+              ],
+      ),
       sampleDurationsMinutes: samples,
+      durationHistory: history,
     );
   }
 
@@ -1110,7 +1131,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         runtime == null ||
         runtime.busy ||
         !_allows(EasyFeature.ai) ||
-        !runtime.automaticEstimateOpportunity ||
+        !runtime.settings.automaticEstimates ||
+        !identical(_savedWorkspace, _data) ||
         ModalRoute.of(context)?.isCurrent != true) {
       return;
     }
@@ -1122,6 +1144,27 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         now.millisecondsSinceEpoch ~/ (2 * Duration.millisecondsPerMinute);
     if (pulse == _lastEstimateCheck) return;
     _lastEstimateCheck = pulse;
+    if (!runtime.automaticEstimateOpportunity &&
+        runtime.pendingEstimates.length < 32) {
+      return;
+    }
+    if (_needsEstimateHistory && !await _prepareTaskHistory()) return;
+    if (!mounted ||
+        !identical(_savedWorkspace, _data) ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        DateTime.now().difference(_lastWorkspaceInput) <
+            const Duration(seconds: 25) ||
+        runtime.busy) {
+      return;
+    }
+    if (runtime.pendingEstimates.length >= 32) {
+      await runtime.discardObsoleteEstimates(_estimateRevision);
+      if (!mounted ||
+          !identical(_savedWorkspace, _data) ||
+          ModalRoute.of(context)?.isCurrent != true)
+        return;
+    }
+    if (!runtime.automaticEstimateOpportunity) return;
     final candidates =
         _data.tasks
             .where((task) => !task.done && task.estimatedMinutes == null)
@@ -1168,9 +1211,14 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }
   }
 
-  void _openTaskEstimates() {
+  Future<void> _openTaskEstimates() async {
     final runtime = _ai;
     if (runtime == null || !_allows(EasyFeature.ai)) return;
+    if (_needsEstimateHistory && !await _prepareTaskHistory()) {
+      if (mounted) _inform('Timing history is unavailable.');
+      return;
+    }
+    if (!mounted) return;
     Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => TaskEstimatesPage(
@@ -2283,11 +2331,13 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final snapshot = data.encode();
     _queueSave(() async {
       await _saveMutation(WorkspaceMutation.workspace(snapshot));
+      _savedWorkspace = data;
       _queueReminderSync(data);
     }, () => _update(_data));
   }
 
   void _assignData(WorkspaceData data) {
+    if (_changesTaskEvidence(_data.tasks, data.tasks)) _taskHistoryRevision++;
     final taskSeriesChanged = !identical(
       data.sections[recurringTasksSection],
       _data.sections[recurringTasksSection],
@@ -2365,6 +2415,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           );
         }
         await _saveMutation(mutation, operationId: operationId);
+        _savedWorkspace = updated;
         _queueReminderSync(updated);
         if (mounted) {
           setState(() {
@@ -3632,6 +3683,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             onSchedule: _canScheduleTask(record)
                 ? () => Navigator.pop(context, 'schedule')
                 : null,
+            onTimingHistory: _canSeeTaskTiming(record)
+                ? () => Navigator.pop(context, 'timing')
+                : null,
           ),
         ),
       ),
@@ -3661,6 +3715,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }
     if (action == 'reminder') await _editRecordReminder(record);
     if (action == 'schedule') await _openManualBlock(record);
+    if (action == 'timing' && record is TaskItem) await _openTaskTiming(record);
   }
 
   bool _canRepeatEvent(Object? record) =>
@@ -3849,7 +3904,15 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   Future<void> _suggestDuration(TaskItem task) async {
     final runtime = _ai;
     if (runtime == null || !runtime.settings.allowEstimates) return;
+    if (_hasTaskHistory) await _prepareTaskHistory();
+    if (!mounted ||
+        !identical(runtime, _ai) ||
+        !_data.tasks.any((record) => identical(record, task))) {
+      return;
+    }
     final revision = _contentRevision;
+    final historyKey = _taskHistoryKey;
+    final history = _timingFor(task)?.duration;
     final scope = CaptureInput(
       id: 'estimate:${task.id}',
       revision: revision,
@@ -3860,10 +3923,14 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       source: scope,
       input: AiEstimateInput(
         title: task.title,
-        sampleDurationsMinutes: _durationSamples(task),
+        sampleDurationsMinutes: history?.compatibleMinutes ?? const [],
+        durationHistory: history,
       ),
       currentRevision: (id) =>
-          mounted && id == scope.id && revision == _contentRevision
+          mounted &&
+              id == scope.id &&
+              revision == _contentRevision &&
+              historyKey == _taskHistoryKey
           ? (sourceRevision: revision, contextRevision: revision)
           : null,
       authorize: (preview) => mounted
@@ -3918,35 +3985,11 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     );
     if (!mounted || approved != true) return;
     final current = _data.tasks.where((item) => item.id == task.id).firstOrNull;
-    if (!identical(current, task)) {
+    if (!identical(current, task) || historyKey != _taskHistoryKey) {
       _inform('This task changed. Review its duration again.');
       return;
     }
     _saveRecord(task.withEstimate(minutes));
-  }
-
-  List<int> _durationSamples(TaskItem task) {
-    final ActivityData activity;
-    try {
-      activity = _activityData();
-    } catch (_) {
-      return const [];
-    }
-    final title = task.title.trim().toLowerCase();
-    final finished = activity.records.where(
-      (record) =>
-          record.finishedAt != null &&
-          (record.target?.id == task.id &&
-                  record.target?.kind == ActivityTargetKind.task ||
-              record.category == task.category &&
-                  record.title.trim().toLowerCase() == title),
-    );
-    return [
-      for (final record in finished.toList().reversed.take(16))
-        if (record.elapsedAt(record.finishedAt!).inMinutes case final minutes
-            when minutes >= 1 && minutes <= 1440)
-          minutes,
-    ];
   }
 
   Widget? _focusedContent(BuildContext context, FocusMode? mode) {
@@ -4388,6 +4431,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                                                   _canScheduleTask(_inspected)
                                                   ? () => _openManualBlock(
                                                       _inspected!,
+                                                    )
+                                                  : null,
+                                              onTimingHistory:
+                                                  _canSeeTaskTiming(_inspected)
+                                                  ? () => _openTaskTiming(
+                                                      _inspected! as TaskItem,
                                                     )
                                                   : null,
                                             ),

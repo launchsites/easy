@@ -5,11 +5,88 @@ import 'package:easy/ai/ai_budget.dart';
 import 'package:easy/ai/ai_runtime.dart';
 import 'package:easy/ai/ai_settings_page.dart';
 import 'package:easy/capture/capture_interpreter.dart';
+import 'package:easy/task_context/task_context.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
 void main() {
+  test(
+    'timing history matches the disclosed payload only when configured',
+    () async {
+      final source = _capture();
+      final history = TaskDurationEvidence(
+        cohort: TaskEvidenceCohort.titleAndCategory,
+        strength: TaskEvidenceStrength.indicative,
+        median: const Duration(minutes: 35),
+        lower: const Duration(minutes: 25),
+        upper: const Duration(minutes: 45),
+        minimum: const Duration(minutes: 25),
+        maximum: const Duration(minutes: 45),
+        sampleCount: 2,
+        matchingSamples: 2,
+        last90DaysCount: 2,
+        outlierCount: null,
+        earliestCompletion: _clock().subtract(const Duration(days: 2)),
+        latestCompletion: _clock().subtract(const Duration(days: 1)),
+        asOf: _clock(),
+        compatibleMinutes: const [25, 45],
+      );
+      Map<String, Object?>? disclosed;
+      var useHistory = false;
+      final runtime = _Store().runtime(
+        send: (request) async {
+          final payload = _userPayload(request);
+          expect(payload, disclosed);
+          expect(payload.containsKey('durationHistory'), useHistory);
+          expect(payload.containsKey('sampleDurationsMinutes'), useHistory);
+          if (useHistory) {
+            final fields = payload['durationHistory'] as Map;
+            expect(fields['cohort'], 'titleAndCategory');
+            expect(fields['sampleCount'], 2);
+            expect(fields['medianSeconds'], 2100);
+            expect(fields['newestAgeDays'], 1);
+            expect(fields.containsKey('latestCompletion'), isFalse);
+            expect(fields.containsKey('taskId'), isFalse);
+          }
+          return _estimateAnswer(payload);
+        },
+      );
+      addTearDown(runtime.dispose);
+      for (final share in [false, true]) {
+        useHistory = share;
+        await runtime.saveSettings(
+          AiRuntimeSettings(
+            route: AiRoute.local,
+            localModel: 'test-local',
+            allowEstimates: true,
+            includeOptionalMetadata: share,
+          ),
+        );
+        final result = await runtime.runEstimate(
+          source: source,
+          input: AiEstimateInput(
+            title: source.text,
+            sampleDurationsMinutes: history.compatibleMinutes,
+            durationHistory: history,
+          ),
+          currentRevision: (id) => id == source.id
+              ? (
+                  sourceRevision: source.revision,
+                  contextRevision: source.context.revision,
+                )
+              : null,
+          authorize: (preview) async {
+            disclosed = preview.fields;
+            return true;
+          },
+        );
+        expect(result.status, AiRunStatus.ready);
+        expect(result.value?.duration, const Duration(minutes: 35));
+      }
+    },
+  );
+
   test('pound amounts retain exact microunits and reject invalid input', () {
     expect(parsePoundsMicros('£1,234.000009'), 1234000009);
     expect(parsePoundsMicros('.50'), 500000);
