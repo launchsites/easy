@@ -21,6 +21,9 @@ A separate AOSP API 36 release completed Full sample setup at 1080 × 2400. A co
 
 The hosted `a339bf8` release produced all three development-signed review APKs. Each package passed signature, manifest, compiled policy, and 16 KiB ZIP and ELF alignment checks. Release lint reported zero errors and one notice about a newer available Gradle version. A second runner verified the exact uploaded archives and their internal checksums, then installed the uploaded x86-64 APK on AOSP 36. That APK completed setup, chose Calendar with the held drag, swiped forward one day, and saved the reviewed 10:05–10:25 event with touch input. [Hosted packages](https://github.com/launchsites/easy/actions/runs/45348743492) · [Hosted APK readback and runtime](https://github.com/launchsites/easy/actions/runs/45350059663) · [Verification results](benchmark-results/android-packages-a339bf8-hosted-20261124.json)
 
+
+The downloadable `ecdc55a` packages also passed assembly, signature and compiled policy checks, and 16 KiB ZIP and ELF alignment on each ABI. Release lint recorded zero errors and one available Gradle upgrade warning. The independent AOSP runtime check installed the exact uploaded x86-64 APK verified against its digest, completing setup and the held-drag, day swipe, and timed event save. [Current review APKs](https://github.com/launchsites/easy/actions/runs/45352804011) · [Uploaded APK runtime](https://github.com/launchsites/easy/actions/runs/45353884908) · [Current package evidence](benchmark-results/android-packages-ecdc55a-hosted-20261124.json)
+
 ```sh
 flutter build apk --release --split-per-abi
 cd android

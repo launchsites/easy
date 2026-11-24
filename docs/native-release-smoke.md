@@ -15,6 +15,8 @@ The extracted review archive from `6f18fe901e9c3b2622240ff8b17e26d626b0df3e` pas
 
 The `5d2ef907c9a6396e34943606fe8e80b96d099d35` review archive passed 38 baseline checkpoints in 156.14 seconds after extraction. The same binary passed 101 more checkpoints with IPv4 and IPv6 sockets blocked across the personal-day journey, Today fit, calendar transfer, workout completion fault, and recurring workout plan. The bundle contained 23 regular files with no workspace database or preferences. [Baseline report](benchmark-results/native-release-smoke-5d2ef90-epyc-20261124.json) · [Five offline scenarios](benchmark-results/native-final-scenarios-5d2ef90-epyc-20261124.json)
 
+An independent Ubuntu 24.04 runner downloaded the `ecdc55a` review archive produced by the main verification job. The runner verified the archive SHA-256 and `BUILD.txt` source, checked dynamic linking, and ran the extracted release under X11 with Mesa llvmpipe. All 38 native checks passed in 55.90 seconds, including both onboarding paths, Health visibility and live workout capture. [Native package run](https://github.com/launchsites/easy/actions/runs/45357107699) · [Verification results](benchmark-results/native-release-smoke-ecdc55a-hosted-20261124.json) · [Screenshots and raw output](https://github.com/launchsites/easy/actions/runs/45357107699/artifacts/14903286313)
+
 The runner uses Flutter's Linux x64 release bundle, Python 3, Xvfb, xdotool, ImageMagick, and Tesseract. It checks simulated pointer and keyboard input at desktop and phone dimensions. Android, iOS, and physical touch use require separate checks.
 
 ```sh

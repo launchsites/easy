@@ -13,6 +13,8 @@ Easy brings your calendar, tasks, notes, and activity into one device-first work
 
 ## Run
 
+Download a development review build for Linux x86-64 or Android. [Review builds](docs/ci.md#review-builds)
+
 Use Flutter 3.50.1 with the checked-in dependency lockfile.
 
 ```sh

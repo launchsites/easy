@@ -1,0 +1,22 @@
+{
+  "app_revision": "ecdc55a553e83d8b357dc2651011f33f26099677",
+  "build_run_id": 45352683815,
+  "build_artifact_id": 14902297185,
+  "build_artifact_sha256": "4233d605b8745554afab1c81bf3676ddcfc1bc29dd6be6ff432cb1f3f1045510",
+  "archive_sha256": "afaf8830cf309ee06c2124de08d7fd01a151b67f1478e09cfe376decf8ad8312",
+  "archive_entries": 34,
+  "runtime_run_id": 45357107699,
+  "runtime_job_id": 138317547983,
+  "runtime_artifact_id": 14903286313,
+  "runtime_artifact_sha256": "92371fccb944bd023dd0a995337f56827c7c30cfe3f96dadd005cbff358aa3ed",
+  "status": "passed",
+  "visual_and_storage_checks": 38,
+  "elapsed_seconds": 55.9,
+  "runner": "GitHub-hosted Ubuntu 24.04",
+  "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+  "fixtures": [
+    "onboarding",
+    "health-scope",
+    "live-gym-capture"
+  ]
+}

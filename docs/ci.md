@@ -20,7 +20,7 @@ The workflows request read-only repository contents and use GitHub's checkout ac
 
 | Hosted check | Revision | Result |
 | --- | --- | --- |
-| Linux | `7658f5b` | Analyzer, native checks, 809 Flutter tests with seven conditional skips, both DST checks, and release compilation passed. [Run](https://github.com/launchsites/easy/actions/runs/45334600558) |
+| Linux | `ecdc55a` | Analyzer, eight Python checks, 884 Flutter tests with seven conditional skips, both DST checks, release compilation and archive extraction passed. [Run](https://github.com/launchsites/easy/actions/runs/45352683815) |
 | Apple SDK | `f8c14fc` | The iOS simulator debug build and unsigned macOS release compiled with Xcode 26.3. [Run](https://github.com/launchsites/easy/actions/runs/45334132108) |
 | iPhone simulator | `b20417a` | Xcode 26.4.1 compiled iOS and macOS. The iPhone 17 simulator on iOS 26.4 launched Easy, verified the private empty workspace, and captured the 1206 × 2622 setup screen. [Run](https://github.com/launchsites/easy/actions/runs/45341653863) |
 | macOS startup | `3f56109` | Easy's ARM64 release launched on macOS 15.8.2 with Xcode 26.3. A runner-local ad hoc copy passed strict signature and release-entitlement checks. The live app created its sandboxed workspace, where a read-only probe verified the empty pending setup, SQLite integrity, and document checksums. [Run](https://github.com/launchsites/easy/actions/runs/45345576521) |
@@ -28,6 +28,17 @@ The workflows request read-only repository contents and use GitHub's checkout ac
 | Android setup and meal replay | `975c6e8` | AOSP API 36 verified first launch, 17.27:1 clock and 3.01:1 navigation glyph contrast, one recovered draft at revision 3, and unchanged workspace revision and attachment checksum after replay. [Run](https://github.com/launchsites/easy/actions/runs/45343142083) |
 | Android simplified system theme | `5c4bd85` | The AOSP API 36 first-launch check passed and the photographed clock and navigation glyph contrast matched the previous run. [Run](https://github.com/launchsites/easy/actions/runs/45344251920) |
 | Android touch journey | `3832097` | The Android 36 release completed sample setup, selected Calendar with a held drag, swiped to the next day, and saved a timed event using the two floating controls. [Run](https://github.com/launchsites/easy/actions/runs/45347390357) |
+
+## Review builds
+
+The downloadable previews were built from `ecdc55a` and include SHA-256 checksums. GitHub sign-in is required. Run `./easy` from the extracted Linux directory. The Android archives contain development-signed APKs.
+
+- [Linux x86-64](https://github.com/launchsites/easy/actions/runs/45352683815/artifacts/14902297185)
+- [Android ARM64](https://github.com/launchsites/easy/actions/runs/45352804011/artifacts/14901376881)
+- [Android ARMv7](https://github.com/launchsites/easy/actions/runs/45352804011/artifacts/14900594599)
+- [Android x86-64](https://github.com/launchsites/easy/actions/runs/45352804011/artifacts/14900918873)
+
+## Run the checks locally
 
 Run the Linux checks from a clone with the build packages in the README.
 

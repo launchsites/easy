@@ -1,0 +1,25 @@
+{
+  "app_revision": "5d2ef907c9a6396e34943606fe8e80b96d099d35",
+  "hosted_run_id": 45347131526,
+  "hosted_job_id": 138284304049,
+  "artifact_id": 14902691184,
+  "artifact_sha256": "e789757320fd4ee3fe6bf4ff6183f35b10588167197941d22e4f33874ab254a8",
+  "status": "passed",
+  "host_image": "ubuntu-24.04",
+  "logical_cpu_count": 1,
+  "ip_sockets_denied": [
+    "IPv4",
+    "IPv6"
+  ],
+  "unix_sockets_verified": true,
+  "workspace_records": 11721,
+  "elapsed_seconds": 2700.57,
+  "cycles": 487,
+  "desktop_route_checks": 280,
+  "desktop_route_mismatches": 0,
+  "orbit_checks": 42,
+  "orbit_mismatches": 0,
+  "peak_rss_kib": 737988,
+  "final_rss_kib": 637948,
+  "workspace_verified": true
+}
