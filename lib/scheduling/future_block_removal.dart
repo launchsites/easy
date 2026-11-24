@@ -1,5 +1,6 @@
 import '../calendar_page.dart';
 import '../task_model.dart';
+import 'task_reservations.dart';
 
 final class FutureBlockRemovalReview {
   factory FutureBlockRemovalReview.prepare({
@@ -102,9 +103,7 @@ bool _eligible(
 ) =>
     event.id.trim().isNotEmpty &&
     event.plannedTaskId == taskId &&
-    !event.isReadOnly &&
-    event.recurringSeriesId == null &&
-    !event.allDay &&
+    isOwnedTaskReservation(event) &&
     event.start.isAfter(now) &&
     event.end.isAfter(event.start) &&
     !protectedIds.contains(event.id);

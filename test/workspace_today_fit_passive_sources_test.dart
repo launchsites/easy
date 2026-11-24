@@ -118,6 +118,22 @@ void main() {
     expect(find.text('Fits now'), findsNothing);
   });
 
+  testWidgets('A free Apple appointment remains visible without blocking fit', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final adapter = _AppleFixture([
+      _appleEvent(now, status: CalendarEventStatus.unknown, blocksTime: false),
+    ]);
+    addTearDown(adapter.close);
+    await _openToday(tester, now, selected: [_apple], adapter: adapter);
+    final fit = find.text('Fits now');
+    await _wait(tester, until: () => fit.evaluate().isNotEmpty);
+    if (_canFitMinute(now)) expect(fit, findsOneWidget);
+    expect(find.text(_eventTitle), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('An unavailable selected Apple calendar leaves time unverified', (
     tester,
   ) async {
@@ -177,6 +193,33 @@ void main() {
       },
     );
   }
+
+  testWidgets('A transparent import stays on Today without blocking fit', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final source = WorkspaceIcsCalendar(
+      id: 'studio-file',
+      name: 'Studio file',
+      document: _calendarDocument(
+        now,
+        'TENTATIVE',
+        ended: false,
+        transparent: true,
+      ),
+    );
+    await _openToday(
+      tester,
+      now,
+      selected: [source.identity],
+      imports: [source],
+    );
+    final fit = find.text('Fits now');
+    await _wait(tester, until: () => fit.evaluate().isNotEmpty);
+    expect(find.text(_eventTitle), findsOneWidget);
+    if (_canFitMinute(now)) expect(fit, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 bool _canFitMinute(DateTime now) =>
@@ -255,6 +298,7 @@ SourcedCalendarEvent<ExternalCalendarEvent> _appleEvent(
   DateTime now, {
   bool ended = false,
   CalendarEventStatus status = CalendarEventStatus.confirmed,
+  bool blocksTime = true,
 }) => SourcedCalendarEvent(
   id: const CalendarOccurrenceIdentity(
     calendar: _apple,
@@ -265,11 +309,17 @@ SourcedCalendarEvent<ExternalCalendarEvent> _appleEvent(
     start: now.subtract(const Duration(minutes: 10)).toUtc(),
     end: now.add(Duration(minutes: ended ? -5 : 15)).toUtc(),
     allDay: false,
+    blocksTime: blocksTime,
     status: status,
   ),
 );
 
-String _calendarDocument(DateTime now, String? status, {required bool ended}) {
+String _calendarDocument(
+  DateTime now,
+  String? status, {
+  required bool ended,
+  bool transparent = false,
+}) {
   String stamp(DateTime instant) {
     final seconds = instant.toUtc().toIso8601String().split('.').first;
     return '${seconds.replaceAll(RegExp('[-:]'), '')}Z';
@@ -286,6 +336,7 @@ String _calendarDocument(DateTime now, String? status, {required bool ended}) {
     'DTEND:${stamp(now.add(Duration(minutes: ended ? -5 : 15)))}',
     'SUMMARY:$_eventTitle',
     if (status != null) 'STATUS:$status',
+    if (transparent) 'TRANSP:TRANSPARENT',
     'END:VEVENT',
     'END:VCALENDAR',
     '',

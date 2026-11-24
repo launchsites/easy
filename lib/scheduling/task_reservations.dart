@@ -39,6 +39,7 @@ final class TaskReservationReview {
 }
 
 bool isOwnedTaskReservation(CalendarEvent event) =>
+    event.blocksTime &&
     event.plannedTaskId != null &&
     !event.isReadOnly &&
     !event.allDay &&
@@ -46,7 +47,7 @@ bool isOwnedTaskReservation(CalendarEvent event) =>
 
 /// Revalidates accepted blocks against the task's release, deadline and
 /// prerequisite requirements.
-/// The caller keeps every calendar interval occupied independently of this
+/// The caller keeps blocking calendar intervals occupied independently of this
 /// evidence. A proposed upstream block becomes evidence after acceptance.
 TaskReservationReview reviewTaskReservations({
   required List<TaskItem> tasks,

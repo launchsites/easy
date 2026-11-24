@@ -969,6 +969,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       end: event.end.toLocal(),
       category: 'calendar',
       allDay: event.allDay,
+      blocksTime: event.blocksTime,
       location: event.location,
       description: event.notes,
       sourceLabel: source?.name ?? 'Apple Calendar',
@@ -2178,6 +2179,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
               start: event.start,
               end: event.end,
               allDay: event.allDay,
+              blocksTime: event.blocksTime,
             ),
       ],
       tasks: [
@@ -3277,8 +3279,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       return null;
     }
     return [
-      ..._appleFeed.events.map(_fromApple),
-      for (final row in _icsFeed.events) row.event,
+      for (final row in _appleFeed.events)
+        if (row.event.status != CalendarEventStatus.cancelled) _fromApple(row),
+      for (final row in _icsFeed.events)
+        if (row.status != CalendarEventStatus.cancelled) row.event,
       for (final row in _internalFeed.events) row.event,
     ];
   }
@@ -4405,6 +4409,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       local != null &&
       local.title == apple.title &&
       local.allDay == apple.allDay &&
+      local.blocksTime == apple.blocksTime &&
       local.start.isAtSameMomentAs(apple.start) &&
       local.end.isAtSameMomentAs(apple.end);
 

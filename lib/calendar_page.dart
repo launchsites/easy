@@ -17,6 +17,7 @@ class CalendarEvent {
     required this.end,
     required this.category,
     this.allDay = false,
+    this.blocksTime = true,
     this.location,
     this.savedPlaceId,
     this.plannedTaskId,
@@ -34,6 +35,7 @@ class CalendarEvent {
   final DateTime end;
   final String category;
   final bool allDay;
+  final bool blocksTime;
   final String? location;
   final String? savedPlaceId;
   final String? plannedTaskId;
@@ -52,6 +54,7 @@ class CalendarEvent {
     end: end,
     category: category,
     allDay: allDay,
+    blocksTime: blocksTime,
     location: location,
     savedPlaceId: placeId,
     plannedTaskId: plannedTaskId,

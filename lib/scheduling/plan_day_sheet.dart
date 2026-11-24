@@ -36,7 +36,7 @@ ScheduleProposal planWorkspaceDay({
   final placeIds =
       settings?.places.map((place) => place.id).toSet() ?? const <String>{};
   for (final event in events) {
-    if (!event.end.isAfter(event.start)) continue;
+    if (!event.blocksTime || !event.end.isAfter(event.start)) continue;
     final eventSpan = TimeSpan(event.start, event.end);
     commitments.add(FixedCommitment(eventSpan));
     if (settings != null) {

@@ -187,6 +187,26 @@ class IcsEvent {
 
   bool get hasLegacyExclusionRule =>
       _extra.any((property) => property.name == 'EXRULE');
+
+  /// RFC 5545 defaults missing transparency to opaque. Unusable or repeated
+  /// values also keep time reserved while their original lines round-trip.
+  late final bool blocksTime = _readBlocksTime();
+
+  bool _readBlocksTime() {
+    var transparent = false;
+    for (final property in _extra) {
+      if (property.name != 'TRANSP') continue;
+      final type = property.parameters['VALUE']?.toUpperCase();
+      if (transparent ||
+          property.value.toUpperCase() != 'TRANSPARENT' ||
+          (type != null && type != 'TEXT') ||
+          property.parameters.containsKey('TZID')) {
+        return true;
+      }
+      transparent = true;
+    }
+    return !transparent;
+  }
 }
 
 class IcsCalendar {

@@ -159,7 +159,11 @@ TaskObjectiveReview reviewTaskObjectives({
   final duplicateReservations = <String>{};
   for (final event in events) {
     if (!reservationIds.add(event.id)) duplicateReservations.add(event.id);
-    if (!event.end.isAfter(event.start) || !event.end.isAfter(now)) continue;
+    if (!event.blocksTime ||
+        !event.end.isAfter(event.start) ||
+        !event.end.isAfter(now)) {
+      continue;
+    }
     if (!event.start.isAfter(now)) {
       activeCommitments++;
       untilCommitment = Duration.zero;

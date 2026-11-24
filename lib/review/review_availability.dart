@@ -20,7 +20,7 @@ final class ReviewDayAvailability {
   /// The requested categories that have saved hours.
   final int categoryCount;
 
-  /// All-day calendar rows occupy planning time while ReviewAgenda still
+  /// Blocking all-day rows occupy planning time while ReviewAgenda still
   /// omits their civil duration from its elapsed scheduled-time total.
   final bool hasAllDayCommitment;
   final Set<TravelIssueKind> travelIssues;
@@ -52,6 +52,7 @@ ReviewDayAvailability? deriveReviewDayAvailability({
   final horizon = TimeSpan(start, nextReviewDay(start));
   final unique = <String, CalendarEvent>{};
   for (final event in events) {
+    if (!event.blocksTime) continue;
     if (event.id.trim().isEmpty || !event.end.isAfter(event.start)) return null;
     final previous = unique[event.id];
     if (previous != null && _calendarFacts(previous) != _calendarFacts(event)) {

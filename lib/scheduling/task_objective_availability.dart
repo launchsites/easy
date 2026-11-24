@@ -63,6 +63,7 @@ TaskObjectiveAvailability deriveTaskObjectiveAvailability({
   final seen = <String>{};
   final placeIds = {for (final place in settings.places) place.id};
   for (final event in confirmedEvents) {
+    if (!event.blocksTime) continue;
     if (coverage != null &&
         (!event.start.isBefore(coverage.end) ||
             !coverage.start.isBefore(event.end))) {

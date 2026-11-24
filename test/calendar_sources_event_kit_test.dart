@@ -26,6 +26,44 @@ void main() {
   });
 
   test(
+    'only explicitly free EventKit availability leaves time unblocked',
+    () async {
+      const values = <Object?>[-1, 0, 1, 2, 3, null, '1', 1.0];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'events');
+        return [
+          for (final (index, availability) in values.indexed)
+            {
+              ...source.toJson(),
+              'eventId': 'event-$index',
+              'title': 'Appointment $index',
+              'allDay': false,
+              'recurring': false,
+              'startMilliseconds': start.millisecondsSinceEpoch,
+              'endMilliseconds': end.millisecondsSinceEpoch,
+              if (availability != null) 'availability': availability,
+            },
+        ];
+      });
+      final rows = await adapter.events(
+        start: start,
+        end: end,
+        calendars: [source],
+      );
+      expect(rows.map((row) => row.event.blocksTime), [
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+      ]);
+    },
+  );
+
+  test(
     'only the explicit permission method requests calendar access',
     () async {
       final calls = <String>[];

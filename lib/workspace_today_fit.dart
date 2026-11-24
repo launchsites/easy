@@ -59,6 +59,7 @@ _TodayFitResult _projectTodayFit(_TodayFitInput input) {
               if (row.status != CalendarEventStatus.cancelled) row.event,
         ];
   for (final event in events) {
+    if (!event.blocksTime) continue;
     consider(event.start.subtract(Duration(minutes: settings.beforeMinutes)));
     consider(event.end.add(Duration(minutes: settings.afterMinutes)));
   }
@@ -195,6 +196,7 @@ extension _WorkspaceTodayFit on _WorkspaceState {
     for (final row in _appleFeed.events) {
       final event = row.event;
       if (!selected.contains(row.id.calendar) ||
+          !event.blocksTime ||
           event.status == CalendarEventStatus.cancelled ||
           !event.start.isBefore(coverage.end) ||
           !coverage.start.isBefore(event.end) ||

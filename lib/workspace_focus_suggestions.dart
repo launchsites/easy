@@ -145,9 +145,11 @@ extension _WorkspaceFocusSuggestions on _WorkspaceState {
         start.isBefore(tomorrow);
     final local = [
       for (final event in _standaloneEvents(_data.events))
-        if (relevant(event.start, event.end, event.allDay)) event,
+        if (event.blocksTime && relevant(event.start, event.end, event.allDay))
+          event,
       for (final row in _internalFeed.events)
-        if (relevant(row.event.start, row.event.end, row.event.allDay))
+        if (row.event.blocksTime &&
+            relevant(row.event.start, row.event.end, row.event.allDay))
           row.event,
     ];
     final linked = <CalendarOccurrenceIdentity, CalendarEvent>{
@@ -166,7 +168,8 @@ extension _WorkspaceFocusSuggestions on _WorkspaceState {
         ),
       if (appleAllowed && _appleFeed.problem == null)
         for (final row in _appleFeed.events)
-          if (row.event.status == CalendarEventStatus.confirmed &&
+          if (row.event.blocksTime &&
+              row.event.status == CalendarEventStatus.confirmed &&
               !_sameAppleEvent(linked[row.id], row.event) &&
               relevant(row.event.start, row.event.end, row.event.allDay))
             FocusSuggestionEvent.sourced(
@@ -177,7 +180,8 @@ extension _WorkspaceFocusSuggestions on _WorkspaceState {
             ),
       if (_icsFeed.problem == null)
         for (final row in _icsFeed.events)
-          if (row.status == CalendarEventStatus.confirmed &&
+          if (row.event.blocksTime &&
+              row.status == CalendarEventStatus.confirmed &&
               relevant(row.event.start, row.event.end, row.event.allDay))
             FocusSuggestionEvent.sourced(
               id: CalendarOccurrenceIdentity(

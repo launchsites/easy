@@ -23,6 +23,7 @@ class ExternalCalendarEvent {
     this.notes,
     this.timeZoneId,
     this.recurring = false,
+    this.blocksTime = true,
     this.status = CalendarEventStatus.unknown,
   });
 
@@ -34,6 +35,7 @@ class ExternalCalendarEvent {
   final String? notes;
   final String? timeZoneId;
   final bool recurring;
+  final bool blocksTime;
   final CalendarEventStatus status;
 }
 
@@ -498,6 +500,8 @@ SourcedCalendarEvent<ExternalCalendarEvent> _readEvent(Object? value) {
       location: _optionalString(event, 'location'),
       notes: _optionalString(event, 'notes'),
       timeZoneId: _optionalString(event, 'timeZoneId'),
+      // EventKit sends EKEventAvailability.free as the integer raw value 1.
+      blocksTime: event['availability'] is! int || event['availability'] != 1,
       status: CalendarEventStatus.fromSource(event['status']),
     ),
   );

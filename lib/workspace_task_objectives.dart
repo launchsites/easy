@@ -120,6 +120,7 @@ extension _WorkspaceTaskObjectives on _WorkspaceState {
       if (hasApple) {
         for (final row in apple) {
           final event = row.event;
+          if (!event.blocksTime) continue;
           if (_sameAppleEvent(linked[row.id], event)) continue;
           if (event.status == CalendarEventStatus.confirmed) {
             trusted.add(_fromApple(row));
@@ -130,6 +131,7 @@ extension _WorkspaceTaskObjectives on _WorkspaceState {
       }
       if (hasImports) {
         for (final row in imports) {
+          if (!row.event.blocksTime) continue;
           if (row.status == CalendarEventStatus.confirmed) {
             trusted.add(row.event);
           } else if (uncertain(row.status, row.event.start, row.event.end)) {

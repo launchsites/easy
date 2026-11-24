@@ -213,9 +213,7 @@ ManualBlockReview reviewManualTimeBlock({
     problem = (kind: ManualBlockProblem.missingTask, relatedTitle: null);
   } else if (existingEventId != null &&
       (existing == null ||
-          existing.isReadOnly ||
-          existing.allDay ||
-          existing.recurringSeriesId != null ||
+          !isOwnedTaskReservation(existing) ||
           existing.plannedTaskId != taskId)) {
     problem = (kind: ManualBlockProblem.missingBlock, relatedTitle: null);
   } else if (conflictingEvents) {
@@ -289,7 +287,8 @@ _ManualProblem? _checkBlock(
     }
   }
   for (final event in events) {
-    if (event.end.isAfter(event.start) &&
+    if (event.blocksTime &&
+        event.end.isAfter(event.start) &&
         event.start.isBefore(span.end) &&
         span.start.isBefore(event.end)) {
       return issue(ManualBlockProblem.busy, event.title);
@@ -438,7 +437,7 @@ SchedulingInputs _calendarInputs(
     categories: [category],
     commitments: [
       for (final event in events)
-        if (event.end.isAfter(event.start))
+        if (event.blocksTime && event.end.isAfter(event.start))
           PlacedCommitment(
             id: event.id,
             span: TimeSpan(event.start, event.end),
@@ -506,6 +505,7 @@ Object _eventSource(CalendarEvent event) => (
   event.end.microsecondsSinceEpoch,
   event.category,
   event.allDay,
+  event.blocksTime,
   event.location,
   event.description,
   event.savedPlaceId,

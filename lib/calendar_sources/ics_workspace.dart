@@ -105,6 +105,7 @@ List<IcsWorkspaceEvent> expandWorkspaceIcs(IcsWorkspaceWindow input) {
           end: occurrence.end.toLocal(),
           category: 'calendar',
           allDay: occurrence.allDay,
+          blocksTime: source.blocksTime,
           location: source.location,
           description: source.description,
           sourceLabel: calendar.name,

@@ -304,6 +304,7 @@ List<CalendarEvent> _uniqueEvents(List<CalendarEvent> events) {
         existing.savedPlaceId != event.savedPlaceId ||
         existing.isReadOnly != event.isReadOnly ||
         existing.allDay != event.allDay ||
+        existing.blocksTime != event.blocksTime ||
         existing.recurringSeriesId != event.recurringSeriesId) {
       throw const FormatException('A calendar event has conflicting details.');
     }

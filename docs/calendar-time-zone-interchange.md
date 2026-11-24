@@ -4,6 +4,8 @@ Easy includes one `VTIMEZONE` per named clock in an authored iCalendar export. H
 
 Imported named times use the file's own definition when supplied. A matching private definition can use fixed transition dates or supported annual rules and can share a name with a built-in zone. Easy preserves the physical definition block, including folding and property order, for valid UTF-8 inputs. Invalid UTF-8 split at a physical fold is normalized by the compatibility reader. Unsupported rules and conflicting transitions produce an explicit import preview error.
 
+Events marked free in Apple Calendar or carrying a valid `TRANSP:TRANSPARENT` iCalendar property stay on the agenda and leave the time available for planning. An ordinary repeating occurrence uses its series property. An imported exception needs its own explicit transparent property. Missing or invalid transparency keeps the event on the busy timeline.
+
 ## Verification run
 
 The Linux AOT clock matched Python's `zoneinfo` on 849,924 UTC offsets across all 597 compiled zone names. Samples cover monthly checkpoints through year 9998 and points one second before, at, and after 2037–2040 changes. Separately, `python-dateutil` read 12 exported definitions and matched 4,608 local-noon offsets, including Lord Howe's half-hour change, Cairo's month boundary, and Gaza's future exceptions. Curl and zic were used to compile the official test data. These checks used synthetic records.

@@ -14,6 +14,7 @@ class ReviewEvent {
     required this.start,
     required this.end,
     this.allDay = false,
+    this.blocksTime = true,
   });
 
   final String id;
@@ -21,6 +22,7 @@ class ReviewEvent {
   final DateTime start;
   final DateTime end;
   final bool allDay;
+  final bool blocksTime;
 }
 
 class ReviewTask {
@@ -85,7 +87,7 @@ class ReviewAgenda {
     ]..sort((a, b) => a._dueDay!.compareTo(b._dueDay!));
     final booked = _merged([
       for (final event in scheduled)
-        if (!event.allDay)
+        if (event.blocksTime && !event.allDay)
           ?_intersect(ReviewWindow(event.start, event.end), day, last),
     ]);
     final withinDay = availability == null
