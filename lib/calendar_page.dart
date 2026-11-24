@@ -878,12 +878,16 @@ Widget _timelineTick(
   required bool compact,
 }) {
   final fullTime = _time(context, mark.time);
-  final visibleTime = compact ? _mobileAxisTime(context, mark.time, fullTime) : fullTime;
+  final visibleTime = compact
+      ? _mobileAxisTime(context, mark.time, fullTime)
+      : fullTime;
   final repeated = mark.repeatedAt;
   return Text(
     repeated == null ? visibleTime : '$visibleTime\n${repeated.timeZoneName}',
     semanticsLabel: repeated == null
-        ? compact ? fullTime : null
+        ? compact
+              ? fullTime
+              : null
         : '$fullTime, ${_utcOffset(repeated.timeZoneOffset)}',
     textAlign: TextAlign.right,
     maxLines: repeated == null ? null : 2,
@@ -896,11 +900,7 @@ Widget _timelineTick(
   );
 }
 
-String _mobileAxisTime(
-  BuildContext context,
-  TimeOfDay time,
-  String fullTime,
-) {
+String _mobileAxisTime(BuildContext context, TimeOfDay time, String fullTime) {
   if (time.minute != 0 || MediaQuery.alwaysUse24HourFormatOf(context)) {
     return fullTime;
   }

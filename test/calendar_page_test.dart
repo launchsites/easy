@@ -2,6 +2,7 @@ import 'dart:ui' show SemanticsAction;
 
 import 'package:easy/calendar_page.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -55,8 +56,15 @@ void main() {
         use24Hour: use24Hour,
       );
 
-      final label = find.text(use24Hour ? '10:00' : '10 AM').hitTestable();
+      await tester.pumpAndSettle();
+
+      final label = find.text(use24Hour ? '10:00' : '10 AM').first;
       expect(label, findsOneWidget);
+      final paragraph = tester.renderObject<RenderParagraph>(label);
+      expect(
+        paragraph.getMaxIntrinsicWidth(double.infinity),
+        lessThanOrEqualTo(paragraph.size.width + .01),
+      );
       expect(
         tester.widget<Text>(label).semanticsLabel,
         use24Hour ? '10:00' : '10:00 AM',
@@ -353,8 +361,14 @@ void main() {
         if (hours == 23) {
           expect(find.text('2 AM').hitTestable(), findsNothing);
         } else {
-          expect(find.text('1 AM\nEDT').hitTestable(), findsOneWidget);
-          expect(find.text('1 AM\nEST').hitTestable(), findsOneWidget);
+          for (final (zone, offset) in [('EDT', '04'), ('EST', '05')]) {
+            final tick = find.text('1 AM\n$zone').hitTestable();
+            expect(tick, findsOneWidget);
+            expect(
+              tester.widget<Text>(tick).semanticsLabel,
+              '1:00 AM, UTC−$offset:00',
+            );
+          }
         }
         for (final label in [
           'Day',
