@@ -39,14 +39,31 @@ EventCaptureText parseEventCapture(
   final duration = _takeDuration(place.text);
   final clocks = _takeClocks(duration.text, reference);
   final allDay = _takeAllDay(clocks.text, reference);
+  final vagueDayPart = _vagueDayPartSuffix.firstMatch(allDay.text);
+  final dayPart = vagueDayPart != null && !_quoted(allDay.text, vagueDayPart)
+      ? vagueDayPart
+      : null;
+  final dateText = dayPart == null
+      ? allDay.text
+      : _remove(allDay.text, dayPart.end - dayPart[1]!.length, dayPart.end);
   final datePhrase = _takeDate(
-    allDay.text,
+    dateText,
     reference,
     allowLeading:
         allDay.value || clocks.start != null || duration.value != null,
   );
   final effectiveDate = datePhrase.value ?? _day(date);
-  var error = duration.error ?? clocks.error ?? datePhrase.error;
+  var error = _isUnresolvedZone(place.text)
+      ? 'Enter the time in your device’s time zone.'
+      : duration.error ?? clocks.error ?? datePhrase.error;
+  if (error == null &&
+      _hasUnresolvedEventDate(
+        datePhrase.text,
+        hasSchedulingCue:
+            clocks.start != null || duration.value != null || allDay.value,
+      )) {
+    error = _invalidDate;
+  }
   final startClock = clocks.start;
   final endClock = clocks.end;
   if (allDay.value && (startClock != null || duration.value != null)) {
@@ -57,11 +74,20 @@ EventCaptureText parseEventCapture(
 
   DateTime? start;
   DateTime? end;
-  if (!allDay.value && startClock != null) {
+  if (error == null && !allDay.value && startClock != null) {
     final (startMinute, endMinute) = _resolveRange(startClock, endClock);
-    start = _atMinute(effectiveDate, startMinute);
+    final compatibleDayPart =
+        dayPart == null ||
+        (dayPart[2]!.toLowerCase() == 'morning') == (startMinute < 12 * 60);
+    final resolvedStart = compatibleDayPart
+        ? _atMinute(effectiveDate, startMinute)
+        : (
+            time: null,
+            error: 'Check the time of day, using am, pm or a 24-hour time.',
+          );
+    start = resolvedStart.time;
     if (start == null) {
-      error ??= _invalidTime;
+      error = resolvedStart.error;
     } else if (endMinute != null && endMinute == startMinute) {
       error ??= 'Enter a different end time.';
     } else if (endMinute != null &&
@@ -72,8 +98,11 @@ EventCaptureText parseEventCapture(
       final endDate = endMinute < startMinute
           ? _plusDays(effectiveDate, 1)
           : effectiveDate;
-      end = _atMinute(endDate, endMinute);
-      if (end == null || !end.isAfter(start)) error ??= _invalidTime;
+      final resolvedEnd = _atMinute(endDate, endMinute);
+      end = resolvedEnd.time;
+      if (end == null || !end.isAfter(start)) {
+        error = resolvedEnd.error ?? _invalidTime;
+      }
     } else if (duration.value case final length?) {
       end = start.add(length);
     }
@@ -106,7 +135,7 @@ TaskCaptureText parseTaskCapture(
 
 DateTime? parseCaptureTime(String input, {required DateTime date}) {
   final value = _parseClock(input.trim().replaceFirst(_timeQualifier, ''));
-  return value == null ? null : _atMinute(_day(date), value.minutes);
+  return value == null ? null : _atMinute(_day(date), value.minutes).time;
 }
 
 /// Resolves a complete numeric date without assuming a regional date order.
@@ -132,6 +161,10 @@ DateTime? parseCaptureNumericDate(String text) {
 
 const _invalidDate = 'Enter a valid date, such as tomorrow or 2026-11-24.';
 const _invalidTime = 'Enter a valid time, such as 18:30 or 6:30pm.';
+const _unavailableWallTime =
+    'That time is skipped on this date. Choose another time.';
+const _ambiguousWallTime =
+    'That time occurs twice on this date. Choose an unambiguous time.';
 const _invalidDuration = 'Enter a duration from 1 minute to 24 hours.';
 const _weekday =
     r'mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?';
@@ -166,6 +199,29 @@ final _dateQualifier = RegExp(
 );
 final _schedulePunctuation = RegExp(r'^\s*[,;.]?\s*$');
 final _doubleQuotes = RegExp(r'"[^"]*"|“[^”]*”');
+final _vagueDayPartSuffix = RegExp(
+  '(?<![\\w/:-])$_datePattern([ \\t]+(?:(?:in|during)[ \\t]+(?:the[ \\t]+)?)?'
+  '(?:(?:early|late)[ \\t]+)?(morning|afternoon|evening)[.,;]?[ \\t]*)\$',
+  caseSensitive: false,
+);
+final _unresolvedEventDate = RegExp(
+  r'(?<![\w/:-])(?:\d{1,2}(?:[-/.]\d{1,2})(?:[-/.]\d{2,4})?'
+  r'|\d{1,2}(?:st|nd|rd|th)'
+  r'|(?:this|next|last)[ \t]+(?:week|weekend|month|year)'
+  r'|in[ \t]+\d+[ \t]+(?:days?|weeks?|months?|years?))'
+  r'(?![\w/:-])',
+  caseSensitive: false,
+);
+
+bool _hasUnresolvedEventDate(String text, {required bool hasSchedulingCue}) =>
+    _unresolvedEventDate.allMatches(text).any((match) {
+      if (_quoted(text, match)) return false;
+      final before = text.substring(0, match.start);
+      final after = text.substring(match.end);
+      return _dateQualifier.hasMatch(before) ||
+          (_schedulePunctuation.hasMatch(after) &&
+              (hasSchedulingCue || match[0]!.contains('/')));
+    });
 
 ({String text, DateTime? value, String? error}) _takeDate(
   String text,
@@ -285,21 +341,41 @@ DateTime? _validatedDay(int year, int month, int day) {
       : null;
 }
 
-DateTime? _atMinute(DateTime date, int minute) {
+({DateTime? time, String? error}) _atMinute(DateTime date, int minute) {
   final hour = minute ~/ 60;
-  final value = DateTime(date.year, date.month, date.day, hour, minute % 60);
-  return value.day == date.day &&
-          value.hour == hour &&
-          value.minute == minute % 60
-      ? value
-      : null;
+  final wall = DateTime.utc(date.year, date.month, date.day, hour, minute % 60);
+  // The local constructor selects one side of a fold. Test the surrounding
+  // offsets against the requested components to discover every matching side.
+  final offsets = {
+    for (final day in [-2, 0, 2])
+      wall.add(Duration(days: day)).toLocal().timeZoneOffset,
+  };
+  DateTime? result;
+  for (final offset in offsets) {
+    final candidate = wall.subtract(offset).toLocal();
+    if (candidate.year != date.year ||
+        candidate.month != date.month ||
+        candidate.day != date.day ||
+        candidate.hour != hour ||
+        candidate.minute != minute % 60 ||
+        candidate.second != 0) {
+      continue;
+    }
+    if (result != null) return (time: null, error: _ambiguousWallTime);
+    result = candidate;
+  }
+  return (time: result, error: result == null ? _unavailableWallTime : null);
 }
 
 final _locationSuffix = RegExp(
   r'(?:^|\s)(?:@\s*|location:\s*)([^\n]+)$',
   caseSensitive: false,
 );
-final _zoneLike = RegExp(r'^[A-Za-z_]+/[A-Za-z_]+(?:/[A-Za-z_]+)?$');
+const _zoneId =
+    r'(?:Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Brazil|Canada|Chile|Etc|Europe|Indian|Mexico|Pacific|US)(?:/[A-Za-z0-9_+\-]+){1,2}';
+const _commonZones =
+    r'(?:UTC|GMT|BST|CET|CEST|EET|EEST|EST|EDT|CST|CDT|MST|MDT|PST|PDT|AKST|AKDT|HST|IST|JST|KST|AEST|AEDT|ACST|ACDT|AWST|NZST|NZDT)';
+final _zoneLike = RegExp('^(?:$_zoneId|$_commonZones)\$', caseSensitive: false);
 
 ({String text, String? value}) _takeLocation(String text) {
   final location = _locationSuffix.firstMatch(text);
@@ -372,21 +448,54 @@ final _allDay = RegExp(r'\ball[ -]+day\b', caseSensitive: false);
 
 const _clockAtom =
     r'(?:\d{1,3}(?::\d{0,3})?(?:[ \t]*[ap]\.?m\.?)?|noon|midnight)';
+const _zoneSuffix =
+    '(?:[ \\t]*(?:Z|[+−]\\d{2}:?\\d{2}|-\\d{4})(?![\\w:])'
+    '|[ \\t]+(?:(?:in|@)[ \\t]*)?(?:$_zoneId|$_commonZones)\\b)';
+final _zoneAfterClock = RegExp(
+  '(?<![\\w:])$_clockAtom$_zoneSuffix',
+  caseSensitive: false,
+);
+final _zoneAfterDate = RegExp(
+  '(?<![\\w/:-])$_datePattern$_zoneSuffix',
+  caseSensitive: false,
+);
+final _isoDateTime = RegExp(
+  r'\b\d{4}-\d{1,2}-\d{1,2}T\d{1,2}:\d{2}',
+  caseSensitive: false,
+);
+final _approximateClock = RegExp(
+  '\\b(?:about|around|roughly|approximately|before|after|by)[ \\t]+($_clockAtom)(?![\\w:])',
+  caseSensitive: false,
+);
+
+bool _isUnresolvedZone(String text) =>
+    [_zoneAfterClock, _zoneAfterDate, _isoDateTime].any(
+      (pattern) =>
+          pattern.allMatches(text).any((match) => !_quoted(text, match)),
+    );
+
 final _clock = RegExp(
   r'^(\d{1,2})(?::(\d{2}))?(?:[ \t]*([ap])\.?m\.?)?$',
   caseSensitive: false,
 );
+const _startLabel = r'(?:start(?:s|\s+time)?|begin(?:s)?)(?:\s+at)?|at|from';
+const _endLabel =
+    r'(?:end(?:s|\s+time)?|finish(?:es)?)(?:\s+at)?|to|until|through';
+const _clockLabelGap = r'(?:[ \t]*:[ \t]*|[ \t]+)';
 final _timeQualifier = RegExp(
-  r'^(?:at|from|to|until)\s+',
+  '^(?:$_startLabel|$_endLabel)$_clockLabelGap',
   caseSensitive: false,
 );
+final _endClockLabel = RegExp('^(?:$_endLabel)\$', caseSensitive: false);
+final _clockJoin = RegExp(r'^[,;]?\s*and\s*$', caseSensitive: false);
+final _clockDateQualifier = RegExp(r'^on[ \t]+', caseSensitive: false);
 final _period = RegExp(r'[ap]\.?m\.?$', caseSensitive: false);
 final _range = RegExp(
-  '(?<![\\w:/–—-])(?:(at|from)[ \\t]+)?($_clockAtom)[ \\t]*(?:[-–—]|[ \\t]+(?:to|until|through)[ \\t]+)[ \\t]*($_clockAtom)(?![\\w:/–—-])',
+  '(?<![\\w:/–—-])(?:($_startLabel|$_endLabel)$_clockLabelGap)?($_clockAtom)[ \\t]*(?:[-–—]|[ \\t]+(?:to|until|through)[ \\t]+)[ \\t]*($_clockAtom)(?![\\w:/–—-])',
   caseSensitive: false,
 );
 final _singleTime = RegExp(
-  '(?<![\\w:/–—-])(?:(at|from)[ \\t]+)?($_clockAtom)(?![\\w:/–—-])',
+  '(?<![\\w:/–—-])(?:($_startLabel|$_endLabel)$_clockLabelGap)?($_clockAtom)(?![\\w:/–—-])',
   caseSensitive: false,
 );
 
@@ -432,21 +541,35 @@ bool _strongClock(String token) =>
 bool _wordClock(String token) =>
     token.toLowerCase() == 'noon' || token.toLowerCase() == 'midnight';
 
-bool _qualifiedRange(RegExpMatch match) {
+bool _qualifiedRange(Match match) {
   final first = match[2]!;
   final second = match[3]!;
   return match[1] != null ||
       _strongClock(first) ||
       _strongClock(second) ||
       _wordClock(first) ||
-      _wordClock(second) ||
-      ((int.tryParse(first) ?? 0) >= 13 && (int.tryParse(second) ?? 0) >= 13);
+      _wordClock(second);
 }
 
 ({String text, _Clock? start, _Clock? end, String? error}) _takeClocks(
   String text,
   DateTime reference,
 ) {
+  final approximate = _approximateClock.allMatches(text).any((match) {
+    if (_quoted(text, match)) return false;
+    final token = match[1]!;
+    if (_strongClock(token) || _wordClock(token)) return true;
+    final range = _range.matchAsPrefix(text, match.end - token.length);
+    return range != null && _qualifiedRange(range);
+  });
+  if (approximate) {
+    return (
+      text: text,
+      start: null,
+      end: null,
+      error: 'Enter an exact start and end time.',
+    );
+  }
   final ranges = _range
       .allMatches(text)
       .where((match) => _qualifiedRange(match) && !_quoted(text, match))
@@ -475,6 +598,14 @@ bool _qualifiedRange(RegExpMatch match) {
   }).toList();
 
   if (range != null) {
+    if (_endClockLabel.hasMatch(range[1] ?? '')) {
+      return (
+        text: text,
+        start: null,
+        end: null,
+        error: 'Enter one start time and one end time.',
+      );
+    }
     final start = _parseClock(range[2]!);
     final end = _parseClock(range[3]!);
     if (start == null || end == null) {
@@ -488,6 +619,9 @@ bool _qualifiedRange(RegExpMatch match) {
         error: 'Enter one time range for this event.',
       );
     }
+    if (_needsRangePeriod(range[2]!, range[3]!)) {
+      return (text: text, start: null, end: null, error: _clarifyRangePeriod);
+    }
     return (text: remaining, start: start, end: end, error: null);
   }
   if (singles.isEmpty) return (text: text, start: null, end: null, error: null);
@@ -499,22 +633,61 @@ bool _qualifiedRange(RegExpMatch match) {
       error: 'Enter up to two times for this event.',
     );
   }
-  final start = _parseClock(singles.first[2]!);
-  final end = singles.length == 2 ? _parseClock(singles.last[2]!) : null;
+  final first = singles.first;
+  final last = singles.last;
+  final endFirst = _endClockLabel.hasMatch(first[1] ?? '');
+  final endLast = _endClockLabel.hasMatch(last[1] ?? '');
+  if (endFirst && (singles.length == 1 || endLast || last[1] == null)) {
+    return (
+      text: text,
+      start: null,
+      end: null,
+      error: 'Enter both a start time and an end time.',
+    );
+  }
+  final startToken = (endFirst ? last : first)[2]!;
+  final endToken = singles.length == 2 ? (endFirst ? first : last)[2]! : null;
+  final start = _parseClock(startToken);
+  final end = endToken == null ? null : _parseClock(endToken);
   if (start == null || (singles.length == 2 && end == null)) {
     return (text: text, start: null, end: null, error: _invalidTime);
   }
   if (end != null) {
-    final between = text
-        .substring(singles.first.end, singles.last.start)
-        .trim();
-    if (!_schedulePunctuation.hasMatch(between) &&
-        _parseDate(between, reference) == null) {
+    final firstStarts = first[1]?.toLowerCase();
+    final lastStarts = last[1]?.toLowerCase();
+    bool explicitStart(String? label) =>
+        label != null && label != 'at' && !_endClockLabel.hasMatch(label);
+    if (explicitStart(firstStarts) && explicitStart(lastStarts)) {
+      return (
+        text: text,
+        start: null,
+        end: null,
+        error: 'Enter one start time for this event.',
+      );
+    }
+    final between = text.substring(first.end, last.start).trim();
+    final join =
+        _schedulePunctuation.hasMatch(between) ||
+        ((endFirst || endLast) && _clockJoin.hasMatch(between));
+    if (!join &&
+        _parseDate(between.replaceFirst(_clockDateQualifier, ''), reference) ==
+            null) {
       return (
         text: text,
         start: null,
         end: null,
         error: 'Use a dash between the start and end times.',
+      );
+    }
+    if (_needsRangePeriod(startToken, endToken!)) {
+      return (text: text, start: null, end: null, error: _clarifyRangePeriod);
+    }
+    if (join) {
+      return (
+        text: _remove(text, first.start, last.end),
+        start: start,
+        end: end,
+        error: null,
       );
     }
   }
@@ -524,6 +697,13 @@ bool _qualifiedRange(RegExpMatch match) {
   }
   return (text: rest, start: start, end: end, error: null);
 }
+
+const _clarifyRangePeriod =
+    'Use 24-hour times or include am or pm in the range.';
+final _bareTwelveHourClock = RegExp(r'^(?:[1-9]|1[0-2])$');
+
+bool _needsRangePeriod(String start, String end) =>
+    _bareTwelveHourClock.hasMatch(start) && _bareTwelveHourClock.hasMatch(end);
 
 (int, int?) _resolveRange(_Clock start, _Clock? end) {
   if (end == null) return (start.minutes, null);

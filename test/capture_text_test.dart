@@ -29,6 +29,80 @@ void main() {
       expect(event.error, isNull);
     });
 
+    test('reads labeled clock endpoints with explicit 24-hour times', () {
+      for (final text in [
+        'Workshop Thu, starts at 14:30, ends at 15:45',
+        'Workshop Thursday starts 14:30 and ends 15:45',
+        'Workshop on Thu end time: 15:45 and start time: 14:30',
+        'Workshop on Thursday begins at 14:30–15:45',
+        'Workshop starts at 14:30 on Thursday ends at 15:45',
+      ]) {
+        final event = parseEventCapture(text, date: monday);
+        expect(event.error, isNull, reason: text);
+        expect(event.title, 'Workshop', reason: text);
+        expect(event.start, DateTime(2026, 11, 26, 14, 30), reason: text);
+        expect(event.end, DateTime(2026, 11, 26, 15, 45), reason: text);
+      }
+    });
+
+    test('never turns a range boundary or uncertain time into a start', () {
+      for (final text in [
+        'Workshop ends at 15:30',
+        'Workshop ends at 14:00–15:30',
+        'Workshop until 15:30',
+        'Workshop from 7 to 8',
+        'Workshop begins at 7 and ends at 8',
+        'Workshop after 7–8pm',
+        'Workshop around 14:00 to 15:00',
+        'Workshop by 14:00',
+        'Workshop starts at 14:00 and starts at 15:00',
+      ]) {
+        final event = parseEventCapture(text, date: monday);
+        expect(event.error, isNotNull, reason: text);
+        expect(event.start, isNull, reason: text);
+        expect(event.end, isNull, reason: text);
+      }
+
+      final title = parseEventCapture('Review after 5 meetings', date: monday);
+      expect(title.title, 'Review after 5 meetings');
+      expect(title.start, isNull);
+      expect(title.error, isNull);
+    });
+
+    test(
+      'requires exact local schedule when the date or zone is unresolved',
+      () {
+        for (final text in [
+          'Call 03/04',
+          'Call on 03/04 14:00–15:00',
+          'Call 04/05/26 at 14:00',
+          'Call next weekend 14:00 to 15:00',
+          'Call in 3 days 14:00–15:00',
+          'Call at 14:00Z',
+          'Call at 14:00+02:00',
+          'Call at 14:00 -0500',
+          'Call 14:00–15:00 GMT',
+          'Call from 14:00 to 15:00 on Thu GMT',
+          'Call 14:00–15:00 @Europe/London',
+          'Call at 2pm in America/Argentina/Buenos_Aires',
+          'Call 2026-11-24T14:00:00Z',
+        ]) {
+          final event = parseEventCapture(text, date: monday);
+          expect(event.error, isNotNull, reason: text);
+          expect(event.start, isNull, reason: text);
+          expect(event.end, isNull, reason: text);
+        }
+
+        final quoted = parseEventCapture(
+          'Review “Call at 2pm PST” 14:00-15:00',
+          date: monday,
+        );
+        expect(quoted.title, 'Review “Call at 2pm PST”');
+        expect(quoted.start, DateTime(2026, 11, 23, 14));
+        expect(quoted.error, isNull);
+      },
+    );
+
     test('uses a duration and keeps the selected day as fallback', () {
       final event = parseEventCapture(
         'Coffee with Alex at 10am for 45m',
@@ -114,6 +188,7 @@ void main() {
       for (final title in [
         'Review iPhone 15',
         'Read chapters 7–9',
+        'Read chapters 13–15',
         'Tomorrow Never Dies',
         'All Day Breakfast',
       ]) {
@@ -140,6 +215,31 @@ void main() {
       expect(day.start, isNull);
       expect(day.end, isNull);
       expect(day.error, isNull);
+    });
+
+    test('keeps the explicit date when a part of the day is too vague', () {
+      final event = parseEventCapture('Lunch tomorrow afternoon', date: monday);
+      expect(event.date, DateTime(2026, 11, 24));
+      expect(event.title, 'Lunch');
+      expect(event.start, isNull);
+      expect(event.end, isNull);
+      expect(event.error, isNull);
+
+      final compatible = parseEventCapture(
+        'Lunch tomorrow afternoon 14:00–15:00',
+        date: monday,
+      );
+      expect(compatible.title, 'Lunch');
+      expect(compatible.start, DateTime(2026, 11, 24, 14));
+      expect(compatible.end, DateTime(2026, 11, 24, 15));
+
+      final unresolved = parseEventCapture(
+        'Dinner tomorrow evening at 7 for 1h',
+        date: monday,
+      );
+      expect(unresolved.date, DateTime(2026, 11, 24));
+      expect(unresolved.start, isNull);
+      expect(unresolved.error, contains('Check the time of day'));
     });
 
     test(
@@ -233,4 +333,58 @@ void main() {
     expect(parseCaptureTime('24:00', date: monday), isNull);
     expect(parseCaptureTime('8:3', date: monday), isNull);
   });
+
+  final newYork =
+      DateTime(2026, 11, 1, 0).timeZoneOffset == const Duration(hours: -4) &&
+      DateTime(2026, 11, 1, 3).timeZoneOffset == const Duration(hours: -5);
+  test('New York distinguishes a skipped hour and both fall-back instants', () {
+    final gap = parseEventCapture('Gap 2026-03-08 02:30–04:30', date: monday);
+    expect(gap.start, isNull);
+    expect(gap.error, contains('skipped'));
+    expect(parseCaptureTime('02:30', date: DateTime(2026, 3, 8)), isNull);
+
+    final fold = parseEventCapture('Fold 2026-11-01 00:30–01:30', date: monday);
+    expect(fold.start!.toUtc(), DateTime.utc(2026, 11, 1, 4, 30));
+    expect(fold.end, isNull);
+    expect(fold.error, contains('twice'));
+    expect(parseCaptureTime('01:30', date: DateTime(2026, 11, 1)), isNull);
+
+    final crossFold = parseEventCapture(
+      'Fold 2026-11-01 00:30–02:30',
+      date: monday,
+    );
+    expect(crossFold.error, isNull);
+    expect(
+      crossFold.end!.difference(crossFold.start!),
+      const Duration(hours: 3),
+    );
+
+    final elapsed = parseEventCapture(
+      'Gap 2026-03-08 01:50 for 30m',
+      date: monday,
+    );
+    expect(elapsed.end, DateTime(2026, 3, 8, 3, 20));
+  }, skip: !newYork);
+
+  final lordHowe =
+      DateTime(2026, 4, 5, 0).timeZoneOffset == const Duration(hours: 11) &&
+      DateTime(2026, 4, 5, 3).timeZoneOffset ==
+          const Duration(hours: 10, minutes: 30);
+  test('Lord Howe validates half-hour transitions without rounding', () {
+    final fold = parseEventCapture('Fold 2026-04-05 01:45–03:00', date: monday);
+    expect(fold.start, isNull);
+    expect(fold.error, contains('twice'));
+    expect(parseCaptureTime('01:45', date: DateTime(2026, 4, 5)), isNull);
+
+    final gap = parseEventCapture('Gap 2026-10-04 01:50–02:15', date: monday);
+    expect(gap.end, isNull);
+    expect(gap.error, contains('skipped'));
+    expect(parseCaptureTime('02:15', date: DateTime(2026, 10, 4)), isNull);
+
+    final elapsed = parseEventCapture(
+      'Gap 2026-10-04 01:50 for 30m',
+      date: monday,
+    );
+    expect(elapsed.end, DateTime(2026, 10, 4, 2, 50));
+  }, skip: !lordHowe);
 }
