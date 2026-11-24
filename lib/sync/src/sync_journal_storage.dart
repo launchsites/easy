@@ -17,5 +17,7 @@ abstract interface class SyncLedger {
     required SyncLedgerHead head,
     required Uint8List encrypted,
   });
+  void holdRevision(int expectedRevision);
+  void releaseRevision();
   void close();
 }

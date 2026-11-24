@@ -271,6 +271,52 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'staging checks only reviewed rows and leaves file export separate',
+    (tester) async {
+      final local = (await tester.runAsync(() async {
+        final inviter = await workspace('stage-local');
+        final responder = await workspace(
+          'stage-peer',
+          workspaceId: inviter.workspaceId,
+        );
+        await makePair(inviter, responder);
+        return inviter;
+      }))!;
+      final projection = _OutgoingRecorder();
+      var saved = 0;
+      await screen(
+        tester,
+        ManualSyncPageHost(
+          openConfigured: () async => local,
+          enable: (_) => throw StateError('The device is already paired.'),
+          copyToken: (_) async {},
+          pasteToken: () async => null,
+          pickBundle: () async => null,
+          saveBundle: (_, _) async => saved++,
+        ),
+        projector: projection,
+      );
+      await _tap(tester, 'Paired device');
+      await _tap(tester, 'Choose records');
+      await _waitFor(tester, find.text('A saved task'));
+      expect(projection.staged, isEmpty);
+      final initial = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Stage records'),
+      );
+      expect(initial.onPressed, isNull);
+      await _tap(tester, 'A saved task');
+      await _tap(tester, 'Stage 1 record');
+      await _waitFor(
+        tester,
+        find.text('1 record staged. Export when you are ready to share them.'),
+      );
+      expect(projection.staged, {_OutgoingRecorder.task});
+      expect(saved, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Future<void> _tap(WidgetTester tester, String label) async {
@@ -350,5 +396,42 @@ final class _ProjectionRecorder implements ManualSyncProjector {
         workoutPlanJson: const [],
       ),
     );
+  }
+}
+
+final class _OutgoingRecorder extends _ProjectionRecorder
+    implements ManualSyncOutgoing {
+  static const task = (kind: SyncRecordKind.task, id: 'task');
+  Set<SyncRecordKey> staged = {};
+
+  @override
+  Future<ManualSyncOutgoingPreview> previewOutgoing({
+    required ManualSyncWorkspace sync,
+    String query = '',
+  }) async => ManualSyncOutgoingPreview(
+    syncRevision: 1,
+    expectedWorkspaceRevision: 1,
+    records: const [
+      ManualSyncOutgoingRecord(
+        key: task,
+        title: 'A saved task',
+        details: 'Task · Work',
+      ),
+      ManualSyncOutgoingRecord(
+        key: _newNote,
+        title: 'A saved note',
+        details: 'Note · Outline',
+      ),
+    ],
+    hasMore: false,
+  );
+
+  @override
+  Future<int> stageOutgoing(
+    ManualSyncOutgoingPreview preview, {
+    required Set<SyncRecordKey> selected,
+  }) async {
+    staged = selected;
+    return staged.length;
   }
 }

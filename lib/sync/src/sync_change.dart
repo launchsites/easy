@@ -12,6 +12,8 @@ final _workspaceIdPattern = RegExp(r'^[a-f0-9]{32}$');
 final _recordIdPattern = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_.:@+\-]{0,199}$');
 final _fieldNamePattern = RegExp(r'^[A-Za-z][A-Za-z0-9_]{0,63}$');
 
+bool isValidSyncRecordId(String id) => syncMatches(_recordIdPattern, id);
+
 final class SyncWorkspaceId {
   SyncWorkspaceId(String value) : value = _validate(value);
 
@@ -111,7 +113,7 @@ final class SyncChange {
         dot.counter > maxSyncCounter) {
       throw const FormatException('Invalid sync change counter.');
     }
-    if (!syncMatches(_recordIdPattern, record.id)) {
+    if (!isValidSyncRecordId(record.id)) {
       throw const FormatException('Invalid sync record ID.');
     }
     if (fields.length > _maximumFields ||

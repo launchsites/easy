@@ -5,6 +5,10 @@ import '../../ui_theme.dart';
 import '../manual_sync_contracts.dart';
 import '../manual_sync_workspace.dart';
 import 'manual_sync_ui.dart';
+import 'sync_wire.dart' show maxLocalSyncBatchChanges;
+import 'workspace_sync_record.dart';
+
+part 'manual_sync_outgoing_page.dart';
 
 class ManualSyncPeerPage extends StatefulWidget {
   const ManualSyncPeerPage({
@@ -53,6 +57,21 @@ class _ManualSyncPeerPageState extends State<ManualSyncPeerPage> {
   void _inform(String message, {bool error = false}) {
     if (mounted) setState(() => _feedback = (message: message, error: error));
   }
+
+  Future<void> _stage(ManualSyncOutgoing outgoing) => _run(() async {
+    final count = await Navigator.of(context).push<int>(
+      MaterialPageRoute(
+        builder: (_) =>
+            _OutgoingReview(workspace: widget.workspace, outgoing: outgoing),
+      ),
+    );
+    if (count == null) return;
+    _inform(
+      count == 0
+          ? 'These records are already staged.'
+          : '${_records(count)} staged. Export when you are ready to share them.',
+    );
+  });
 
   Future<void> _export() => _run(() async {
     final receipt = await requestManualSyncToken(
@@ -158,79 +177,95 @@ class _ManualSyncPeerPageState extends State<ManualSyncPeerPage> {
   });
 
   @override
-  Widget build(BuildContext context) => ManualSyncFrame(
-    title: 'Paired device',
-    canPop: !_busy,
-    child: ListView(
-      padding: manualSyncPadding,
-      children: [
-        ManualSyncSurface(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _revoked ? 'Revoked device' : 'Device fingerprint',
-                style: sectionHeadingStyle,
+  Widget build(BuildContext context) {
+    final outgoing = widget.projector;
+    return ManualSyncFrame(
+      title: 'Paired device',
+      canPop: !_busy,
+      child: ListView(
+        padding: manualSyncPadding,
+        children: [
+          ManualSyncSurface(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _revoked ? 'Revoked device' : 'Device fingerprint',
+                  style: sectionHeadingStyle,
+                ),
+                const SizedBox(height: 7),
+                SelectableText(
+                  manualFingerprint(widget.peerId),
+                  style: contentMetadataStyle,
+                ),
+              ],
+            ),
+          ),
+          if (!_revoked) ...[
+            const SizedBox(height: 16),
+            if (outgoing is ManualSyncOutgoing) ...[
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: OutlinedButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => _stage(outgoing as ManualSyncOutgoing),
+                  icon: const Icon(Icons.checklist_rounded, size: 18),
+                  label: const Text('Choose records'),
+                ),
               ),
-              const SizedBox(height: 7),
-              SelectableText(
-                manualFingerprint(widget.peerId),
-                style: contentMetadataStyle,
-              ),
+              const SizedBox(height: 8),
             ],
-          ),
-        ),
-        if (!_revoked) ...[
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton.icon(
-                onPressed: _busy ? null : _export,
-                icon: const Icon(Icons.ios_share_rounded, size: 18),
-                label: const Text('Export changes'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: _busy ? null : _export,
+                  icon: const Icon(Icons.ios_share_rounded, size: 18),
+                  label: const Text('Export changes'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _import,
+                  icon: const Icon(Icons.folder_open_rounded, size: 18),
+                  label: const Text('Open change bundle'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: _busy ? null : _copyProgress,
+                child: const Text('Copy progress code'),
               ),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _import,
-                icon: const Icon(Icons.folder_open_rounded, size: 18),
-                label: const Text('Open change bundle'),
+            ),
+          ],
+          if (_feedback case final feedback?) ...[
+            const SizedBox(height: 10),
+            ManualSyncFeedback(feedback.message, error: feedback.error),
+          ],
+          const SizedBox(height: 18),
+          if (!_revoked)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: _busy ? null : _revoke,
+                child: const Text('Revoke this device'),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: TextButton(
-              onPressed: _busy ? null : _copyProgress,
-              child: const Text('Copy progress code'),
+            )
+          else if (_pendingCleanup != null)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: _busy ? null : _retryCleanup,
+                child: const Text('Remove saved key'),
+              ),
             ),
-          ),
         ],
-        if (_feedback case final feedback?) ...[
-          const SizedBox(height: 10),
-          ManualSyncFeedback(feedback.message, error: feedback.error),
-        ],
-        const SizedBox(height: 18),
-        if (!_revoked)
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: TextButton(
-              onPressed: _busy ? null : _revoke,
-              child: const Text('Revoke this device'),
-            ),
-          )
-        else if (_pendingCleanup != null)
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: TextButton(
-              onPressed: _busy ? null : _retryCleanup,
-              child: const Text('Remove saved key'),
-            ),
-          ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _BundleReview extends StatefulWidget {
@@ -492,6 +527,10 @@ class _WorkspaceProjectionReviewState
     } on WorkspaceRevisionConflict {
       _stale = true;
       _error = 'Your workspace changed while you reviewed this selection. Open a fresh workspace review.';
+    } on SyncJournalRevisionConflict {
+      _stale = true;
+      _error =
+          'The sync journal changed. Open the bundle again for a fresh review.';
     } catch (error) {
       _error = manualSyncError(
         error,
@@ -531,9 +570,24 @@ class _WorkspaceProjectionReviewState
                   key: ValueKey(record.key),
                   controlAffinity: ListTileControlAffinity.leading,
                   title: Text(record.title, style: contentTitleStyle),
-                  subtitle: Text(
-                    record.details ?? _projectionLabel(record.action),
-                    style: contentMetadataStyle,
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        record.details ?? _projectionLabel(record.action),
+                        style: contentMetadataStyle,
+                      ),
+                      if (record.localDetails case final local?)
+                        Text(
+                          'On this device · $local',
+                          style: contentMetadataStyle,
+                        ),
+                      if (record.incomingDetails case final incoming?)
+                        Text(
+                          'Incoming · $incoming',
+                          style: contentMetadataStyle,
+                        ),
+                    ],
                   ),
                   value: _selected.contains(record.key),
                   onChanged: _busy || _stale || !record.selectable
@@ -570,9 +624,22 @@ class _WorkspaceProjectionReviewState
 }
 
 String _changes(int count) => '$count ${count == 1 ? 'change' : 'changes'}';
+String _records(int count) => '$count ${count == 1 ? 'record' : 'records'}';
 
 String _recordTitle(SyncRecordChange change) {
   final record = change.after ?? change.before;
+  if (record != null) {
+    try {
+      final title = WorkspaceSyncRecord.fromJournal(record).title;
+      return String.fromCharCodes(title.runes.take(120));
+    } on FormatException {
+      // Fall back to the generic journal labels for another record format.
+    } on TypeError {
+      // Malformed payloads can still be reviewed as opaque journal changes.
+    } on ArgumentError {
+      // Invalid portable values are not workspace records.
+    }
+  }
   for (final field in ['title', 'name', 'text', 'body']) {
     final value = record?.fields[field]?.firstOrNull?.value;
     if (value is String && value.trim().isNotEmpty) {

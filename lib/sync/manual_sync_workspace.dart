@@ -1,13 +1,21 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'sync_credentials.dart';
 import 'sync_journal.dart';
 import 'sync_pairing.dart';
+import 'src/sync_wire.dart' show maxLocalSyncBatchChanges;
 
 export 'sync_credentials.dart';
 export 'sync_journal.dart';
 export 'sync_pairing.dart';
 export 'sync_password_vault.dart';
+
+typedef ManualSyncLocalRecord = ({
+  SyncRecordKey key,
+  Map<String, Object?> fields,
+});
 
 /// Explicit manual pairing and encrypted bundle exchange. This session does
 /// not advertise, listen, upload or project changes into the live workspace.
@@ -100,6 +108,8 @@ final class ManualSyncWorkspace {
   final SyncDeviceCredentials _credentials;
   final SyncJournal _journal;
   final _session = Object();
+  final _committedImports = Expando<SyncJournalStatus>();
+  Future<void>? _workspaceWrite;
   var _closed = false;
 
   SyncDevicePublicKey get device => _identity.publicKey;
@@ -194,6 +204,56 @@ final class ManualSyncWorkspace {
     );
   }
 
+  /// Commits the explicitly selected local patches as one journal entry.
+  Future<SyncJournalStatus> writeLocalRecords({
+    required List<ManualSyncLocalRecord> records,
+    required int expectedRevision,
+    Future<void> Function()? verifyWorkspace,
+  }) async {
+    _ensureOpen();
+    if (records.isEmpty ||
+        records.length > maxLocalSyncBatchChanges ||
+        records.map((record) => record.key).toSet().length != records.length) {
+      throw const SyncJournalException(
+        'Choose a smaller set of distinct sync records.',
+      );
+    }
+    final saved = await status();
+    if (saved.revision != expectedRevision) {
+      throw SyncJournalRevisionConflict(expectedRevision, saved.revision);
+    }
+    final author = device.fingerprint;
+    var watermark = saved.watermark;
+    final signed = <SignedSyncChange>[];
+    var byteCount = 1;
+    for (final record in records) {
+      final counter = watermark[author] + 1;
+      final change = SyncChange(
+        workspaceId: workspaceId,
+        dot: (deviceId: author, counter: counter),
+        context: watermark,
+        record: record.key,
+        kind: SyncChangeKind.patch,
+        fields: record.fields,
+      );
+      final entry = await _identity.sign(change);
+      byteCount += utf8.encode(entry.encode()).length + 1;
+      if (byteCount > SyncEnvelopeCodec.maximumPayloadBytes) {
+        throw const SyncJournalException(
+          'Select fewer records to stage at once.',
+        );
+      }
+      signed.add(entry);
+      watermark = SyncVersionVector({...watermark.counters, author: counter});
+    }
+    await verifyWorkspace?.call();
+    _ensureOpen();
+    return _journal.commitLocalBatch(
+      signed,
+      expectedRevision: expectedRevision,
+    );
+  }
+
   Future<SyncJournalExport?> exportFor(
     String recipientId, {
     SyncVersionVector known = const SyncVersionVector.empty(),
@@ -265,11 +325,53 @@ final class ManualSyncWorkspace {
     SyncImportPreview preview, {
     bool approveDestructiveChanges = false,
     bool approveConflicts = false,
-  }) => _journal.commitImport(
-    preview,
-    approveDestructiveChanges: approveDestructiveChanges,
-    approveConflicts: approveConflicts,
-  );
+  }) async {
+    _ensureOpen();
+    final committed = await _journal.commitImport(
+      preview,
+      approveDestructiveChanges: approveDestructiveChanges,
+      approveConflicts: approveConflicts,
+    );
+    _committedImports[preview] = committed;
+    return committed;
+  }
+
+  void verifyCommittedImport(
+    SyncImportPreview preview,
+    SyncJournalStatus committed,
+  ) {
+    _ensureOpen();
+    if (!identical(_committedImports[preview], committed)) {
+      throw const SyncJournalException(
+        'Save the reviewed bundle to this journal first.',
+      );
+    }
+  }
+
+  /// Pins the authenticated journal head while a WorkspaceStore revision CAS
+  /// publishes the reviewed projection. A terminated process releases SQLite's
+  /// write lock without leaving a durable lease behind.
+  Future<T> applyAtRevision<T>(int revision, Future<T> Function() write) async {
+    _ensureOpen();
+    if (_workspaceWrite != null) {
+      throw const SyncJournalException(
+        'Another workspace review is being applied.',
+      );
+    }
+    final completion = Completer<void>();
+    _workspaceWrite = completion.future;
+    try {
+      final lease = await _journal.holdRevision(revision);
+      try {
+        return await write();
+      } finally {
+        await _journal.releaseRevision(lease);
+      }
+    } finally {
+      _workspaceWrite = null;
+      completion.complete();
+    }
+  }
 
   Future<SyncRevocationPreview> reviewRevocation(String deviceId) async {
     final current = await _journal.status();
@@ -359,6 +461,7 @@ final class ManualSyncWorkspace {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    await _workspaceWrite;
     _identity.destroy();
     await _journal.close();
   }

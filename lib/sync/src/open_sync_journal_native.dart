@@ -41,6 +41,9 @@ enum _Command {
   revoke,
   draft,
   local,
+  localBatch,
+  holdRevision,
+  releaseRevision,
   export,
   preview,
   import,
@@ -93,6 +96,20 @@ final class _NativeSyncJournal implements SyncJournal {
     SignedSyncChange change, {
     required int expectedRevision,
   }) => _client.request(_Command.local, (change, expectedRevision));
+
+  @override
+  Future<SyncJournalStatus> commitLocalBatch(
+    List<SignedSyncChange> changes, {
+    required int expectedRevision,
+  }) => _client.request(_Command.localBatch, (changes, expectedRevision));
+
+  @override
+  Future<String> holdRevision(int expectedRevision) =>
+      _client.request(_Command.holdRevision, expectedRevision);
+
+  @override
+  Future<void> releaseRevision(String lease) =>
+      _client.request(_Command.releaseRevision, lease);
 
   @override
   Future<SyncJournalExport?> exportChanges({
@@ -329,6 +346,14 @@ Future<Object?> _execute(
     case _Command.local:
       final (change, revision) = data as (SignedSyncChange, int);
       return journal.commitLocal(change, expectedRevision: revision);
+    case _Command.localBatch:
+      final (changes, revision) = data as (List<SignedSyncChange>, int);
+      return journal.commitLocalBatch(changes, expectedRevision: revision);
+    case _Command.holdRevision:
+      return journal.holdRevision(data as int);
+    case _Command.releaseRevision:
+      await journal.releaseRevision(data as String);
+      return null;
     case _Command.export:
       final (recipient, key, known) = data as _ExportRequest;
       return _usePair(

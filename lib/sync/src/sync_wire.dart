@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 const maxSyncDevices = 64;
+const maxLocalSyncBatchChanges = 24;
 const maxSyncChangeBytes = 128 * 1024;
 const maxSyncCounter = 0x1fffffffffffff;
 

@@ -61,7 +61,7 @@ An AOT frame workload verified 64 MiB of synthetic bytes by SHA-256. The scratch
 | Five logical CPUs | 8.52 s | 7.86 s | 123.9 MiB |
 | One logical CPU, second run | 14.58 s | 7.09 s | 144.6 MiB |
 
-The measurements share the Linux host with other development work. CPU affinity is a resource constraint for the whole benchmark process, including the encryption worker. The spread between one-core reads reflects shared-host variation. [Frame codec](../lib/storage/src/media_backup_frames.dart)
+A 256 MiB run with one logical CPU wrote the archive in 60.35 s, read and verified it in 64.81 s, matched SHA-256 and peaked at 132.6 MiB RSS. The measurements share the Linux host with other development work. CPU affinity constrains the entire benchmark process, including the encryption worker. [Frame codec](../lib/storage/src/media_backup_frames.dart)
 
 ## Temporary media files
 

@@ -66,12 +66,54 @@ final class ManualSyncProjectionRecord {
     required this.title,
     required this.action,
     this.details,
+    this.localDetails,
+    this.incomingDetails,
   });
 
   final SyncRecordKey key;
   final String title;
   final ManualSyncProjectionAction action;
   final String? details;
+  final String? localDetails;
+  final String? incomingDetails;
 
   bool get selectable => action != ManualSyncProjectionAction.resolveConflict;
+}
+
+abstract interface class ManualSyncOutgoing {
+  Future<ManualSyncOutgoingPreview> previewOutgoing({
+    required ManualSyncWorkspace sync,
+    String query = '',
+  });
+
+  Future<int> stageOutgoing(
+    ManualSyncOutgoingPreview preview, {
+    required Set<SyncRecordKey> selected,
+  });
+}
+
+final class ManualSyncOutgoingPreview {
+  ManualSyncOutgoingPreview({
+    required this.syncRevision,
+    required this.expectedWorkspaceRevision,
+    required Iterable<ManualSyncOutgoingRecord> records,
+    required this.hasMore,
+  }) : records = List.unmodifiable(records);
+
+  final int syncRevision;
+  final int expectedWorkspaceRevision;
+  final List<ManualSyncOutgoingRecord> records;
+  final bool hasMore;
+}
+
+final class ManualSyncOutgoingRecord {
+  const ManualSyncOutgoingRecord({
+    required this.key,
+    required this.title,
+    required this.details,
+  });
+
+  final SyncRecordKey key;
+  final String title;
+  final String details;
 }

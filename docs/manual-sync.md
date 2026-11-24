@@ -1,6 +1,6 @@
-# Manual sync foundation
+# Manual sync
 
-The device starts with local records. The host opens a manual sync workspace only for an explicit setup or join action. The sealed journal and the normal Easy workspace remain separate. Bundle preview shows affected records and conflicts before commit so a host can review how those records will be used.
+The device starts with local records. The host opens a manual sync workspace after setup or joining. The encrypted journal and Easy workspace retain their own revisions and review steps.
 
 ## Pair two devices
 
@@ -16,9 +16,11 @@ The system vault stores the installation identity, journal encryption keys and p
 
 A journal approval binds the peer's public fingerprint to an immutable key ID. A competing approval can leave its own candidate in protected storage while the committed key remains attached to the active grant. Revocation removes journal permission before cleaning up the vault entry. If vault cleanup fails, the caller can retry while the earlier permission stays revoked. Copies already exported remain with their recipients.
 
-Choose an approved device for export or import. Files contain authenticated encrypted batches with signed, bounded changes. The receiving device can share an encrypted progress code after saving each bundle. The next export uses that device-specific code to continue from its saved watermark.
+Choose an approved device and open **Choose records** to search saved tasks, calendar events and notes. Check the rows to stage in the journal. **Export changes** then creates an authenticated encrypted file with the journal changes that device is missing. The receiving device can share an encrypted progress code after saving each bundle. The next export uses that device-specific code to continue from its saved watermark.
 
-Import preview checks the workspace, sender, recipient, key, causal dependencies, and conflict states. Commit uses the reviewed revision and requires separate consent for removals or conflicts. Reviewed journal records can then be selected for a separate workspace projection. Projection previews bind the workspace and sync revisions, and an operation ID lets a confirmed workspace restore be retried with its recovery point intact. Reopening an accepted bundle reveals its current journal records for another workspace review.
+Import preview checks the workspace, sender, recipient, key, causal dependencies, and conflict states. Saving the reviewed bundle to the journal requires separate consent for removals or conflicts. **Review workspace changes** shows additions, replacements and removals alongside available local and incoming details. You choose which changes to apply. The journal and workspace revisions must match the review, and an interrupted or repeated apply can reuse its recovery point. Reopening an accepted bundle reveals its current journal records for another workspace review.
+
+The supported records are standalone tasks, events and notes. Task dependencies and structured note links need their referenced records on the destination device or in the same selection. Recurring templates, mirrored or read-only calendar events, planner blocks, attachments, app settings, and records with unrecognized fields stay local. The chooser stages records that exist in the local workspace. Receiving a removal requires a matching saved local version and a review that preserves remaining references.
 
 ## Validation
 
@@ -26,4 +28,4 @@ Import preview checks the workspace, sender, recipient, key, causal dependencies
 flutter test test/sync_pairing_test.dart test/manual_sync_workspace_test.dart test/manual_sync_page_test.dart test/sync_password_vault_test.dart test/sync_journal_test.dart test/workspace_sync_test.dart
 ```
 
-The tests exercise the code exchange, stale and competing approvals, locked-vault recovery, revoke-before-cleanup, ciphertext transfer and directional progress between two synthetic native stores, and passphrase file reopening and corruption checks. The pairing widget test uses a 320-pixel viewport with 135% text scaling. A separate test reviews a conflicting bundle and projects only a selected record before confirming revocation. The system vault adapter is exercised through the plugin's test backend. Access to platform keychains and in-person token scanning needs separate real-device validation.
+The tests exercise the code exchange, stale and competing approvals, locked-vault recovery, revoke-before-cleanup, ciphertext transfer and directional progress between synthetic native stores, and passphrase file reopening and corruption checks. They also cover phase-by-phase selection, linked records and protected deletions, retry after intervening edits, exact recovery in SQLite and the preference store, and release of the SQLite journal lock after a failed workspace commit. The paired-device and staging widgets run at 320 pixels with 135% text scaling. The system vault adapter is exercised through the plugin's test backend. Platform keychains and in-person token scanning need separate real-device validation.

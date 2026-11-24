@@ -60,6 +60,7 @@ final class SyncJournalCore implements SyncJournal {
   var _hash = Uint8List(32);
   var _healthy = true;
   var _closed = false;
+  String? _projectionLease;
 
   SyncJournalStatus _status() => SyncJournalStatus(
     workspaceId: _trust.workspaceId,
@@ -149,14 +150,25 @@ final class SyncJournalCore implements SyncJournal {
   Future<SyncJournalStatus> commitLocal(
     SignedSyncChange change, {
     required int expectedRevision,
+  }) => commitLocalBatch([change], expectedRevision: expectedRevision);
+
+  @override
+  Future<SyncJournalStatus> commitLocalBatch(
+    List<SignedSyncChange> changes, {
+    required int expectedRevision,
   }) async {
+    if (changes.isEmpty || changes.length > maxLocalSyncBatchChanges) {
+      throw const FormatException('Select fewer sync records for one review.');
+    }
     await _refresh();
-    if (change.change.dot.deviceId != _local.fingerprint) {
+    if (changes.any(
+      (change) => change.change.dot.deviceId != _local.fingerprint,
+    )) {
       throw const SyncTrustException(
         'Local edits require the local device signature.',
       );
     }
-    final verified = [await _trust.verify(change)];
+    final verified = await _verifyAll(changes);
     final SyncBatchResult result;
     try {
       result = _replica.previewBatch(verified).result;
@@ -165,9 +177,39 @@ final class SyncJournalCore implements SyncJournal {
       rethrow;
     }
     // An exact repeat can follow a successful commit whose response was lost.
-    if (result.duplicates == 1) return _status();
+    if (result.duplicates == changes.length) return _status();
     _expect(expectedRevision);
+    if (result.duplicates != 0) {
+      throw const SyncJournalException(
+        'Review the current sync records again.',
+      );
+    }
     return _commitVerified(verified, result);
+  }
+
+  @override
+  Future<String> holdRevision(int expectedRevision) async {
+    if (_projectionLease != null) {
+      throw const SyncJournalException(
+        'Another workspace review is being applied.',
+      );
+    }
+    await _refresh();
+    _expect(expectedRevision);
+    final lease = syncHex(syncRandomBytes(16));
+    _ledger.holdRevision(expectedRevision);
+    return _projectionLease = lease;
+  }
+
+  @override
+  Future<void> releaseRevision(String lease) async {
+    if (_projectionLease != lease) {
+      throw const SyncJournalException(
+        'The workspace review lease has expired.',
+      );
+    }
+    _ledger.releaseRevision();
+    _projectionLease = null;
   }
 
   @override
@@ -437,6 +479,11 @@ final class SyncJournalCore implements SyncJournal {
     Map<String, Object?> action,
     void Function() apply,
   ) async {
+    if (_projectionLease != null) {
+      throw const SyncJournalException(
+        'Finish applying the current workspace review first.',
+      );
+    }
     final revision = _revision + 1;
     final body = utf8.encode(jsonEncode(action));
     if (revision > syncLedgerMaximumRows ||

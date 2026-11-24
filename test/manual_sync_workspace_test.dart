@@ -1,10 +1,20 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:easy/storage/workspace_store.dart';
+import 'package:easy/sync/manual_sync_contracts.dart';
 import 'package:easy/sync/manual_sync_workspace.dart';
+import 'package:easy/sync/workspace_manual_sync.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 const _note = (kind: SyncRecordKind.note, id: 'shared-note');
+const _task = (kind: SyncRecordKind.task, id: 'focus-task');
+const _event = (kind: SyncRecordKind.calendarEvent, id: 'calendar-event');
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +26,12 @@ void main() {
   final workspaces = <ManualSyncWorkspace>[];
 
   setUp(() async {
+    final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    addTearDown(
+      () => SharedPreferencesAsyncPlatform.instance = previousPreferences,
+    );
     temporary = await Directory.systemTemp.createTemp('easy-manual-sync-');
     firstVault = _TrialVault();
     secondVault = _TrialVault();
@@ -374,6 +390,421 @@ void main() {
       'Next file',
     );
   });
+  Future<(ManualSyncWorkspace, ManualSyncWorkspace)> pair() async {
+    final first = await create();
+    final second = await create(isSecond: true, id: first.workspaceId);
+    final (left, right) = await review(first, second);
+    addTearDown(left.discard);
+    addTearDown(right.discard);
+    await first.approvePair(left, expectedRevision: 0);
+    await second.approvePair(right, expectedRevision: 0);
+    return (first, second);
+  }
+
+  Future<WorkspaceStore> localStore(
+    String name,
+    WorkspaceSnapshot seed, {
+    bool preferences = false,
+  }) async {
+    final store = await openWorkspaceStore(
+      preferences: SharedPreferencesAsync(),
+      databasePath: preferences
+          ? null
+          : temporary.uri.resolve('$name.sqlite').toFilePath(),
+      readLegacy: () async => seed,
+      usePreferences: preferences,
+    );
+    addTearDown(store.close);
+    return store;
+  }
+
+  Future<ManualSyncProjectionPreview> receive(
+    ManualSyncWorkspace sender,
+    ManualSyncWorkspace receiver,
+    WorkspaceManualSyncProjector target, {
+    bool approveRemovals = false,
+  }) async {
+    final bytes = (await sender.exportFor(receiver.device.fingerprint))!.bytes;
+    final imported = await receiver.previewIncoming(
+      bytes: bytes,
+      senderId: sender.device.fingerprint,
+    );
+    final committed = await receiver.commitIncoming(
+      imported,
+      approveDestructiveChanges: approveRemovals,
+    );
+    return target.previewIncoming(
+      sync: receiver,
+      imported: imported,
+      committed: committed,
+    );
+  }
+
+  for (final preferences in [false, true]) {
+    test(
+      'selected records move through a verified bundle and durable recovery ($preferences preferences)',
+      () async {
+        final (sender, receiver) = await pair();
+        final source = await localStore('source', _sourceSnapshot());
+        final initial = _snapshot(
+          notes: [
+            _noteRow(title: 'Recipient title', body: 'Recipient private edit'),
+          ],
+          sections: {
+            'unrecognizedSection': {
+              'roundTrip': [1, true, 'keep'],
+            },
+          },
+        );
+        final destination = await localStore(
+          'destination',
+          initial,
+          preferences: preferences,
+        );
+        var flushCount = 0;
+        final loaded = <WorkspaceRevision>[];
+        final exporter = WorkspaceManualSyncProjector(
+          store: source,
+          flushWorkspaceWrites: () async => flushCount++,
+        );
+        final importer = WorkspaceManualSyncProjector(
+          store: destination,
+          onRestored: (saved) async {
+            loaded.add(saved);
+          },
+        );
+
+        final search = await exporter.previewOutgoing(
+          sync: sender,
+          query: 'café',
+        );
+        expect(search.records.map((row) => row.key), [_note]);
+        final outgoing = await exporter.previewOutgoing(sync: sender);
+        expect(outgoing.records.map((row) => row.key).toSet(), {
+          _task,
+          _event,
+          _note,
+          (kind: SyncRecordKind.note, id: 'keep-local'),
+        });
+        expect(await sender.exportFor(receiver.device.fingerprint), isNull);
+        await expectLater(
+          exporter.stageOutgoing(
+            outgoing,
+            selected: {
+              _note,
+              (kind: SyncRecordKind.calendarEvent, id: 'apple:external'),
+            },
+          ),
+          throwsA(isA<SyncJournalException>()),
+        );
+        final expectedJournalRevision = outgoing.syncRevision + 1;
+        expect(
+          await exporter.stageOutgoing(
+            outgoing,
+            selected: {_task, _event, _note},
+          ),
+          3,
+        );
+        expect((await sender.status()).revision, expectedJournalRevision);
+        expect((await sender.status()).changes, 3);
+        expect(
+          await exporter.stageOutgoing(
+            await exporter.previewOutgoing(sync: sender),
+            selected: {_note},
+          ),
+          0,
+        );
+        expect((await sender.status()).revision, expectedJournalRevision);
+        expect(flushCount, greaterThanOrEqualTo(4));
+
+        final bundle = (await sender.exportFor(receiver.device.fingerprint))!;
+        final imported = await receiver.previewIncoming(
+          bytes: bundle.bytes,
+          senderId: sender.device.fingerprint,
+        );
+        final beforeCommit = await receiver.status();
+        await expectLater(
+          importer.previewIncoming(
+            sync: receiver,
+            imported: imported,
+            committed: beforeCommit,
+          ),
+          throwsA(isA<SyncJournalException>()),
+        );
+        final committed = await receiver.commitIncoming(imported);
+        final preview = await importer.previewIncoming(
+          sync: receiver,
+          imported: imported,
+          committed: committed,
+        );
+        expect(preview.records.map((row) => row.key).toSet(), {
+          _task,
+          _event,
+          _note,
+        });
+        final note = preview.records.firstWhere((row) => row.key == _note);
+        expect(note.action, ManualSyncProjectionAction.update);
+        expect(note.localDetails, contains('Recipient private edit'));
+        expect(note.incomingDetails, contains('café'));
+        expect(
+          (await destination.read()).snapshot.workspaceJson,
+          initial.workspaceJson,
+        );
+        await expectLater(
+          importer.applyIncoming(preview, selected: {_note}),
+          throwsA(
+            isA<SyncJournalException>().having(
+              (e) => e.message,
+              'message',
+              contains('linked'),
+            ),
+          ),
+        );
+        expect(await destination.readRecoveryBackup(), isNull);
+        final applied = await importer.applyIncoming(
+          preview,
+          selected: {_task, _event, _note},
+        );
+        expect(loaded.single, same(applied));
+        final projected = jsonDecode(applied.snapshot.workspaceJson) as Map;
+        expect(projected['unrecognizedSection'], {
+          'roundTrip': [1, true, 'keep'],
+        });
+        expect(projected['notes'], [
+          _noteRow(
+            title: 'Source planning',
+            body: 'café prep',
+            links: [
+              {'id': _task.id, 'kind': 'task'},
+              {'id': _event.id, 'kind': 'event', 'title': 'Focus day'},
+            ],
+          ),
+        ]);
+        expect(
+          (projected['tasks'] as List).single['date'],
+          '2026-11-24T00:00:00.000',
+        );
+        expect((projected['tasks'] as List).single['estimatedMinutes'], 45);
+        expect(
+          (projected['events'] as List).single['start'],
+          '2026-11-24T00:00:00.000',
+        );
+        expect(
+          (projected['events'] as List).single['end'],
+          '2026-11-25T00:00:00.000',
+        );
+        expect(applied.snapshot.gymSessionJson, initial.gymSessionJson);
+        final recovery = (await destination.readRecoveryBackup())!;
+        expect(
+          (await destination.previewBackup(recovery)).snapshot.workspaceJson,
+          initial.workspaceJson,
+        );
+
+        projected['unrecognizedSection'] = {'laterEdit': true};
+        final later = await destination.save(
+          WorkspaceMutation.workspace(jsonEncode(projected)),
+        );
+        final repeated = await importer.applyIncoming(
+          preview,
+          selected: {_note, _event, _task},
+        );
+        expect(repeated.revision, later.revision);
+        expect(repeated.snapshot.workspaceJson, later.snapshot.workspaceJson);
+        expect(loaded.last.revision, later.revision);
+        expect(await destination.readRecoveryBackup(), recovery);
+      },
+    );
+  }
+
+  test(
+    'stale reviews fail before changing the journal or live workplace',
+    () async {
+      final (sender, receiver) = await pair();
+      final source = await localStore('source', _sourceSnapshot());
+      final destination = await localStore('destination', _snapshot());
+      final exporter = WorkspaceManualSyncProjector(store: source);
+      final importer = WorkspaceManualSyncProjector(store: destination);
+      final outgoing = await exporter.previewOutgoing(sync: sender);
+      await source.save(
+        WorkspaceMutation.workspace(
+          _sourceSnapshot({'edited': 1}).workspaceJson,
+        ),
+      );
+      await expectLater(
+        exporter.stageOutgoing(outgoing, selected: {_task}),
+        throwsA(isA<WorkspaceRevisionConflict>()),
+      );
+      expect((await sender.status()).changes, 0);
+
+      final fresh = await exporter.previewOutgoing(sync: sender);
+      await sender.writeLocalChange(
+        record: (kind: SyncRecordKind.note, id: 'opaque'),
+        kind: SyncChangeKind.patch,
+        fields: {'title': 'Unsupported journal data'},
+      );
+      await expectLater(
+        exporter.stageOutgoing(fresh, selected: {_task}),
+        throwsA(isA<SyncJournalRevisionConflict>()),
+      );
+      final stage = await exporter.previewOutgoing(sync: sender);
+      await exporter.stageOutgoing(stage, selected: {_task});
+
+      final preview = await receive(sender, receiver, importer);
+      expect(
+        preview.records.singleWhere((row) => row.key == _task).selectable,
+        isTrue,
+      );
+      expect(
+        preview.records.singleWhere((row) => row.key.id == 'opaque').selectable,
+        isFalse,
+      );
+      final staleCopy = ManualSyncProjectionPreview(
+        syncWorkspaceId: preview.syncWorkspaceId,
+        syncRevision: preview.syncRevision,
+        expectedWorkspaceRevision: preview.expectedWorkspaceRevision,
+        records: preview.records,
+      );
+      await expectLater(
+        importer.applyIncoming(staleCopy, selected: {_task}),
+        throwsA(isA<SyncJournalException>()),
+      );
+      final other = await open(receiver.workspaceId, isSecond: true);
+      await other.writeLocalChange(
+        record: (kind: SyncRecordKind.note, id: 'other-edit'),
+        kind: SyncChangeKind.patch,
+        fields: {'title': 'New journal head'},
+      );
+      await expectLater(
+        importer.applyIncoming(preview, selected: {_task}),
+        throwsA(isA<SyncJournalRevisionConflict>()),
+      );
+      final again = await receive(sender, receiver, importer);
+      expect(
+        again.records.singleWhere((row) => row.key == _task).selectable,
+        isTrue,
+      );
+      final later = await destination.save(
+        WorkspaceMutation.workspace(
+          _snapshot(sections: {'lateEdit': true}).workspaceJson,
+        ),
+      );
+      await expectLater(
+        importer.applyIncoming(again, selected: {_task}),
+        throwsA(isA<WorkspaceRevisionConflict>()),
+      );
+      expect(
+        (await destination.read()).snapshot.workspaceJson,
+        later.snapshot.workspaceJson,
+      );
+      expect(await destination.readRecoveryBackup(), isNull);
+    },
+  );
+
+  test('typed removal protects local edits and references until separately reviewed', () async {
+    final (sender, receiver) = await pair();
+    final source = await localStore('source', _sourceSnapshot());
+    final destination = await localStore(
+      'destination',
+      _snapshot(
+        tasks: [
+          _taskRow(),
+          _taskRow(id: 'dependent', parent: _task.id),
+        ],
+        notes: [_noteRow(title: 'Distinct local version')],
+      ),
+    );
+    final exporter = WorkspaceManualSyncProjector(store: source);
+    final importer = WorkspaceManualSyncProjector(store: destination);
+    final stage = await exporter.previewOutgoing(sync: sender);
+    await exporter.stageOutgoing(stage, selected: {_task, _note});
+    await sender.writeLocalChange(record: _task, kind: SyncChangeKind.delete);
+    await sender.writeLocalChange(record: _note, kind: SyncChangeKind.delete);
+
+    final preview = await receive(
+      sender,
+      receiver,
+      importer,
+      approveRemovals: true,
+    );
+    expect(
+      preview.records.singleWhere((row) => row.key == _task).action,
+      ManualSyncProjectionAction.remove,
+    );
+    final edited = preview.records.singleWhere((row) => row.key == _note);
+    expect(edited.selectable, isFalse);
+    expect(edited.localDetails, contains('Note'));
+    await expectLater(
+      importer.applyIncoming(preview, selected: {_task}),
+      throwsA(
+        isA<SyncJournalException>().having(
+          (e) => e.message,
+          'message',
+          contains('links'),
+        ),
+      ),
+    );
+    final independent = _snapshot(
+      tasks: [_taskRow()],
+      notes: [_noteRow(title: 'Distinct local version')],
+    );
+    await destination.save(
+      WorkspaceMutation.workspace(independent.workspaceJson),
+    );
+    final second = await receive(
+      sender,
+      receiver,
+      importer,
+      approveRemovals: true,
+    );
+    final removed = await importer.applyIncoming(second, selected: {_task});
+    expect(
+      (jsonDecode(removed.snapshot.workspaceJson) as Map)['tasks'],
+      isEmpty,
+    );
+    expect(await destination.readRecoveryBackup(), isNotNull);
+    expect(
+      (await destination.previewBackup(
+        (await destination.readRecoveryBackup())!,
+      )).snapshot.workspaceJson,
+      independent.workspaceJson,
+    );
+  });
+
+  test('journal revision lease excludes competing connections and releases after workspace failure', () async {
+    final first = await create();
+    final other = await open(first.workspaceId);
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    final revision = (await first.status()).revision;
+    final projection = first.applyAtRevision<void>(revision, () async {
+      entered.complete();
+      await release.future;
+      throw const WorkspaceStoreException('Deliberate workspace failure.');
+    });
+    final failed = expectLater(
+      projection,
+      throwsA(isA<WorkspaceStoreException>()),
+    );
+    await entered.future;
+    var committed = false;
+    final writer = other
+        .writeLocalChange(
+          record: _note,
+          kind: SyncChangeKind.patch,
+          fields: {'title': 'Other connection'},
+          expectedRevision: revision,
+        )
+        .then((status) {
+          committed = true;
+          return status;
+        });
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+    expect(committed, isFalse);
+    expect((await first.status()).revision, revision);
+    release.complete();
+    await failed;
+    expect((await writer).revision, revision + 1);
+  });
 }
 
 final class _TrialVault implements SyncSecretVault {
@@ -401,3 +832,93 @@ final class _TrialVault implements SyncSecretVault {
     contents.remove(reference);
   }
 }
+
+Map<String, Object?> _taskRow({String id = 'focus-task', String? parent}) => {
+  'id': id,
+  'title': 'Plan focus window',
+  'category': 'work',
+  'done': false,
+  'date': '2026-11-24T00:00:00.000',
+  'estimatedMinutes': 45,
+  'parentId': ?parent,
+};
+
+Map<String, Object?> _eventRow({String id = 'calendar-event', String? task}) =>
+    {
+      'id': id,
+      'title': 'Focus day',
+      'category': 'work',
+      'allDay': true,
+      'start': '2026-11-24T00:00:00.000',
+      'end': '2026-11-25T00:00:00.000',
+      'plannedTaskId': ?task,
+    };
+
+Map<String, Object?> _noteRow({
+  String id = 'shared-note',
+  String title = 'A local note',
+  String body = '',
+  List<Map<String, String>>? links,
+}) => {
+  'id': id,
+  'title': title,
+  'body': body,
+  'updated': '2026-11-24T10:00:00.000Z',
+  'links': ?links,
+};
+
+WorkspaceSnapshot _snapshot({
+  List<Map<String, Object?>> tasks = const [],
+  List<Map<String, Object?>> events = const [],
+  List<Map<String, Object?>> notes = const [],
+  Map<String, Object?> sections = const {},
+}) => WorkspaceSnapshot(
+  workspaceJson: jsonEncode({
+    ...sections,
+    'tasks': tasks,
+    'events': events,
+    'notes': notes,
+  }),
+  gymSessionJson: const [
+    '{"planned":false,"startedAt":"2026-11-24T10:00:00","finishedAt":null,"entries":[]}',
+  ],
+  workoutPlanJson: const [],
+);
+
+WorkspaceSnapshot _sourceSnapshot([Map<String, Object?> sections = const {}]) =>
+    _snapshot(
+      tasks: [
+        _taskRow(),
+        _taskRow(id: 'recurring-template'),
+      ],
+      events: [
+        _eventRow(),
+        _eventRow(id: 'apple:external'),
+        _eventRow(id: 'ics:external'),
+        _eventRow(id: 'recurring-event'),
+        _eventRow(id: 'mirrored-event'),
+        _eventRow(id: 'planner-block', task: _task.id),
+      ],
+      notes: [
+        _noteRow(
+          title: 'Source planning',
+          body: 'café prep',
+          links: [
+            {'id': _task.id, 'kind': 'task'},
+            {'id': _event.id, 'kind': 'event', 'title': 'Focus day'},
+          ],
+        ),
+        _noteRow(id: 'keep-local'),
+        {..._noteRow(id: 'future-note'), 'futureFlag': true},
+      ],
+      sections: {
+        'recurringTasks': [
+          {'id': 'recurring-template'},
+        ],
+        'recurringEvents': [
+          {'id': 'recurring-event'},
+        ],
+        'appleCalendarCopies': {'mirrored-event': {}},
+        ...sections,
+      },
+    );

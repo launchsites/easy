@@ -142,5 +142,25 @@ final class SqliteSyncLedger implements SyncLedger {
   });
 
   @override
+  void holdRevision(int expectedRevision) {
+    _db.execute('BEGIN IMMEDIATE');
+    try {
+      final current = readHead();
+      if (current == null) {
+        throw const SyncJournalException('The sync journal head is missing.');
+      }
+      if (current.revision != expectedRevision) {
+        throw SyncJournalRevisionConflict(expectedRevision, current.revision);
+      }
+    } catch (_) {
+      _db.execute('ROLLBACK');
+      rethrow;
+    }
+  }
+
+  @override
+  void releaseRevision() => _db.execute('ROLLBACK');
+
+  @override
   void close() => _db.close();
 }

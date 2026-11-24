@@ -33,6 +33,16 @@ abstract interface class SyncJournal {
     required int expectedRevision,
   });
 
+  Future<SyncJournalStatus> commitLocalBatch(
+    List<SignedSyncChange> changes, {
+    required int expectedRevision,
+  });
+
+  /// Holds one reviewed journal revision during a short external workspace
+  /// commit. The caller must release the lease even if that write fails.
+  Future<String> holdRevision(int expectedRevision);
+  Future<void> releaseRevision(String lease);
+
   Future<SyncJournalExport?> exportChanges({
     required String recipientId,
     required SyncPairKey pairKey,
