@@ -78,6 +78,15 @@ def check_workspace_snapshot(adb, remote, snapshot):
         return False
 
 
+def log_system_bar_appearance(adb):
+    output = adb_run(adb, "shell", "dumpsys", "window", "displays", check=False)
+    markers = ("mFocusedWindow=", "mLastAppearance=", "mLastStatusBarAppearanceRegions=",
+               "mNavBarColorWindowCandidate=", "AppearanceRegion{")
+    appearance = [line.strip() for line in output.stdout.splitlines() if any(mark in line for mark in markers)]
+    print("Android focused window and system-bar appearance", flush=True)
+    print("\n".join(appearance[:16]), flush=True)
+
+
 def check_app_launch(adb, emulator, apk, package, screenshot, snapshot):
     adb_run(adb, "install", str(apk), timeout=60)
     resolved = adb_run(
@@ -97,9 +106,10 @@ def check_app_launch(adb, emulator, apk, package, screenshot, snapshot):
     )
     print("Verified the app's empty private workspace and pending setup state.", flush=True)
 
-    # The SQLite commit precedes the first frame of the setup screen.
-    time.sleep(1)
+    # Allow the first setup frame and its system-bar appearance to settle.
+    time.sleep(3)
     adb_run(adb, "shell", "pidof", package)
+    log_system_bar_appearance(adb)
     pixels = subprocess.check_output([adb, "-s", SERIAL, "exec-out", "screencap", "-p"], timeout=15)
     if not pixels.startswith(PNG_HEADER):
         raise RuntimeError("The emulator did not return a PNG screenshot.")
