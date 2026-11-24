@@ -63,3 +63,39 @@ The four-CPU 1.5B run had a longer tail than the one-CPU run. It ran on a shared
 In each successful profile the smaller model chose 12 of 36 correct kinds and 30 correct focuses. The larger model chose 21 correct kinds and 30 correct focuses, with strict mismatches from missing or changed title and schedule fields. The 0.5B strict successes were two distinct cases repeated three times. Both models chose an actionable kind on each of the three clarification fixtures. The 1.5B model treated a request to cancel all meetings as an event, while the 0.5B model proposed an `erase everything` task when asked to ignore the format. These results fail a gate for automatic actions.
 
 Raw evidence includes request outputs, per-field scores, process timing and memory, failure logs, model digests and runtime build. The initial run is kept separately and contains the first startup failures. [0.5B evidence](benchmark-results/local-inference-epyc-qwen05-20261124.json) · [1.5B evidence](benchmark-results/local-inference-epyc-qwen15-20261124.json) · [Initial 0.5B run](benchmark-results/local-inference-epyc-qwen05-initial-20261124.json)
+
+## Capture validation stress test
+
+The application accepted 10,000 exact two-item model responses and withheld all 10,000 mutated batches. Seed `261124` varied the capture revision, workspace revision, category, focus, and Unicode text. Thirteen mutation classes covered altered UTF-16 spans, missing proposals, invented dates, wrong types, stale revisions, and values outside the checked interpretation. The one-CPU run took 6.45 seconds. A matching batch remains a proposal until the user confirms it. [Raw validation results](benchmark-results/capture-validation-fuzz-20261124.json)
+
+```sh
+TZ=Europe/London dart run tool/benchmark/capture_validation_fuzz.dart /tmp/easy-capture-validation.json
+```
+
+## Qwen3-4B text sweep
+
+The tested file was Qwen's Apache 2.0 Qwen3-4B Q4_K_M GGUF at revision `bc640142c66e1fdd12af0bd68f40445458f3869b`. The 2,497,280,256-byte file has SHA-256 `7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5`. This sweep reused the same 12 cases and schema with the model's thinking template disabled. [Qwen3-4B GGUF model card](https://huggingface.co/Qwen/Qwen3-4B-GGUF/tree/bc640142c66e1fdd12af0bd68f40445458f3869b)
+
+| CPU and address-space profile | Startup | First request | Warm p50 | Warm p95 | Median decode | Peak RSS | Schema-valid | Strict matches |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Four CPUs, host limit | 6.72 s | 6.16 s | 7.38 s | 22.84 s | 10.70 tokens/s | 4.14 GiB | 26/36 | 5/36 |
+| One CPU under 6 GiB | 7.86 s | 17.93 s | 16.51 s | 23.30 s | 6.40 tokens/s | 4.13 GiB | 36/36 | 9/36 |
+| One CPU under 2 GiB | 0.51 s to mapping failure | — | — | — | — | — | — | — |
+
+Ten four-CPU requests reached the 30-second client timeout. The p50 and p95 columns include successful responses. The shared cgroup recorded memory-limit reclaim events during the sweep and its OOM-kill count stayed at zero. The one-CPU profile produced three distinct strict matches. It proposed a task for all three multi-action clarification inputs and a workout log for all three literal-input clarification examples. These outcomes keep the reviewed capture gate necessary. [Raw 4B sweep](benchmark-results/local-inference-epyc-qwen4b-20261124.json)
+
+```sh
+curl -fL https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/bc640142c66e1fdd12af0bd68f40445458f3869b/Qwen3-4B-Q4_K_M.gguf -o "$easy_bench_dir/Qwen3-4B-Q4_K_M.gguf"
+python3 tool/benchmark/local_inference.py \
+  --server "$easy_bench_dir/llama-b12657/llama-server" \
+  --model "$easy_bench_dir/Qwen3-4B-Q4_K_M.gguf" \
+  --model-sha256 7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5 \
+  --disable-thinking --profile one-cpu-2048mib --profile available-cpu \
+  --profile one-cpu-6144mib --output "$easy_bench_dir/qwen4b-results.json"
+```
+
+## Offline speech pilot
+
+For speech, stage the MIT-licensed whisper.cpp b5907 Linux x86-64 CPU archive with SHA-256 `a6199027fe5b4239c84171d2bca4c0ff44ec86a515494d5a39b237b212d429bd`. The MIT model repository at revision `5359861c739e955e79d9a303bcbc70fb988958b1` supplies English `ggml-tiny.en.bin` at SHA-256 `921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f` and `ggml-base.en.bin` at SHA-256 `a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002`. Use synthetic local speech from at least two eSpeak NG voices, with fixed 16 kHz mono PCM fixtures. Include clean recordings and seeded noise, and reuse the same WAV files for each model and profile. [whisper.cpp b5907 release](https://github.com/ggml-org/whisper.cpp/releases/tag/b5907) · [Model files](https://huggingface.co/ggerganov/whisper.cpp/tree/5359861c739e955e79d9a303bcbc70fb988958b1) · [OpenAI Whisper license](https://github.com/openai/whisper/blob/main/LICENSE)
+
+Measure transcript word error rate alongside the accuracy of names, times, durations and workout metrics. Record process startup, inference wall time, audio duration, real-time factor and peak RSS for one and four CPUs. Apply the same review requirement to typed, model-proposed and transcribed records. Show the interpreted fields for correction, and require explicit confirmation before any write. This is an experiment plan. Measurements and device support remain to be established.

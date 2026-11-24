@@ -4,6 +4,7 @@
 import argparse
 from datetime import datetime, timezone
 import hashlib
+from itertools import cycle
 import json
 import math
 import os
@@ -27,7 +28,9 @@ FIELDS = ("kind", "focus", "title", "schedule")
 PROFILES = {
     "available-cpu": (4, None),
     "one-cpu-1536mib": (1, 1536),
+    "one-cpu-2048mib": (1, 2048),
     "one-cpu-2560mib": (1, 2560),
+    "one-cpu-6144mib": (1, 6144),
     "one-cpu-1gib": (1, 1024),
     "one-cpu-384mib": (1, 384),
 }
@@ -216,6 +219,44 @@ def summarise(results):
     }
 
 
+def run_soak(process, port, token, cases, args, progress):
+    started = time.monotonic()
+    deadline = started + args.soak_seconds
+    samples = []
+    results = []
+    next_sample = started
+    for case in cycle(cases):
+        now = time.monotonic()
+        if now >= deadline or process.poll() is not None:
+            break
+        if now >= next_sample:
+            sample = {
+                "elapsed_seconds": round(now - started, 2),
+                **memory_details(process.pid),
+            }
+            samples.append(sample)
+            if progress is not None:
+                progress.write(json.dumps({"memory_kib": sample}) + "\n")
+            next_sample = now + 60
+            print(f"soak: {sample['elapsed_seconds']:.0f}s, {len(results)} requests", flush=True)
+        record = run_case(port, token, case, args)
+        record["completed_seconds"] = round(time.monotonic() - started, 2)
+        results.append(record)
+        if progress is not None:
+            progress.write(json.dumps({"request": record}) + "\n")
+
+    elapsed = time.monotonic() - started
+    return {
+        "target_seconds": args.soak_seconds,
+        "elapsed_seconds": round(elapsed, 2),
+        "server_alive_after_run": process.poll() is None,
+        "reached_target": elapsed >= args.soak_seconds,
+        "process_memory_samples_kib": samples,
+        "summary": summarise(results),
+        "requests": results,
+    }
+
+
 def run_profile(label, cpus, cases, args):
     cpu_count, memory_mib = PROFILES[label]
     selected = cpus[:cpu_count]
@@ -237,6 +278,8 @@ def run_profile(label, cpus, cases, args):
             "--ubatch-size", "128", "--n-gpu-layers", "0", "--no-warmup",
             "--cache-ram", "0", "--no-webui", "--no-webui-mcp-proxy",
         ])
+        if args.disable_thinking:
+            command.extend(["--chat-template-kwargs", '{"enable_thinking":false}'])
         with tempfile.TemporaryFile(mode="w+t") as server_log:
             started = time.monotonic()
             with subprocess.Popen(
@@ -259,6 +302,15 @@ def run_profile(label, cpus, cases, args):
                             memory_kib=memory_details(process.pid),
                         )
                         result["warm_summary"] = summarise(result["warm"])
+                        if args.soak_seconds:
+                            if args.soak_progress is None:
+                                result["soak"] = run_soak(process, port, token, cases, args, None)
+                            else:
+                                with args.soak_progress.open("x", buffering=1) as progress:
+                                    result["soak"] = run_soak(
+                                        process, port, token, cases, args, progress,
+                                    )
+                            result["memory_kib"] = memory_details(process.pid)
                 finally:
                     if process.poll() is None:
                         process.terminate()
@@ -295,10 +347,28 @@ def main():
     parser.add_argument("--max-tokens", type=int, default=96)
     parser.add_argument("--startup-timeout", type=float, default=45)
     parser.add_argument("--request-timeout", type=float, default=30)
+    parser.add_argument(
+        "--soak-seconds", type=float, default=0,
+        help="keep sending sequential cases for this long after the warm corpus",
+    )
+    parser.add_argument(
+        "--soak-progress", type=Path,
+        help="new JSONL file with incremental samples and requests for interrupted soaks",
+    )
+    parser.add_argument(
+        "--disable-thinking", action="store_true",
+        help="set enable_thinking=false in the model chat template",
+    )
     args = parser.parse_args()
     positive = (args.warm_rounds, args.max_tokens, args.startup_timeout, args.request_timeout)
     if not all(value > 0 for value in positive):
         parser.error("rounds, max tokens and timeouts must be positive")
+    if not math.isfinite(args.soak_seconds) or args.soak_seconds < 0:
+        parser.error("soak duration must be finite and non-negative")
+    if args.soak_seconds and (not args.profile or len(args.profile) != 1):
+        parser.error("a soak needs one explicitly selected profile")
+    if args.soak_progress and not args.soak_seconds:
+        parser.error("soak progress output needs a positive soak duration")
     args.server = args.server.resolve()
     args.model = args.model.resolve()
     digest = sha256(args.model)
@@ -325,6 +395,8 @@ def main():
             "warm_rounds": args.warm_rounds,
             "context_tokens": 512,
             "max_tokens": args.max_tokens,
+            "thinking_disabled": args.disable_thinking,
+            "soak_seconds": args.soak_seconds,
             "system_prompt": SYSTEM_PROMPT,
         },
         "profiles": [
