@@ -63,6 +63,7 @@ import 'mobile_home.dart';
 import 'notes/note_preview.dart';
 import 'nutrition/meal_vision_review.dart';
 import 'nutrition/nutrition.dart';
+import 'onboarding/workspace_setup.dart';
 import 'orbit_navigation.dart';
 import 'preferences/feature_preferences.dart';
 import 'preferences/feature_preferences_page.dart';
@@ -113,6 +114,7 @@ part 'workspace_manual_plan.dart';
 part 'workspace_task_context.dart';
 part 'workspace_apple_updates.dart';
 part 'workspace_activity_actions.dart';
+part 'workspace_onboarding.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -454,9 +456,11 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _loadFailed = false;
     });
     _refreshCalendarViews();
-    _queueReminderSync(data, force: true);
+    if (!_requiresWorkspaceSetup) _queueReminderSync(data, force: true);
     if (!_allows(EasyFeature.ai)) _ai?.setForeground(false);
-    if (!kIsWeb && identical(widget.openStore, openWorkspaceStore)) {
+    if (!_requiresWorkspaceSetup &&
+        !kIsWeb &&
+        identical(widget.openStore, openWorkspaceStore)) {
       if (_allows(EasyFeature.ai)) unawaited(_prepareAi());
     }
   }
@@ -467,10 +471,23 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _legacyPreferences.getStringList(_gymStorageKey),
       _legacyPreferences.getStringList(_workoutPlansKey),
     ).wait;
+    final nativeEntry = identical(widget.openStore, openWorkspaceStore);
+    final fallback = nativeEntry
+        ? WorkspaceData(
+            events: [],
+            tasks: [],
+            notes: [],
+            sections: {
+              if (workspace == null && gym == null && plans == null)
+                _workspaceSetupKey: _workspaceSetupPending,
+            },
+          )
+        : WorkspaceData.samples(_today);
     return WorkspaceSnapshot(
-      workspaceJson: workspace ?? WorkspaceData.samples(_today).encode(),
+      workspaceJson: workspace ?? fallback.encode(),
       gymSessionJson: gym ?? [],
-      workoutPlanJson: plans ?? [_sampleWorkoutPlan(_today).encode()],
+      workoutPlanJson:
+          plans ?? (nativeEntry ? [] : [_sampleWorkoutPlan(_today).encode()]),
     );
   }
 
@@ -2396,22 +2413,25 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     WorkspaceData updated, {
     String? operationId,
     List<GymSession>? sessions,
+    List<WorkoutPlan>? plans,
   }) {
     if (_reviewSaving) {
       return Future.error(StateError('A reviewed change is being saved.'));
     }
     final previousSessions = _gymSessions;
+    final previousPlans = _workoutPlans;
     setState(() => _reviewSaving = true);
     final operation = _pendingSave.then((_) async {
       try {
         if (!mounted ||
             !identical(_data, previous) ||
-            (sessions != null && !identical(_gymSessions, previousSessions))) {
+            (sessions != null && !identical(_gymSessions, previousSessions)) ||
+            (plans != null && !identical(_workoutPlans, previousPlans))) {
           throw StateError('The workspace changed after review.');
         }
         final workspace = updated.encode();
         final WorkspaceMutation mutation;
-        if (sessions == null) {
+        if (sessions == null && plans == null) {
           mutation = WorkspaceMutation.workspace(workspace);
         } else {
           final state = await _store!.read();
@@ -2421,10 +2441,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           mutation = WorkspaceMutation.replace(
             WorkspaceSnapshot(
               workspaceJson: workspace,
-              gymSessionJson: [
-                for (final session in sessions) session.encode(),
-              ],
-              workoutPlanJson: state.snapshot.workoutPlanJson,
+              gymSessionJson: sessions == null
+                  ? state.snapshot.gymSessionJson
+                  : [for (final session in sessions) session.encode()],
+              workoutPlanJson: plans == null
+                  ? state.snapshot.workoutPlanJson
+                  : [for (final plan in plans) plan.encode()],
             ),
           );
         }
@@ -2435,6 +2457,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           setState(() {
             _assignData(updated);
             if (sessions != null) _gymSessions = List.unmodifiable(sessions);
+            if (plans != null) _workoutPlans = List.unmodifiable(plans);
           });
         }
       } finally {
@@ -4154,6 +4177,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                 )
               : const CircularProgressIndicator(),
         ),
+      );
+    }
+    if (_requiresWorkspaceSetup) {
+      return WorkspaceSetupPage(
+        appName: appName,
+        onChosen: _finishWorkspaceSetup,
       );
     }
 
