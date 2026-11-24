@@ -234,30 +234,6 @@ extension _WorkspaceAutomation on _WorkspaceState {
     );
   }
 
-  void _persistWorkoutWithAutomation() {
-    final workspace = _data;
-    final sessions = _gymSessions!;
-    final workspaceJson = workspace.encode();
-    final sessionJson = [for (final session in sessions) session.encode()];
-    _queueSave(() async {
-      final saved = await _store!.read();
-      await _saveMutation(
-        WorkspaceMutation.replace(
-          WorkspaceSnapshot(
-            workspaceJson: workspaceJson,
-            gymSessionJson: sessionJson,
-            workoutPlanJson: saved.snapshot.workoutPlanJson,
-          ),
-        ),
-      );
-      _savedWorkspace = workspace;
-      _savedGymSessions = sessions;
-      _queueReminderSync(workspace);
-      _queueAutomationCalendarCheck();
-      _queueTodayFit();
-    }, _persistWorkoutWithAutomation);
-  }
-
   ReviewData _readReviewData(WorkspaceData workspace) {
     final raw = workspace.sections[_reviewsKey];
     return raw == null

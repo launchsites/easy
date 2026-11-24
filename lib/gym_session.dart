@@ -313,6 +313,7 @@ class GymSessionPage extends StatefulWidget {
     required this.session,
     required this.onChanged,
     this.previousSessions = const [],
+    this.onFinish,
     this.buildCaptureControl,
     super.key,
   });
@@ -320,6 +321,10 @@ class GymSessionPage extends StatefulWidget {
   final GymSession? session;
   final ValueChanged<GymSession?> onChanged;
   final List<GymSession> previousSessions;
+
+  /// Persists a finished session before its summary replaces the live logger.
+  final Future<void> Function(GymSession previous, GymSession finished)?
+  onFinish;
 
   /// Builds a compact capture control for a live workout. Report a reviewed
   /// session through the callback after the caller has persisted it.
@@ -375,6 +380,8 @@ class _GymSessionPageState extends State<GymSessionPage> {
   String? _error;
   WorkoutWeightUnit _weightUnit = WorkoutWeightUnit.kilograms;
   bool _selectedWeightUnit = false;
+  bool _finishing = false;
+  bool _finishFailed = false;
 
   bool get _editing =>
       _editingEntry != null ||
@@ -463,6 +470,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
   }
 
   Future<void> _finish() async {
+    if (_finishing || !_active) return;
     final session = _session!;
     final initialEdit =
         _metricInitial ??
@@ -470,30 +478,51 @@ class _GymSessionPageState extends State<GymSessionPage> {
         _editingEntry?.title ??
         _editingExercise?.target;
     final pending = _input.text.trim();
-    if (_extraDraft.isNotEmpty ||
-        (pending.isNotEmpty && pending != initialEdit)) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Discard draft and finish?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Keep logging'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Finish'),
-            ),
-          ],
-        ),
-      );
-      if (!mounted || confirmed != true) return;
+    setState(() {
+      _finishing = true;
+      _finishFailed = false;
+    });
+    try {
+      if (_extraDraft.isNotEmpty ||
+          (pending.isNotEmpty && pending != initialEdit)) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Discard draft and finish?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Keep logging'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Finish'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted || confirmed != true || !identical(_session, session)) {
+          return;
+        }
+      }
+      final finished = session._finish(DateTime.now());
+      final save = widget.onFinish;
+      if (save != null) {
+        try {
+          await save(session, finished);
+        } on Object {
+          if (mounted) setState(() => _finishFailed = true);
+          return;
+        }
+      }
+      if (!mounted) return;
+      _focus.unfocus();
+      _cancelEdit();
+      _input.clear();
+      _update(finished, notify: save == null);
+    } finally {
+      if (mounted) setState(() => _finishing = false);
     }
-    _focus.unfocus();
-    _cancelEdit();
-    _input.clear();
-    _update(session._finish(DateTime.now()));
   }
 
   void _logExercise(_Exercise exercise, String actual) {
@@ -599,7 +628,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
   }
 
   void _submit() {
-    if (!_active) return;
+    if (_finishing || !_active) return;
     final value = _input.text.trim();
     if (value.isEmpty) {
       setState(() => _error = _editing ? 'Enter a result.' : 'Enter an entry.');
@@ -1825,15 +1854,38 @@ class _GymSessionPageState extends State<GymSessionPage> {
   @override
   Widget build(BuildContext context) {
     final session = _session;
-    final width = MediaQuery.sizeOf(context).width;
+    final size = MediaQuery.sizeOf(context);
+    final width = size.width;
     final side = width < 360 ? 16.0 : (width < 600 ? 20.0 : 30.0);
+    final roomForError =
+        size.height - MediaQuery.viewInsetsOf(context).bottom >= 240;
+    const failure = 'The workout could not be saved.';
+    final error = _active && _finishFailed
+        ? Semantics(
+            liveRegion: true,
+            label: failure,
+            excludeSemantics: true,
+            child: Text(
+              roomForError ? failure : 'Save failed',
+              maxLines: roomForError ? 2 : 1,
+              overflow: TextOverflow.ellipsis,
+              style: contentMetadataStyle.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          )
+        : null;
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          session?.structured == true ? session!.workoutTitle : 'Gym session',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: error != null && !roomForError
+            ? error
+            : Text(
+                session?.structured == true
+                    ? session!.workoutTitle
+                    : 'Gym session',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
         titleTextStyle: contentTitleStyle.copyWith(
           fontSize: 19,
           fontWeight: FontWeight.w700,
@@ -1854,7 +1906,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
             Padding(
               padding: EdgeInsetsDirectional.only(end: side - 6),
               child: TextButton(
-                onPressed: _finish,
+                onPressed: _finishing ? null : _finish,
                 style: TextButton.styleFrom(
                   minimumSize: const Size(58, 44),
                   backgroundColor: softAccent,
@@ -1870,11 +1922,25 @@ class _GymSessionPageState extends State<GymSessionPage> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 620),
-            child: Column(
-              children: [
-                Expanded(child: _sessionList(session, side)),
-                if (_active) _inputBar(side),
-              ],
+            child: ExcludeFocus(
+              excluding: _finishing,
+              child: IgnorePointer(
+                ignoring: _finishing,
+                child: Column(
+                  children: [
+                    if (error != null && roomForError)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(side, 6, side, 2),
+                          child: error,
+                        ),
+                      ),
+                    Expanded(child: _sessionList(session, side)),
+                    if (_active) _inputBar(side),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

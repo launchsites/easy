@@ -2643,6 +2643,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             session: session,
             previousSessions: sessions,
             onChanged: _saveGymSession,
+            onFinish: _completeGymSession,
             buildCaptureControl: (onReviewed) =>
                 _gymCaptureControl(session.startedAt, onReviewed),
           ),
@@ -2801,7 +2802,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   void _saveGymSession(GymSession? session) {
-    if (session == null || !mounted) return;
+    if (session == null || session.finished || !mounted) return;
     final sessions = _gymSessions!;
     final index = sessions.indexWhere(
       (value) => value.startedAt.isAtSameMomentAs(session.startedAt),
@@ -2810,22 +2811,29 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (index == -1) {
       updated.add(session);
     } else {
+      if (sessions[index].finished) return;
       updated[index] = session;
     }
-    final workout = index >= 0 && sessions[index].finished
-        ? null
-        : automationForWorkout(session);
-    final revised = _withAutomationEvents(_data, [?workout]);
-    final addedDraft = !identical(revised, _data);
-    setState(() {
-      _gymSessions = updated;
-      if (addedDraft) _assignData(revised);
-    });
-    if (addedDraft) {
-      _persistWorkoutWithAutomation();
-    } else {
-      _persistGymSessions();
+    setState(() => _gymSessions = updated);
+    _persistGymSessions();
+  }
+
+  Future<void> _completeGymSession(GymSession previous, GymSession finished) {
+    final sessions = _gymSessions;
+    final latest = sessions?.lastOrNull;
+    if (!mounted ||
+        sessions == null ||
+        !identical(latest, previous) ||
+        previous.finished ||
+        !finished.finished) {
+      return Future.error(StateError('The live workout changed.'));
     }
+    final workspace = _data;
+    return _commitReviewedData(
+      workspace,
+      _withAutomationEvents(workspace, [?automationForWorkout(finished)]),
+      sessions: [...sessions.take(sessions.length - 1), finished],
+    );
   }
 
   void _persistGymSessions() {
