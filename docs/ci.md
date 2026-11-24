@@ -10,6 +10,8 @@ Select **Launch Easy on an iPhone simulator and capture first-run setup** to als
 
 **Android emulator smoke** is a separate manual workflow on GitHub’s Ubuntu 24.04 x64 runner. It validates KVM, builds and checks a development-signed, non-debuggable release APK, and launches it on a disposable Android 36 AOSP emulator. The emulator’s root shell reads copies of the app’s private SQLite database and write-ahead log for the same empty setup verification. The workflow saves `easy-android-setup` for seven days. [Android workflow](../.github/workflows/android-smoke.yml) · [Hardware acceleration](https://github.blog/changelog/2024-04-02-github-actions-hardware-accelerated-android-virtualization-now-available/) · [Android smoke script](../tool/benchmark/android_emulator_smoke.py)
 
+Select **Replay a synthetic saved meal photo through two cold starts** to exercise the image picker's saved-result recovery on that emulator after first-launch setup. The check uses a generated one-pixel image and verifies one local meal draft, the attachment checksum, and an unchanged revision on duplicate replay. [Meal recovery script](../tool/benchmark/android_meal_recovery_smoke.py)
+
 The workflows request read-only repository contents and use GitHub's checkout action at its exact release commit. Builds stay in the runner workspace. Flutter comes directly from its upstream repository. [Checkout v6.0.2](https://github.com/actions/checkout/releases/tag/v6.0.2) · [Flutter 3.50.1](https://github.com/flutter/flutter/releases/tag/3.50.1)
 
 | Hosted check | Revision | Result |

@@ -2,6 +2,7 @@
 """Run a development release on a disposable AOSP phone and verify first launch."""
 
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -96,8 +97,9 @@ def check_app_launch(adb, emulator, apk, package, screenshot, snapshot):
     launchers = [line.strip() for line in resolved if line.strip().startswith(f"{package}/")]
     if len(launchers) != 1:
         raise RuntimeError("Android did not resolve one launcher for the installed release.")
+    launcher = launchers[0]
     adb_run(adb, "shell", "input", "keyevent", "82")
-    adb_run(adb, "shell", "am", "start", "-W", "-n", launchers[0], timeout=45)
+    adb_run(adb, "shell", "am", "start", "-W", "-n", launcher, timeout=45)
 
     remote = f"/data/user/0/{package}/files/easy/workspace.sqlite3"
     wait_on_device(
@@ -115,9 +117,10 @@ def check_app_launch(adb, emulator, apk, package, screenshot, snapshot):
         raise RuntimeError("The emulator did not return a PNG screenshot.")
     screenshot.parent.mkdir(parents=True, exist_ok=True)
     screenshot.write_bytes(pixels)
+    return launcher
 
 
-def run_probe(sdk, apk, screenshot, scratch):
+def run_probe(sdk, apk, screenshot, scratch, *, meal_recovery_replay=False):
     tools = sdk / "cmdline-tools" / "latest" / "bin"
     adb = sdk / "platform-tools" / "adb"
     package = subprocess.check_output(
@@ -146,7 +149,12 @@ def run_probe(sdk, apk, screenshot, scratch):
         ], env=environment, stdout=log, stderr=subprocess.STDOUT)
         try:
             root_test_device(adb, emulator)
-            check_app_launch(adb, emulator, apk, package, screenshot, scratch / "workspace.sqlite3")
+            launcher = check_app_launch(adb, emulator, apk, package, screenshot, scratch / "workspace.sqlite3")
+            if meal_recovery_replay:
+                from android_meal_recovery_smoke import check_meal_recovery
+
+                report = check_meal_recovery(adb, emulator, package, launcher, scratch)
+                print(json.dumps(report, sort_keys=True), flush=True)
         except (OSError, RuntimeError, subprocess.SubprocessError):
             print("\n".join(log_path.read_text(errors="replace").splitlines()[-40:]), flush=True)
             raise
@@ -164,9 +172,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("apk", type=Path)
     parser.add_argument("screenshot", type=Path)
+    parser.add_argument("--meal-recovery-replay", action="store_true")
     arguments = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="easy-android-smoke.") as location:
         run_probe(
             Path(os.environ["ANDROID_HOME"]).resolve(), arguments.apk.resolve(),
             arguments.screenshot.resolve(), Path(location),
+            meal_recovery_replay=arguments.meal_recovery_replay,
         )
