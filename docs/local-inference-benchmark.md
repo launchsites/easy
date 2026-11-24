@@ -306,6 +306,34 @@ python3 tool/benchmark/provider_estimate_local.py \
   --cpu 4 --address-space-mib 1536 --compare-ranges --output /tmp/easy-estimate-range-qwen05.json
 ```
 
+#### Qwen3-4B on one hosted CPU
+
+A second paired run used the same 12 synthetic tasks and the production provider at `5c4bd854f21d864a7eb352b29acfb95358c8e8f8`. A GitHub-hosted `ubuntu-24.04` runner pinned llama.cpp b12657 to one Intel Xeon 6975P-C logical CPU with a 6 GiB server address-space limit and Qwen3-4B Q4_K_M thinking disabled. Both variants used the same timing evidence, a 160-token output cap and a 30-second client deadline. Inference used loopback and made zero paid requests.
+
+| Request | Accepted points | Points within tolerance | Valid ranges | Ranges covering holdout | Client median |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Point only | 11/12 | 9/12 | — | — | 10.54 s |
+| Optional range | 10/12 | 9/12 | 10/12 | 9/10 | 21.52 s |
+
+The same nine tasks met point tolerance in both variants. Optional ranges took about twice as long at the median, including rejected replies. Point-only requests returned one invalid reply and range requests returned two. Neither variant timed out. Peak server RSS was 5.05 GiB and peak virtual memory was 5.76 GiB. The earlier profiles used another host, model family and resource settings, so this run measures the hosted 4B profile as a whole.
+
+Check out `5c4bd854f21d864a7eb352b29acfb95358c8e8f8` in a clean worktree and use Flutter 3.50.1. Use the verified llama.cpp b12657 runtime and Qwen3-4B model from the reproduction instructions above, with `easy_bench_dir` pointing to their directory. The launcher seeds generation at 42 and validates the model checksum.
+
+```sh
+flutter pub get --enforce-lockfile
+dart compile exe tool/benchmark/provider_estimate_bench.dart -o /tmp/easy-estimate-range
+cpu=$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')
+python3 tool/benchmark/provider_estimate_local.py \
+  --server "$easy_bench_dir/llama-b12657/llama-server" \
+  --model "$easy_bench_dir/Qwen3-4B-Q4_K_M.gguf" \
+  --model-sha256 7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5 \
+  --client /tmp/easy-estimate-range --source-revision 5c4bd854f21d864a7eb352b29acfb95358c8e8f8 \
+  --cpu "$cpu" --address-space-mib 6144 --disable-thinking --compare-ranges \
+  --output /tmp/easy-estimate-range-qwen4b.json
+```
+
+The raw JSON SHA-256 is `25bfa0bf027ff9ddd537d9575064d9121be2bb4cf0e1ddb98c397e041dfa56dc`. The Actions archive expires on 1 December 2026. [Pinned workflow](https://github.com/launchsites/easy/blob/9f6a7f081a90dccee05514fac0cf300ba5229531/.github/workflows/qwen3-duration-proof.yml) · [Job log](https://github.com/launchsites/easy/actions/runs/45348836172/job/138289920085) · [Raw JSON archive](https://github.com/launchsites/easy/actions/runs/45348836172/artifacts/14899731951)
+
 ### Native estimate review control
 
 A verified Linux release at `6f18fe9` configured the Local route through Settings in a private X11 session. Declining the first manual estimate disclosure produced zero requests. Approving the disclosure made one unauthenticated loopback request containing the synthetic task title and request identity fields. The mock replied with a 35-minute point using the four-field protocol. The dialog showed title-only provenance and saved the estimate to workspace SQLite after **Use estimate**.
