@@ -28,8 +28,9 @@ extension _WorkspaceActivityActions on _WorkspaceState {
     final event = _searchableEvents()
         .where((item) => item.id == record.id)
         .firstOrNull;
-    if (event == null || event.allDay || !event.end.isAfter(event.start))
+    if (event == null || event.allDay || !event.end.isAfter(event.start)) {
       return null;
+    }
     final selected = ActivityWindow(event.start, event.end);
     final first = event.initialPlannedStart;
     final last = event.initialPlannedEnd;
@@ -49,8 +50,11 @@ extension _WorkspaceActivityActions on _WorkspaceState {
   }
 
   Future<void> _openActualActivity(Object record) async {
-    if (_reviewSaving || _activityActionOpen || !_allows(EasyFeature.activity))
+    if (_reviewSaving ||
+        _activityActionOpen ||
+        !_allows(EasyFeature.activity)) {
       return;
+    }
     final target = _actualTarget(record);
     if (target == null) return;
     _activityActionOpen = true;
@@ -119,8 +123,9 @@ extension _WorkspaceActivityActions on _WorkspaceState {
   }
 
   Future<void> _removeFutureBlocks(TaskItem task) async {
-    if (!_canRemoveFutureBlocks(task) || _reviewSaving || _futureRemovalOpen)
+    if (!_canRemoveFutureBlocks(task) || _reviewSaving || _futureRemovalOpen) {
       return;
+    }
     _futureRemovalOpen = true;
     try {
       final review = FutureBlockRemovalReview.prepare(
@@ -137,8 +142,9 @@ extension _WorkspaceActivityActions on _WorkspaceState {
         context,
         review: review,
       );
-      if (!mounted || approval == null || !_allows(EasyFeature.planning))
+      if (!mounted || approval == null || !_allows(EasyFeature.planning)) {
         return;
+      }
       final current = _workspaceTasks
           .where((item) => item.id == task.id)
           .firstOrNull;
