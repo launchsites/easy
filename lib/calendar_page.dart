@@ -328,14 +328,15 @@ class _CalendarPageState extends State<CalendarPage> {
   }) {
     final multiDay = days.length > 1;
     final daysEvents = days.map(_eventsOn).toList();
+    final axes = [for (final day in days) _DayAxis(day, elapsed: !multiDay)];
     final placements = [
       for (var index = 0; index < days.length; index++)
-        _placeEvents(daysEvents[index], days[index]),
+        _placeEvents(daysEvents[index], axes[index]),
     ];
     final ruler = _TimelineRuler(
       placements.expand((day) => day),
       multiDay ? 57 : _dayHourHeight,
-      fullDay: !multiDay,
+      fullDay: multiDay ? null : axes.single,
     );
     final hourColumn = multiDay ? 62.0 : 50.0;
     final localizations = MaterialLocalizations.of(context);
@@ -403,18 +404,21 @@ class _CalendarPageState extends State<CalendarPage> {
                   height: ruler.height,
                   child: Stack(
                     children: [
-                      for (
-                        var hour = ruler.firstHour;
-                        hour < ruler.lastHour;
-                        hour++
-                      )
+                      for (final mark in ruler.marks)
                         Positioned(
                           left: 0,
                           right: multiDay ? 10 : 8,
-                          top: ruler.offset(hour * 60) + 5,
+                          top: ruler.offset(mark.minute) + 5,
                           child: Text(
-                            _time(context, TimeOfDay(hour: hour, minute: 0)),
+                            mark.repeatedAt == null
+                                ? _time(context, mark.time)
+                                : '${_time(context, mark.time)}\n${mark.repeatedAt!.timeZoneName}',
+                            semanticsLabel: mark.repeatedAt == null
+                                ? null
+                                : '${_time(context, mark.time)}, '
+                                      '${_utcOffset(mark.repeatedAt!.timeZoneOffset)}',
                             textAlign: TextAlign.right,
+                            maxLines: mark.repeatedAt == null ? null : 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: colors.muted,
@@ -433,7 +437,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     child: _timelineColumn(
                       context,
                       colors,
-                      day: days[i],
+                      axis: axes[i],
                       placements: placements[i],
                       ruler: ruler,
                       now: now,
@@ -486,16 +490,16 @@ class _CalendarPageState extends State<CalendarPage> {
   Widget _timelineColumn(
     BuildContext context,
     _CalendarColors colors, {
-    required DateTime day,
+    required _DayAxis axis,
     required List<_TimelinePlacement> placements,
     required _TimelineRuler ruler,
     required DateTime now,
     required bool compact,
   }) {
     const topInset = 2.0;
-    final nowOffset = ruler.offset(now.hour * 60 + now.minute);
+    final nowOffset = ruler.offset(axis.position(now));
     final showNow =
-        DateUtils.isSameDay(day, now) &&
+        DateUtils.isSameDay(axis.date, now) &&
         nowOffset >= 0 &&
         nowOffset < ruler.height;
     return Container(
@@ -509,11 +513,11 @@ class _CalendarPageState extends State<CalendarPage> {
           return Stack(
             clipBehavior: Clip.hardEdge,
             children: [
-              for (var hour = ruler.firstHour; hour < ruler.lastHour; hour++)
+              for (final mark in ruler.marks)
                 Positioned(
                   left: 0,
                   right: 0,
-                  top: ruler.offset(hour * 60),
+                  top: ruler.offset(mark.minute),
                   child: Divider(height: 1, thickness: 1, color: colors.line),
                 ),
               for (final placement in placements)
@@ -566,7 +570,7 @@ class _CalendarPageState extends State<CalendarPage> {
     required bool compact,
   }) {
     final tone = colors.event(event);
-    final time = _eventTime(context, event);
+    final (time, accessibleTime) = _eventTime(context, event);
     final radius = BorderRadius.circular(7);
     final textScaler = MediaQuery.textScalerOf(context);
     final titleSize = compact ? 11.0 : 13.5;
@@ -574,7 +578,7 @@ class _CalendarPageState extends State<CalendarPage> {
     final twoLineHeight =
         5 + (textScaler.scale(titleSize) + textScaler.scale(timeSize)) * 1.35;
     return Tooltip(
-      message: '${event.title}, $time',
+      message: '${event.title}, $accessibleTime',
       child: Material(
         color: tone.fill,
         borderRadius: radius,
@@ -692,7 +696,7 @@ class _ContinuousDayTimelineState extends State<_ContinuousDayTimeline> {
   @override
   void initState() {
     super.initState();
-    _positionAt(widget.date, _initialMinute(widget.date));
+    _positionAt(widget.date, _initialClock(widget.date));
   }
 
   @override
@@ -701,10 +705,10 @@ class _ContinuousDayTimelineState extends State<_ContinuousDayTimeline> {
     if (widget.date == oldWidget.date || widget.date == _visibleDay) return;
 
     final relative = _dateOffset(widget.date, _visibleDay).abs() == 1;
-    final minute = relative ? _visibleMinute() : _initialMinute(widget.date);
+    final clock = relative ? _visibleClock() : _initialClock(widget.date);
     final previous = _controller;
     previous.removeListener(_onScroll);
-    _positionAt(widget.date, minute);
+    _positionAt(widget.date, clock);
     WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
   }
 
@@ -714,17 +718,18 @@ class _ContinuousDayTimelineState extends State<_ContinuousDayTimeline> {
     super.dispose();
   }
 
-  _TimelineRuler _ruler(DateTime date) => _TimelineRuler(
-    _placeEvents(widget.eventsOn(date), date),
+  _TimelineRuler _ruler(_DayAxis axis) => _TimelineRuler(
+    _placeEvents(widget.eventsOn(axis.date), axis),
     _dayHourHeight,
-    fullDay: true,
+    fullDay: axis,
   );
 
-  void _positionAt(DateTime date, int minute) {
+  void _positionAt(DateTime date, _WallClock clock) {
     _anchor = _visibleDay = date;
     _keys.clear();
     _placing = true;
-    final rulerOffset = _ruler(date).offset(minute);
+    final axis = _DayAxis(date, elapsed: true);
+    final rulerOffset = _ruler(axis).offset(axis.positionOfClock(clock));
     final controller = ScrollController(
       initialScrollOffset: 36 + rulerOffset,
       keepScrollOffset: false,
@@ -743,20 +748,24 @@ class _ContinuousDayTimelineState extends State<_ContinuousDayTimeline> {
     });
   }
 
-  int _initialMinute(DateTime date) {
+  _WallClock _initialClock(DateTime date) {
     final now = DateTime.now();
-    return DateUtils.isSameDay(date, now) && now.hour >= 8 && now.hour <= 20
+    final minute =
+        DateUtils.isSameDay(date, now) && now.hour >= 8 && now.hour <= 20
         ? (now.hour - 1) * 60
         : 8 * 60;
+    return (minute: minute, offset: now.timeZoneOffset);
   }
 
-  int _visibleMinute() {
+  _WallClock _visibleClock() {
     final viewport = _topOf(_viewportKey);
     final timeline = _topOf(_keys[_dateOffset(_visibleDay, _anchor)]?.timeline);
     if (viewport == null || timeline == null) {
-      return _initialMinute(_visibleDay);
+      return _initialClock(_visibleDay);
     }
-    return _ruler(_visibleDay).minuteAtOffset(viewport - timeline);
+    final axis = _DayAxis(_visibleDay, elapsed: true);
+    final position = _ruler(axis).minuteAtOffset(viewport - timeline);
+    return axis.clockAt(position);
   }
 
   void _onScroll() {
@@ -846,11 +855,21 @@ class _ContinuousDayTimelineState extends State<_ContinuousDayTimeline> {
   }
 }
 
-String _eventTime(BuildContext context, CalendarEvent event) {
-  if (event.allDay) return 'All day';
-  final start = _time(context, TimeOfDay.fromDateTime(event.start.toLocal()));
-  final end = _time(context, TimeOfDay.fromDateTime(event.end.toLocal()));
-  return '$start–$end';
+(String, String) _eventTime(BuildContext context, CalendarEvent event) {
+  final start = event.start.toLocal();
+  final end = event.end.toLocal();
+  final from = _time(context, TimeOfDay.fromDateTime(start));
+  final until = _time(context, TimeOfDay.fromDateTime(end));
+  if (start.timeZoneOffset == end.timeZoneOffset &&
+      !_repeatedClockTime(start) &&
+      !_repeatedClockTime(end)) {
+    return ('$from–$until', '$from–$until');
+  }
+  return (
+    '$from ${start.timeZoneName}–$until ${end.timeZoneName}',
+    '$from ${_utcOffset(start.timeZoneOffset)} – '
+        '$until ${_utcOffset(end.timeZoneOffset)}',
+  );
 }
 
 String _time(BuildContext context, TimeOfDay time) =>
@@ -859,26 +878,165 @@ String _time(BuildContext context, TimeOfDay time) =>
       alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
     );
 
-int _minuteOnDay(DateTime time, DateTime day) {
-  if (time.isBefore(day)) return 0;
-  if (!time.isBefore(DateUtils.addDaysToDate(day, 1))) return 24 * 60;
-  final local = time.toLocal();
-  return local.hour * 60 + local.minute;
+String _utcOffset(Duration offset) {
+  final sign = offset.isNegative ? '−' : '+';
+  final absolute = offset.abs();
+  final hours = absolute.inHours.toString().padLeft(2, '0');
+  final minutes = (absolute.inMinutes % 60).toString().padLeft(2, '0');
+  return 'UTC$sign$hours:$minutes';
 }
+
+bool _repeatedClockTime(DateTime time) {
+  final axis = _DayAxis(DateUtils.dateOnly(time), elapsed: true);
+  final shift = axis.startOffset - axis.endOffset;
+  if (shift <= Duration.zero) return false;
+  final other = time.add(
+    time.timeZoneOffset == axis.startOffset ? shift : -shift,
+  );
+  return DateUtils.isSameDay(time, other) &&
+      time.hour == other.hour &&
+      time.minute == other.minute;
+}
+
+typedef _WallClock = ({int minute, Duration? offset});
+typedef _TimelineMark = ({int minute, TimeOfDay time, DateTime? repeatedAt});
+
+class _DayAxis {
+  _DayAxis(this.date, {required this.elapsed})
+    : end = DateUtils.addDaysToDate(date, 1);
+
+  final DateTime date;
+  final DateTime end;
+  final bool elapsed;
+  static const _civilMinutes = 24 * 60;
+
+  late final Duration startOffset = date.timeZoneOffset;
+  late final Duration endOffset = end
+      .subtract(const Duration(microseconds: 1))
+      .timeZoneOffset;
+  late final int actualMinutes = end.difference(date).inMinutes;
+  late final int minutes = elapsed ? actualMinutes : _civilMinutes;
+
+  DateTime _instant(int minute) => date.add(Duration(minutes: minute));
+
+  int position(DateTime time) {
+    if (time.isBefore(date)) return 0;
+    if (!time.isBefore(end)) return minutes;
+    if (elapsed) return time.difference(date).inMinutes;
+    final local = time.toLocal();
+    return local.hour * 60 + local.minute;
+  }
+
+  _WallClock clockAt(int minute) {
+    if (minute >= minutes) return (minute: _civilMinutes, offset: null);
+    final local = _instant(minute);
+    return (
+      minute: local.hour * 60 + local.minute,
+      offset: local.timeZoneOffset,
+    );
+  }
+
+  int positionOfClock(_WallClock clock) {
+    if (clock.minute >= _civilMinutes) return minutes;
+    if (clock.offset case final preferred?) {
+      final instant = _wallWithOffset(clock.minute, preferred);
+      if (instant.timeZoneOffset == preferred) return position(instant);
+    }
+    return position(DateTime(date.year, date.month, date.day, 0, clock.minute));
+  }
+
+  DateTime _wallWithOffset(int minute, Duration offset) => DateTime.utc(
+    date.year,
+    date.month,
+    date.day,
+    0,
+    minute,
+  ).subtract(offset).toLocal();
+
+  List<_TimelineMark> marks() {
+    final first = startOffset;
+    final last = endOffset;
+    if (first == last && actualMinutes == _civilMinutes) {
+      return [for (var hour = 0; hour < 24; hour++) _hourMark(hour)];
+    }
+
+    final offsets = {first, last};
+    final instants = {0: date};
+    for (var hour = 0; hour < 24; hour++) {
+      for (final offset in offsets) {
+        final candidate = _wallWithOffset(hour * 60, offset);
+        if (candidate.timeZoneOffset == offset &&
+            !candidate.isBefore(date) &&
+            candidate.isBefore(end)) {
+          instants[position(candidate)] = candidate;
+        }
+      }
+    }
+    if (first != last) {
+      // Include the boundary even when the new clock starts on a half hour.
+      var low = 0;
+      var high = minutes;
+      while (low < high) {
+        final mid = (low + high) ~/ 2;
+        if (_instant(mid).timeZoneOffset == first) {
+          low = mid + 1;
+        } else {
+          high = mid;
+        }
+      }
+      if (low < minutes) instants[low] = _instant(low);
+    }
+
+    final sorted = instants.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    final counts = <TimeOfDay, int>{};
+    for (final instant in instants.values) {
+      final time = TimeOfDay.fromDateTime(instant);
+      counts.update(time, (count) => count + 1, ifAbsent: () => 1);
+    }
+    return sorted.map((entry) {
+      final time = TimeOfDay.fromDateTime(entry.value);
+      return (
+        minute: entry.key,
+        time: time,
+        repeatedAt: counts[time]! > 1 ? entry.value : null,
+      );
+    }).toList();
+  }
+}
+
+_TimelineMark _hourMark(int hour) => (
+  minute: hour * 60,
+  time: TimeOfDay(hour: hour, minute: 0),
+  repeatedAt: null,
+);
 
 List<_TimelinePlacement> _placeEvents(
   List<CalendarEvent> events,
-  DateTime day,
+  _DayAxis axis,
 ) {
+  final spans = [
+    for (final (order, event) in events.indexed)
+      if (!event.allDay)
+        (event: event, start: axis.position(event.start), order: order),
+  ];
+  if (!axis.elapsed && axis.startOffset > axis.endOffset) {
+    // A civil week column can have a later instant with an earlier clock time.
+    spans.sort((a, b) {
+      final comparison = a.start.compareTo(b.start);
+      return comparison == 0 ? a.order.compareTo(b.order) : comparison;
+    });
+  }
   final placements = <_TimelinePlacement>[];
   final lanes = <int>[];
   var groupStart = 0;
   var groupEnd = 0;
-  for (final event in events.where((event) => !event.allDay)) {
-    final start = _minuteOnDay(event.start, day);
+  for (final span in spans) {
+    final event = span.event;
+    final start = span.start;
     final end = math.min(
-      1440,
-      math.max(start + 1, _minuteOnDay(event.end, day)),
+      axis.minutes,
+      math.max(start + 1, axis.position(event.end)),
     );
     if (groupEnd <= start) {
       for (var index = groupStart; index < placements.length; index++) {
@@ -918,21 +1076,28 @@ class _TimelineRuler {
   _TimelineRuler(
     Iterable<_TimelinePlacement> events,
     this.hourHeight, {
-    bool fullDay = false,
+    _DayAxis? fullDay,
   }) {
-    firstHour = fullDay
-        ? 0
-        : events.fold(8, (hour, event) => math.min(hour, event.start ~/ 60));
-    lastHour = fullDay
-        ? 24
-        : events.fold(
-            19,
-            (hour, event) => math.max(hour, (event.end / 60).ceil()),
-          );
+    final int endMinute;
+    if (fullDay != null) {
+      marks = fullDay.marks();
+      endMinute = fullDay.minutes;
+    } else {
+      final firstHour = events.fold(
+        8,
+        (hour, event) => math.min(hour, event.start ~/ 60),
+      );
+      final lastHour = events.fold(
+        19,
+        (hour, event) => math.max(hour, (event.end / 60).ceil()),
+      );
+      marks = [
+        for (var hour = firstHour; hour < lastHour; hour++) _hourMark(hour),
+      ];
+      endMinute = lastHour * 60;
+    }
     final eventStartsByEnd = <int, List<int>>{};
-    final minutes = {
-      for (var hour = firstHour; hour <= lastHour; hour++) hour * 60,
-    };
+    final minutes = {for (final mark in marks) mark.minute, endMinute};
     for (final event in events) {
       minutes.addAll([event.start, event.end]);
       eventStartsByEnd.putIfAbsent(event.end, () => []).add(event.start);
@@ -952,8 +1117,7 @@ class _TimelineRuler {
   }
 
   final double hourHeight;
-  late final int firstHour;
-  late final int lastHour;
+  late final List<_TimelineMark> marks;
   late final List<int> _minutes;
   final _offsets = <int, double>{};
 

@@ -242,6 +242,248 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Trip'), findsNothing);
   });
+
+  final eastern =
+      DateTime.utc(2026, 3, 8, 6).toLocal().timeZoneOffset ==
+          const Duration(hours: -5) &&
+      DateTime.utc(2026, 3, 8, 7).toLocal().timeZoneOffset ==
+          const Duration(hours: -4) &&
+      DateTime.utc(2026, 11, 1, 5).toLocal().timeZoneOffset ==
+          const Duration(hours: -4) &&
+      DateTime.utc(2026, 11, 1, 6).toLocal().timeZoneOffset ==
+          const Duration(hours: -5);
+  for (final (date, nextDay, start, hours, expectedRange) in [
+    (
+      DateTime(2026, 3, 8),
+      DateTime(2026, 3, 9),
+      DateTime.utc(2026, 3, 8, 6, 55),
+      23,
+      '1:55 AM UTC−05:00 – 3:54 AM UTC−04:00',
+    ),
+    (
+      DateTime(2026, 11, 1),
+      DateTime(2026, 11, 2),
+      DateTime.utc(2026, 11, 1, 5, 55),
+      25,
+      '1:55 AM UTC−04:00 – 1:54 AM UTC−05:00',
+    ),
+  ]) {
+    testWidgets(
+      '$hours-hour mobile day keeps elapsed geometry and civil swipe position',
+      (tester) async {
+        expect(nextDay.difference(date), Duration(hours: hours));
+        final across = _eventAt('Across the change', start, 59);
+        final guide = _event('Same duration', date, 4, 0, 59);
+        final morning = _event('Transition morning', date, 9, 30, 59);
+        final nextMorning = _event('Following morning', nextDay, 9, 30, 59);
+        final endOfDay = _event('Before midnight', date, 23, 20, 35);
+        final afterMidnight = _event('After midnight', nextDay, 0, 45, 35);
+        final selected = await _mountCalendar(
+          tester,
+          width: 320,
+          textScale: 2,
+          date: date,
+          events: [
+            across,
+            guide,
+            morning,
+            nextMorning,
+            endOfDay,
+            afterMidnight,
+          ],
+        );
+        await tester.pumpAndSettle();
+
+        final morningPosition = tester.getTopLeft(find.text(morning.title)).dy;
+        await tester.dragFrom(const Offset(260, 300), const Offset(-175, 0));
+        await tester.pumpAndSettle();
+        expect(selected.value, nextDay);
+        expect(
+          tester.getTopLeft(find.text(nextMorning.title)).dy,
+          closeTo(morningPosition, 2),
+        );
+        await tester.dragFrom(const Offset(60, 300), const Offset(175, 0));
+        await tester.pumpAndSettle();
+        expect(selected.value, date);
+        expect(
+          tester.getTopLeft(find.text(morning.title)).dy,
+          closeTo(morningPosition, 2),
+        );
+
+        final scrollBack = hours == 23 ? 335.0 : 440.0;
+        await _wheel(tester, -scrollBack);
+        expect(selected.value, date);
+        final span = find.byTooltip('${across.title}, $expectedRange');
+        expect(span, findsOneWidget);
+        final minuteHeight = (tester.getSize(span).height + 4) / 59;
+        final daySurface = find
+            .ancestor(of: span, matching: find.byType(Material))
+            .first;
+        expect(
+          tester.getSize(daySurface).height,
+          closeTo(hours * 60 * minuteHeight, .5),
+        );
+        expect(
+          tester.getSize(span).height,
+          closeTo(tester.getSize(_card(guide.title)).height, .5),
+        );
+        if (hours == 23) {
+          expect(find.text('2:00 AM').hitTestable(), findsNothing);
+        } else {
+          expect(find.text('1:00 AM\nEDT').hitTestable(), findsOneWidget);
+          expect(find.text('1:00 AM\nEST').hitTestable(), findsOneWidget);
+        }
+        for (final label in [
+          'Day',
+          'Week',
+          'Month',
+          'Today',
+          'Previous day',
+          'Next day',
+          'M',
+          'T',
+          'W',
+          'F',
+          'S',
+        ]) {
+          expect(find.text(label), findsNothing);
+        }
+
+        await _wheel(tester, 760 + scrollBack);
+        expect(selected.value, date);
+        expect(find.text(endOfDay.title).hitTestable(), findsOneWidget);
+        await tester.timedDragFrom(
+          const Offset(170, 748),
+          const Offset(0, -145),
+          const Duration(milliseconds: 750),
+        );
+        await tester.pumpAndSettle();
+        expect(selected.value, nextDay);
+        expect(find.text(afterMidnight.title).hitTestable(), findsOneWidget);
+        await _wheel(tester, -140);
+        expect(selected.value, date);
+        expect(tester.takeException(), isNull);
+      },
+      skip: !eastern,
+    );
+  }
+
+  testWidgets('a mobile swipe lands on the matching repeated offset', (
+    tester,
+  ) async {
+    final sunday = DateTime(2026, 11, 1);
+    final monday = DateTime(2026, 11, 2);
+    final first = _eventAt(
+      'First occurrence',
+      DateTime.utc(2026, 11, 1, 5, 30),
+      35,
+    );
+    final second = _eventAt(
+      'Second occurrence',
+      DateTime.utc(2026, 11, 1, 6, 30),
+      35,
+    );
+    final following = _event('Monday appointment', monday, 1, 30, 35);
+    final selected = await _mountCalendar(
+      tester,
+      width: 390,
+      date: monday,
+      events: [first, second, following],
+    );
+    await tester.pumpAndSettle();
+    await _wheel(tester, -350);
+    final top = tester.getTopLeft(_card(following.title)).dy;
+
+    await tester.dragFrom(const Offset(62, 295), const Offset(178, 0));
+    await tester.pumpAndSettle();
+
+    expect(selected.value, sunday);
+    expect(find.text(first.title).hitTestable(), findsNothing);
+    expect(find.text(second.title).hitTestable(), findsOneWidget);
+    expect(tester.getTopLeft(_card(second.title)).dy, closeTo(top, 2));
+  }, skip: !eastern);
+
+  testWidgets('wide week keeps local clock alignment across the fold', (
+    tester,
+  ) async {
+    final foldDay = DateTime(2026, 11, 1);
+    final weekDay = DateTime(2026, 10, 31);
+    final repeated = _eventAt(
+      'First 1:30',
+      DateTime.utc(2026, 11, 1, 5, 30),
+      45,
+    );
+    final second = _eventAt(
+      'Second 1:30',
+      DateTime.utc(2026, 11, 1, 6, 30),
+      45,
+    );
+    final across = _eventAt(
+      'Across the fold',
+      DateTime.utc(2026, 11, 1, 5, 55),
+      59,
+    );
+    final prior = _event('Saturday eight', weekDay, 8, 0, 45);
+    final current = _event('Sunday eight', foldDay, 8, 0, 45);
+    await _mountCalendar(
+      tester,
+      width: 1600,
+      date: foldDay,
+      events: [repeated, second, across, prior, current],
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('1:00 AM'), findsOneWidget);
+    expect(
+      find.byTooltip('Across the fold, 1:55 AM UTC−04:00 – 1:54 AM UTC−05:00'),
+      findsOneWidget,
+    );
+    expect(
+      tester.getTopLeft(_card(prior.title)).dy,
+      closeTo(tester.getTopLeft(_card(current.title)).dy, .5),
+    );
+    expect(
+      tester
+          .getRect(_card(repeated.title))
+          .overlaps(tester.getRect(_card(second.title))),
+      isFalse,
+    );
+    expect(tester.takeException(), isNull);
+  }, skip: !eastern);
+
+  final halfHourDate = DateTime(2026, 4, 5);
+  final halfHourEnd = DateTime(2026, 4, 6);
+  testWidgets(
+    'half-hour rollback uses its real change point on mobile',
+    (tester) async {
+      final cross = _eventAt(
+        'Half-hour change',
+        DateTime.utc(2026, 4, 4, 14, 55),
+        59,
+      );
+      final guide = _event('Same duration', halfHourDate, 4, 0, 59);
+      await _mountCalendar(
+        tester,
+        width: 390,
+        date: halfHourDate,
+        events: [cross, guide],
+      );
+      await tester.pumpAndSettle();
+      await _wheel(tester, -400);
+      expect(find.text('1:30 AM').hitTestable(), findsOneWidget);
+      expect(find.text('2:00 AM').hitTestable(), findsOneWidget);
+      final span = find.byTooltip(
+        'Half-hour change, 1:55 AM UTC+11:00 – 2:24 AM UTC+10:30',
+      );
+      expect(span, findsOneWidget);
+      expect(
+        tester.getSize(span).height,
+        closeTo(tester.getSize(_card(guide.title)).height, .5),
+      );
+    },
+    skip:
+        halfHourEnd.difference(halfHourDate) !=
+        const Duration(hours: 24, minutes: 30),
+  );
 }
 
 CalendarEvent _event(
@@ -252,13 +494,29 @@ CalendarEvent _event(
   int duration,
 ) {
   final start = DateTime(day.year, day.month, day.day, hour, minute);
-  return CalendarEvent(
-    id: title,
-    title: title,
-    start: start,
-    end: start.add(Duration(minutes: duration)),
-    category: 'work',
+  return _eventAt(title, start, duration);
+}
+
+CalendarEvent _eventAt(String title, DateTime start, int duration) =>
+    CalendarEvent(
+      id: title,
+      title: title,
+      start: start,
+      end: start.add(Duration(minutes: duration)),
+      category: 'work',
+    );
+
+Finder _card(String label) =>
+    find.ancestor(of: find.text(label), matching: find.byType(Tooltip)).first;
+
+Future<void> _wheel(WidgetTester tester, double distance) async {
+  await tester.sendEventToBinding(
+    PointerScrollEvent(
+      position: const Offset(170, 410),
+      scrollDelta: Offset(0, distance),
+    ),
   );
+  await tester.pumpAndSettle();
 }
 
 Future<ValueNotifier<DateTime>> _mountCalendar(
