@@ -818,6 +818,144 @@ void main() {
       expect(rejected.failure, AiProviderFailure.invalidResponse);
     },
   );
+
+  test(
+    'estimate ranges preserve the fenced point reply and submitted basis',
+    () async {
+      const range = {'lowerMinutes': 30, 'upperMinutes': 60};
+      final cases = <(String, bool, Map<String, Object?>, bool)>[
+        ('valid range', true, {'range': range}, true),
+        ('legacy reply', true, {}, true),
+        ('unrequested range', false, {'range': range}, false),
+        ('null range', true, {'range': null}, false),
+        (
+          'zero lower',
+          true,
+          {
+            'range': {'lowerMinutes': 0, 'upperMinutes': 60},
+          },
+          false,
+        ),
+        (
+          'equal bounds',
+          true,
+          {
+            'range': {'lowerMinutes': 45, 'upperMinutes': 45},
+          },
+          false,
+        ),
+        (
+          'reversed range',
+          true,
+          {
+            'range': {'lowerMinutes': 60, 'upperMinutes': 30},
+          },
+          false,
+        ),
+        (
+          'point too short',
+          true,
+          {
+            'range': {'lowerMinutes': 46, 'upperMinutes': 60},
+          },
+          false,
+        ),
+        (
+          'point too long',
+          true,
+          {
+            'range': {'lowerMinutes': 30, 'upperMinutes': 44},
+          },
+          false,
+        ),
+        (
+          'longer than a day',
+          true,
+          {
+            'range': {'lowerMinutes': 30, 'upperMinutes': 1441},
+          },
+          false,
+        ),
+        (
+          'floating bounds',
+          true,
+          {
+            'range': {'lowerMinutes': 30.0, 'upperMinutes': 60},
+          },
+          false,
+        ),
+        (
+          'extra field in range',
+          true,
+          {
+            'range': {...range, 'why': 'extra text'},
+          },
+          false,
+        ),
+        (
+          'fabricated basis',
+          true,
+          {'range': range, 'disclosedDurations': 32},
+          false,
+        ),
+        (
+          'replayed ID',
+          true,
+          {'range': range, 'captureId': 'earlier-request'},
+          false,
+        ),
+        (
+          'replayed revision',
+          true,
+          {'range': range, 'contextRevision': 0},
+          false,
+        ),
+      ];
+      for (final (label, includeRange, extras, valid) in cases) {
+        final fixture = _Fixture();
+        final config = _local(allowEstimates: true);
+        final provider = fixture.provider((request) async {
+          final body = jsonDecode((request as http.Request).body) as Map;
+          final messages = body['messages'] as List;
+          final system = (messages.first as Map)['content'] as String;
+          expect(system.contains('lowerMinutes'), includeRange);
+          final payload =
+              jsonDecode((messages.last as Map)['content'] as String) as Map;
+          expect(payload['sampleDurationsMinutes'], [35, 55]);
+          expect(payload.containsKey('range'), false);
+          return _completion({
+            'captureId': fixture.input.id,
+            'sourceRevision': fixture.input.revision,
+            'contextRevision': fixture.input.context.revision,
+            'minutes': 45,
+            ...extras,
+          });
+        });
+        final result = await provider.estimate(
+          config: config,
+          claim: fixture.claim(config, work: AiWorkKind.discretionary),
+          input: AiEstimateInput(
+            title: 'Draft the brief',
+            sampleDurationsMinutes: [35, 55],
+          ),
+          currentRevision: fixture.currentRevision,
+          includeRange: includeRange,
+        );
+        expect(result.succeeded, valid, reason: label);
+        if (valid) {
+          expect(result.value!.duration.inMinutes, 45);
+          expect(result.value!.details.disclosedDurations, 2);
+          expect(result.value!.details.range?.toJson(), extras['range']);
+        } else {
+          expect(
+            result.failure,
+            AiProviderFailure.invalidResponse,
+            reason: label,
+          );
+        }
+      }
+    },
+  );
 }
 
 const _fakeKey = 'test-only-key';
@@ -988,7 +1126,7 @@ Map<String, Object> _captureOutput(CaptureInput input) => {
 };
 
 http.StreamedResponse _completion(
-  Map<String, Object> output, {
+  Map<String, Object?> output, {
   int? input,
   int? outputTokens,
 }) {

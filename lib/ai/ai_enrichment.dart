@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../task_context/task_context_models.dart';
 import 'ai_budget.dart';
 import 'ai_runtime_settings.dart';
+import 'duration_estimate_details.dart';
 import 'inference_jobs.dart';
 
 class AiEnrichmentCandidate {
@@ -40,6 +41,7 @@ class AiPendingEstimate {
     required this.durationMinutes,
     required this.route,
     required this.createdAt,
+    this.details,
   });
 
   final String taskId;
@@ -48,6 +50,7 @@ class AiPendingEstimate {
   final int durationMinutes;
   final AiRoute route;
   final DateTime createdAt;
+  final AiEstimateDetails? details;
   Duration get duration => Duration(minutes: durationMinutes);
   bool get requiresReview => true;
 
@@ -62,16 +65,19 @@ class AiPendingEstimate {
     'durationMinutes': durationMinutes,
     'route': route.name,
     'createdAt': createdAt.toIso8601String(),
+    if (details case final value?) 'details': value.toJson(),
   };
 
   factory AiPendingEstimate.fromJson(Map<String, dynamic> data) {
+    final minutes = data['durationMinutes'] as int;
     final estimate = AiPendingEstimate(
       taskId: data['taskId'] as String,
       sourceRevision: data['sourceRevision'] as int,
       contextRevision: data['contextRevision'] as int,
-      durationMinutes: data['durationMinutes'] as int,
+      durationMinutes: minutes,
       route: AiRoute.values.byName(data['route'] as String),
       createdAt: DateTime.parse(data['createdAt'] as String),
+      details: AiEstimateDetails.tryParse(data['details'], minutes),
     );
     if (estimate.taskId.trim().isEmpty ||
         estimate.sourceRevision < 0 ||
@@ -85,7 +91,7 @@ class AiPendingEstimate {
   }
 }
 
-/// Durable scheduling stamps and proposals. They contain no title or samples.
+/// Durable scheduling stamps and proposals store numeric review details only.
 class AiEnrichmentState {
   AiEnrichmentState({
     this.lastMinute,

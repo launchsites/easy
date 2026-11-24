@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:easy/ai/ai_budget.dart';
 import 'package:easy/ai/ai_runtime.dart';
 import 'package:easy/ai/ai_settings_page.dart';
+import 'package:easy/ai/task_estimates_page.dart';
 import 'package:easy/capture/capture_interpreter.dart';
 import 'package:easy/task_context/task_context.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -686,6 +687,280 @@ void main() {
     expect(restored.pendingEstimates, hasLength(1));
   });
 
+  test(
+    'a paid estimate range keeps the same disclosed fields and reservation',
+    () async {
+      final source = _capture();
+      final input = AiEstimateInput(
+        title: 'Draft the brief',
+        sampleDurationsMinutes: [11, 22],
+      );
+      var plainRequestBytes = 0;
+      for (final (outputTokens, tightlyBoundInput, rangeExpected) in [
+        (100, false, false),
+        (128, true, false),
+        (128, false, true),
+      ]) {
+        final store = _Store();
+        final inputTokens = tightlyBoundInput ? plainRequestBytes : 8192;
+        final maximum = inputTokens + 2 * outputTokens;
+        var sends = 0;
+        late final AiRuntime runtime;
+        runtime = store.runtime(
+          send: (request) async {
+            sends++;
+            expect(runtime.budget.reservedMicros, maximum);
+            final body = jsonDecode((request as http.Request).body) as Map;
+            final system =
+                ((body['messages'] as List).first as Map)['content'] as String;
+            expect(system.contains('lowerMinutes'), rangeExpected);
+            expect(body['max_completion_tokens'], outputTokens);
+            if (outputTokens == 100) {
+              plainRequestBytes = request.bodyBytes.length;
+            }
+            final payload = _userPayload(request);
+            expect(payload.keys.toSet(), {
+              'captureId',
+              'sourceRevision',
+              'contextRevision',
+              'title',
+            });
+            return _estimateAnswer(
+              payload,
+              range: rangeExpected ? _exampleRange : null,
+            );
+          },
+        );
+        addTearDown(runtime.dispose);
+        expect(
+          await runtime.saveSettings(
+            _paid(
+              allowEstimates: true,
+              maxInputTokens: inputTokens,
+              maxOutputTokens: outputTokens,
+            ),
+            apiKey: _testKey,
+          ),
+          AiSettingsSaveStatus.saved,
+        );
+
+        final result = await runtime.runEstimate(
+          source: source,
+          input: input,
+          currentRevision: _revision,
+          authorize: (preview) async {
+            expect(preview.reserveMicros, maximum);
+            expect(preview.fields.keys.toSet(), {
+              'captureId',
+              'sourceRevision',
+              'contextRevision',
+              'title',
+            });
+            return true;
+          },
+        );
+
+        expect(result.status, AiRunStatus.ready);
+        expect(result.value!.duration.inMinutes, 35);
+        expect(
+          result.value!.uncertainty,
+          rangeExpected
+              ? 'Model range 20–55 min\nModel received the task title only.'
+              : 'Model received the task title only.',
+        );
+        expect(sends, 1);
+        expect(runtime.budget.reservedMicros, 0);
+        expect(runtime.budget.chargedMicros, maximum);
+        expect(runtime.pendingEstimates, isEmpty);
+      }
+    },
+  );
+
+  test(
+    'paid background ranges require adaptive consent and sustainable headroom',
+    () async {
+      for (final (cap, adaptive, rangeExpected) in [
+        (1000000, false, false),
+        (100000, true, false),
+        (1000000, true, true),
+      ]) {
+        final store = _Store();
+        var sends = 0;
+        final runtime = store.runtime(
+          send: (request) async {
+            sends++;
+            final body = jsonDecode((request as http.Request).body) as Map;
+            final system =
+                ((body['messages'] as List).first as Map)['content'] as String;
+            expect(system.contains('lowerMinutes'), rangeExpected);
+            return _estimateAnswer(
+              _userPayload(request),
+              range: rangeExpected ? _exampleRange : null,
+            );
+          },
+        );
+        addTearDown(runtime.dispose);
+        await runtime.saveSettings(
+          _paid(cap: cap, automatic: true, adaptive: adaptive),
+          apiKey: _testKey,
+          authorizeAutomatic: (_) async => true,
+        );
+        final candidate = _candidate('private-workspace-id-range');
+        final result = await runtime.runAutomaticEstimate(
+          candidate: candidate,
+          currentRevision: _candidateRevision,
+        );
+        expect(result.status, AiRunStatus.ready, reason: '$cap $adaptive');
+        expect(sends, 1);
+        expect(runtime.pendingEstimates.single.details!.disclosedDurations, 0);
+        expect(
+          runtime.pendingEstimates.single.details!.range?.toJson(),
+          rangeExpected ? _exampleRange : null,
+        );
+        expect(runtime.budget.chargedMicros, 9216);
+        expect(runtime.budget.reservedMicros, 0);
+      }
+    },
+  );
+
+  test(
+    'local range review survives reopen and older records keep their point',
+    () async {
+      final store = _Store();
+      final runtime = store.runtime(
+        send: (request) async {
+          final payload = _userPayload(request);
+          expect(payload['sampleDurationsMinutes'], [20, 40]);
+          return _estimateAnswer(payload, range: _exampleRange);
+        },
+      );
+      addTearDown(runtime.dispose);
+      await runtime.saveSettings(
+        _automaticLocal(metadata: true, adaptive: true),
+        authorizeAutomatic: (_) async => true,
+      );
+      final result = await runtime.runAutomaticEstimate(
+        candidate: _candidate('private-workspace-id-range'),
+        currentRevision: _candidateRevision,
+      );
+      expect(result.status, AiRunStatus.ready);
+      expect(runtime.budget.chargedMicros, 0);
+      expect(store.state!.value, isNot(contains('Draft reviewed estimate')));
+      expect(store.state!.value, isNot(contains('sampleDurationsMinutes')));
+      final restored = store.runtime();
+      addTearDown(restored.dispose);
+      expect(await restored.load(), true);
+      final pending = restored
+          .currentPendingEstimates(_candidateRevision)
+          .single;
+      expect(
+        pending.details!.reviewDescription,
+        'Model range 20–55 min\nModel received the task title and 2 recorded durations.',
+      );
+      expect(restored.currentPendingEstimates((_) => null), isEmpty);
+
+      final beforeRanges = pending.toJson()..remove('details');
+      final legacy = AiPendingEstimate.fromJson(beforeRanges);
+      expect(legacy.durationMinutes, 35);
+      expect(legacy.details, isNull);
+      expect(legacy.isCurrent(_candidateRevision), true);
+      final damagedRange = AiPendingEstimate.fromJson({
+        ...beforeRanges,
+        'details': {
+          'disclosedDurations': 2,
+          'range': {'lowerMinutes': 36, 'upperMinutes': 40},
+        },
+      });
+      expect(damagedRange.durationMinutes, 35);
+      expect(damagedRange.details!.range, isNull);
+    },
+  );
+
+  test(
+    'context changing in flight keeps the returned range out of review',
+    () async {
+      final store = _Store();
+      final started = Completer<Map<String, dynamic>>();
+      final reply = Completer<http.StreamedResponse>();
+      final runtime = store.runtime(
+        send: (request) {
+          started.complete(_userPayload(request));
+          return reply.future;
+        },
+      );
+      addTearDown(runtime.dispose);
+      await runtime.saveSettings(
+        _automaticLocal(adaptive: true),
+        authorizeAutomatic: (_) async => true,
+      );
+      final candidate = _candidate('private-workspace-id-range');
+      var revision = candidate.revision;
+      final running = runtime.runAutomaticEstimate(
+        candidate: candidate,
+        currentRevision: (_) => revision,
+      );
+      final payload = await started.future;
+      revision = (
+        sourceRevision: candidate.sourceRevision,
+        contextRevision: candidate.contextRevision + 1,
+      );
+      reply.complete(_estimateAnswer(payload, range: _exampleRange));
+
+      final result = await running;
+      expect(result.status, AiRunStatus.stale);
+      expect(runtime.pendingEstimates, isEmpty);
+      expect(store.state!.value, isNot(contains('lowerMinutes')));
+    },
+  );
+
+  testWidgets('range and review controls fit a narrow phone with large text', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 460);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final runtime = _Store().runtime();
+    addTearDown(runtime.dispose);
+    final item = TaskEstimateReviewItem(
+      estimate: AiPendingEstimate.fromJson({
+        'taskId': 'task',
+        'sourceRevision': 2,
+        'contextRevision': 4,
+        'durationMinutes': 35,
+        'route': 'api',
+        'createdAt': _clock().toIso8601String(),
+        'details': {'disclosedDurations': 2, 'range': _exampleRange},
+      }),
+      title: 'Draft a project brief for the next planning session',
+    );
+    AiPendingEstimate? accepted;
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(2)),
+          child: child!,
+        ),
+        home: TaskEstimatesPage(
+          runtime: runtime,
+          readItems: () => [item],
+          onAccept: (estimate) async => accepted = estimate,
+        ),
+      ),
+    );
+    expect(find.textContaining('Model range 20–55 min'), findsOneWidget);
+    expect(accepted, isNull);
+    final useEstimate = find.text('Use estimate');
+    await tester.scrollUntilVisible(useEstimate, 90);
+    await tester.ensureVisible(useEstimate);
+    await tester.pumpAndSettle();
+    await tester.tap(useEstimate);
+    await tester.pumpAndSettle();
+    expect(accepted, same(item.estimate));
+    expect(tester.takeException(), isNull);
+  });
+
   test('a paid forecast at the cap stops automatic work', () async {
     final store = _Store();
     final source = _capture();
@@ -807,20 +1082,37 @@ void main() {
     await tester.scrollUntilVisible(automatic, 120, scrollable: outerScroll);
     await tester.tap(automatic);
     await tester.pumpAndSettle();
+    final adaptive = find.widgetWithText(
+      SwitchListTile,
+      'Group estimates while active',
+    );
+    await tester.scrollUntilVisible(adaptive, 120, scrollable: outerScroll);
+    await tester.ensureVisible(adaptive);
+    await tester.pumpAndSettle();
+    await tester.tap(adaptive);
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(save, 120, scrollable: outerScroll);
     await tester.tap(save);
     await tester.pumpAndSettle();
     expect(find.text('Enable automatic estimates?'), findsOneWidget);
     expect(find.text('Task title and temporary request ID'), findsOneWidget);
+    expect(
+      find.text(
+        'At least 20 minutes between estimates, up to six a day while Easy is active.',
+      ),
+      findsOneWidget,
+    );
     expect(runtime.settings.automaticEstimates, false);
     await tester.tap(find.widgetWithText(FilledButton, 'Enable'));
     await tester.pumpAndSettle();
     expect(runtime.settings.automaticEstimates, true);
+    expect(runtime.settings.adaptiveEstimatePacing, true);
     expect(tester.takeException(), isNull);
   });
 }
 
 const _testKey = 'synthetic-key-for-tests';
+const _exampleRange = {'lowerMinutes': 20, 'upperMinutes': 55};
 
 DateTime _clock() => DateTime.utc(2026, 11, 24);
 
@@ -843,6 +1135,10 @@ AiRuntimeSettings _paid({
   String model = 'text-fixture',
   int cap = 1000000,
   bool automatic = false,
+  bool adaptive = false,
+  bool allowEstimates = false,
+  int maxInputTokens = 8192,
+  int maxOutputTokens = 512,
 }) => AiRuntimeSettings(
   route: AiRoute.api,
   apiBaseUrl: endpoint,
@@ -850,15 +1146,22 @@ AiRuntimeSettings _paid({
   monthlyCapMicros: cap,
   inputMicrosPerMillion: 1000000,
   outputMicrosPerMillion: 2000000,
-  allowEstimates: automatic,
+  maxInputTokens: maxInputTokens,
+  maxOutputTokens: maxOutputTokens,
+  allowEstimates: automatic || allowEstimates,
   automaticEstimates: automatic,
+  adaptiveEstimatePacing: adaptive,
 );
 
-AiRuntimeSettings _automaticLocal({bool metadata = false}) => AiRuntimeSettings(
+AiRuntimeSettings _automaticLocal({
+  bool metadata = false,
+  bool adaptive = false,
+}) => AiRuntimeSettings(
   route: AiRoute.local,
   localModel: 'test-local',
   allowEstimates: true,
   automaticEstimates: true,
+  adaptiveEstimatePacing: adaptive,
   includeOptionalMetadata: metadata,
 );
 
@@ -951,25 +1254,28 @@ Map<String, dynamic> _userPayload(http.BaseRequest request) {
   return jsonDecode(userMessage['content'] as String) as Map<String, dynamic>;
 }
 
-http.StreamedResponse _estimateAnswer(Map<String, dynamic> payload) =>
-    http.StreamedResponse(
-      Stream.value(
-        utf8.encode(
-          jsonEncode({
-            'choices': [
-              {
-                'message': {
-                  'content': jsonEncode({
-                    'captureId': payload['captureId'],
-                    'sourceRevision': payload['sourceRevision'],
-                    'contextRevision': payload['contextRevision'],
-                    'minutes': 35,
-                  }),
-                },
-              },
-            ],
-          }),
-        ),
-      ),
-      200,
-    );
+http.StreamedResponse _estimateAnswer(
+  Map<String, dynamic> payload, {
+  Map<String, int>? range,
+}) => http.StreamedResponse(
+  Stream.value(
+    utf8.encode(
+      jsonEncode({
+        'choices': [
+          {
+            'message': {
+              'content': jsonEncode({
+                'captureId': payload['captureId'],
+                'sourceRevision': payload['sourceRevision'],
+                'contextRevision': payload['contextRevision'],
+                'minutes': 35,
+                'range': ?range,
+              }),
+            },
+          },
+        ],
+      }),
+    ),
+  ),
+  200,
+);

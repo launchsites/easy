@@ -417,7 +417,7 @@ class AiRuntime extends ChangeNotifier {
       routeBlock: (_) => captureEnrichmentChoices(input).isEmpty
           ? 'Review the captured items on this device.'
           : null,
-      execute: (config, claim, settings) => _provider.capture(
+      execute: (config, claim, settings, _) => _provider.capture(
         config: config,
         claim: claim,
         input: input,
@@ -448,15 +448,16 @@ class AiRuntime extends ChangeNotifier {
     routeBlock: (_) => input.title.trim().isEmpty
         ? 'Enter a title to estimate its duration.'
         : null,
-    execute: (config, claim, settings) => _provider.estimate(
+    execute: (config, claim, settings, includeRange) => _provider.estimate(
       config: config,
       claim: claim,
       input: _estimateInput(input, settings),
       currentRevision: currentRevision,
+      includeRange: includeRange,
     ),
     convert: (estimate) => AiDurationReview._(
       duration: estimate.duration,
-      uncertainty: 'Provider estimate for review.',
+      uncertainty: estimate.details.reviewDescription,
     ),
   );
 
@@ -487,7 +488,7 @@ class AiRuntime extends ChangeNotifier {
       routeBlock: (settings) => settings.allowMealVision
           ? null
           : 'Enable meal photo suggestions in AI settings.',
-      execute: (config, claim, settings) => _provider.mealVision(
+      execute: (config, claim, settings, _) => _provider.mealVision(
         config: config,
         claim: claim,
         requestId: requestId,
@@ -541,11 +542,12 @@ class AiRuntime extends ChangeNotifier {
         contextRevision: 0,
       ),
       routeBlock: (_) => null,
-      execute: (config, claim, settings) => _provider.estimate(
+      execute: (config, claim, settings, includeRange) => _provider.estimate(
         config: config,
         claim: claim,
         input: _estimateInput(input, settings),
         currentRevision: live,
+        includeRange: includeRange,
       ),
       convert: (estimate) => AiPendingEstimate(
         taskId: candidate.taskId,
@@ -554,6 +556,7 @@ class AiRuntime extends ChangeNotifier {
         durationMinutes: estimate.duration.inMinutes,
         route: settings.route,
         createdAt: _clock(),
+        details: estimate.details,
       ),
       persistReview: (estimate) => _writeLane(() async {
         if (!_foreground || _cancelRequested || !_current(source, live)) {
@@ -593,6 +596,7 @@ class AiRuntime extends ChangeNotifier {
       AiProviderConfig config,
       AiInferenceClaim claim,
       AiRuntimeSettings settings,
+      bool includeEstimateRange,
     )
     execute,
     required T Function(P result) convert,
@@ -660,8 +664,21 @@ class AiRuntime extends ChangeNotifier {
         return localReview(message);
       }
       final fields = payload(activeSettings);
+      final includeEstimateRange =
+          discretionary &&
+          config.maxOutputTokens >= _minimumDetailedEstimateOutputTokens &&
+          (automatic == null
+              ? activeSettings.route == AiRoute.api
+              : pace!.adaptive && pace.dailyAttempts > 1) &&
+          _provider.fitsRequest(
+            config,
+            fields,
+            estimate: true,
+            estimateRange: true,
+          );
       final fits = vision == null
-          ? _provider.fitsRequest(config, fields, estimate: discretionary)
+          ? includeEstimateRange ||
+                _provider.fitsRequest(config, fields, estimate: discretionary)
           : _provider.fitsMealVision(
               config,
               requestId: vision.requestId,
@@ -769,7 +786,12 @@ class AiRuntime extends ChangeNotifier {
         }
       }
 
-      final reply = await execute(config, claim, activeSettings);
+      final reply = await execute(
+        config,
+        claim,
+        activeSettings,
+        includeEstimateRange,
+      );
       if (reply.succeeded &&
           queue.complete(
             claim,
@@ -941,6 +963,8 @@ AiEstimateInput _estimateInput(
       ? input.durationHistory
       : null,
 );
+
+const _minimumDetailedEstimateOutputTokens = 128;
 
 List<int> _samples(AiEstimateInput input) => [
   for (final value in input.sampleDurationsMinutes.take(32))

@@ -71,8 +71,8 @@ Future<bool> showAiAutomaticDialog(
                   ? preview.route == AiRoute.api
                         ? 'Up to 12 estimates a day as your forecast allows. '
                               'Requests pause when there is no room in the monthly limit.'
-                        : 'Up to six estimates a day while Easy is active.'
-                  : 'One request per hour while Easy is active.',
+                        : 'At least 20 minutes between estimates, up to six a day while Easy is active.'
+                  : 'Up to one request in each clock hour while Easy is active.',
             ),
             const Text('Fields sent', style: sectionHeadingStyle),
             const Text('Task title and temporary request ID'),
@@ -595,12 +595,14 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             contentPadding: EdgeInsets.zero,
             value: _adaptive,
             title: Text(
-              api ? 'Adjust to the spend forecast' : 'Use more foreground time',
+              api
+                  ? 'Adjust to the spend forecast'
+                  : 'Group estimates while active',
             ),
             subtitle: Text(
               api
-                  ? 'Prepare more drafts when the allowance can sustain them'
-                  : 'Prepare up to six estimates a day',
+                  ? 'Space up to 12 estimates a day according to the allowance'
+                  : 'At least 20 minutes apart, up to six estimates a day',
             ),
             onChanged: (value) => setState(() => _adaptive = value),
           ),

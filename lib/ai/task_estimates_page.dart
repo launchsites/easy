@@ -121,6 +121,11 @@ class _TaskEstimatesPageState extends State<TaskEstimatesPage> {
                                   ),
                                   style: contentMetadataStyle,
                                 ),
+                                if (item.estimate.details case final details?)
+                                  Text(
+                                    details.reviewDescription,
+                                    style: contentMetadataStyle,
+                                  ),
                                 if (item.issue case final issue?)
                                   Text(issue, style: contentMetadataStyle),
                                 Align(
