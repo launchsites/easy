@@ -6,6 +6,7 @@ Run the focused suites and the scale workload from the repository root.
 flutter test test/storage_workspace_test.dart test/storage_history_test.dart test/storage_history_page_test.dart test/storage_encrypted_backup_test.dart test/storage_attachment_test.dart test/sync_journal_test.dart test/workspace_sync_test.dart
 flutter test tool/benchmark/storage_scale_test.dart --reporter expanded
 EASY_STORAGE_EDITS=10000 taskset -c 4 flutter test tool/benchmark/storage_churn_test.dart --reporter expanded
+bash tool/benchmark/check_storage_crash.sh
 ```
 
 The scale workload ran on the Linux x86-64 development host on 24 November 2026. The host exposed five logical CPUs and a 16 GiB cgroup memory limit while the app build and other tests were being developed. The fixture held 100,000 tasks, 30,000 events, 50,000 gym sessions, 3,000 notes, and 10,000 opaque meal metadata records. Attachment payload count was zero. The test checked exact workspace JSON after logical export and preview, plus persisted SQLite reopen.
@@ -36,5 +37,7 @@ The churn workload ran with affinity pinned to one logical AMD EPYC 9V74 CPU on 
 | Peak sampled WAL bytes | 2,228,952 |
 
 The WAL sample interval was 250 commits. A separate test held a shared WAL reader open while the writer compacted history. The reader kept its old snapshot until it committed. Retention prunes transient revisions and unreachable chunks under configurable code limits for recent, timed, and named history. Older SQLite files can reuse reclaimed pages.
+
+The Linux crash harness used a synthetic workspace and detected its held SQLite write lock before stopping the Flutter test process. The next process opened the last acknowledged version, verified the in-flight mutation had rolled back, retried it with the same operation ID, recovered the named version, and passed the integrity checks.
 
 The focused suites cover concurrent writes and revision conflicts, interrupted recovery and compaction transactions, selective restore, malformed or modified backup files, independent encryption fixtures, duplicate attachment imports, and digest and symlink checks. History restores saved Easy records and settings, with media continuing to use its local storage. Paired bundles use explicit device grants and authenticated import previews. The attachment format suite uses synthetic media containers and small JPEG and PNG files. A separate local smoke run streamed an 847-byte AAC M4A produced by FFmpeg through storage and verified byte-for-byte readback.
