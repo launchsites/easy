@@ -97,13 +97,16 @@ class AiEnrichmentState {
     this.lastMinute,
     this.attemptsOnLastDay = 0,
     Map<String, AiCaptureRevision> attempted = const {},
+    Map<String, int> localRetryAfterMillis = const {},
     List<AiPendingEstimate> pending = const [],
   }) : attempted = Map.unmodifiable(attempted),
+       _localRetryAfterMillis = Map.unmodifiable(localRetryAfterMillis),
        pending = List.unmodifiable(pending);
 
   final int? lastMinute;
   final int attemptsOnLastDay;
   final Map<String, AiCaptureRevision> attempted;
+  final Map<String, int> _localRetryAfterMillis;
   final List<AiPendingEstimate> pending;
 
   static int minuteOf(DateTime time) =>
@@ -112,10 +115,19 @@ class AiEnrichmentState {
   bool permits(
     AiEnrichmentCandidate candidate,
     DateTime at,
-    AiAutomaticPace pace,
-  ) =>
-      permitsTime(at, pace) &&
-      attempted[candidate.taskId] != candidate.revision;
+    AiAutomaticPace pace, {
+    bool allowLocalRetry = false,
+  }) {
+    if (!permitsTime(at, pace)) return false;
+    if (!hasAttempted(candidate)) return true;
+    final retryAfter = _localRetryAfterMillis[candidate.taskId];
+    return allowLocalRetry &&
+        retryAfter != null &&
+        at.millisecondsSinceEpoch >= retryAfter;
+  }
+
+  bool hasAttempted(AiEnrichmentCandidate candidate) =>
+      attempted[candidate.taskId] == candidate.revision;
 
   bool permitsTime(DateTime at, AiAutomaticPace pace) {
     final latest = lastMinute;
@@ -139,14 +151,41 @@ class AiEnrichmentState {
             if (entry.key != candidate.taskId) entry.key: entry.value,
           candidate.taskId: candidate.revision,
         },
+        localRetryAfterMillis: {
+          for (final entry in _localRetryAfterMillis.entries)
+            if (entry.key != candidate.taskId) entry.key: entry.value,
+        },
         pending: pending,
       );
+
+  /// Records a retry after the first transient Local failure. Claiming the
+  /// retry consumes this deadline through the same write as a normal attempt.
+  AiEnrichmentState withLocalRetry(
+    AiEnrichmentCandidate candidate,
+    DateTime retryAfter,
+  ) {
+    if (!hasAttempted(candidate) ||
+        _localRetryAfterMillis.containsKey(candidate.taskId)) {
+      return this;
+    }
+    return AiEnrichmentState(
+      lastMinute: lastMinute,
+      attemptsOnLastDay: attemptsOnLastDay,
+      attempted: attempted,
+      localRetryAfterMillis: {
+        ..._localRetryAfterMillis,
+        candidate.taskId: retryAfter.millisecondsSinceEpoch,
+      },
+      pending: pending,
+    );
+  }
 
   AiEnrichmentState withEstimate(AiPendingEstimate estimate) =>
       AiEnrichmentState(
         lastMinute: lastMinute,
         attemptsOnLastDay: attemptsOnLastDay,
         attempted: attempted,
+        localRetryAfterMillis: _localRetryAfterMillis,
         pending: [
           estimate,
           for (final other in pending)
@@ -159,6 +198,7 @@ class AiEnrichmentState {
         lastMinute: lastMinute,
         attemptsOnLastDay: attemptsOnLastDay,
         attempted: attempted,
+        localRetryAfterMillis: _localRetryAfterMillis,
         pending: [
           for (final other in pending)
             if (other.taskId != estimate.taskId ||
@@ -178,6 +218,7 @@ class AiEnrichmentState {
       lastMinute: lastMinute,
       attemptsOnLastDay: attemptsOnLastDay,
       attempted: attempted,
+      localRetryAfterMillis: _localRetryAfterMillis,
       pending: kept,
     );
   }
@@ -190,6 +231,8 @@ class AiEnrichmentState {
       for (final entry in attempted.entries)
         entry.key: [entry.value.sourceRevision, entry.value.contextRevision],
     },
+    if (_localRetryAfterMillis.isNotEmpty)
+      'localRetryAfterMillis': _localRetryAfterMillis,
     'pending': pending.map((entry) => entry.toJson()).toList(),
   };
 
@@ -209,6 +252,23 @@ class AiEnrichmentState {
         sourceRevision: parts[0] as int,
         contextRevision: parts[1] as int,
       );
+    }
+    final localRetries = <String, int>{};
+    final storedRetries = data['localRetryAfterMillis'];
+    if (storedRetries != null) {
+      if (storedRetries is! Map<String, dynamic>) {
+        throw const FormatException('Invalid local retry history.');
+      }
+      for (final entry in storedRetries.entries) {
+        final deadline = entry.value;
+        if (!attempted.containsKey(entry.key) ||
+            deadline is! int ||
+            deadline < 0 ||
+            deadline > aiMaxExactInteger) {
+          throw const FormatException('Invalid local retry history.');
+        }
+        localRetries[entry.key] = deadline;
+      }
     }
     final pending = (data['pending'] as List)
         .map(
@@ -231,6 +291,7 @@ class AiEnrichmentState {
       lastMinute: minute,
       attemptsOnLastDay: today,
       attempted: attempted,
+      localRetryAfterMillis: localRetries,
       pending: pending,
     );
   }

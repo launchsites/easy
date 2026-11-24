@@ -176,10 +176,17 @@ class AiRuntime extends ChangeNotifier {
     return pace != null && _enrichment.permitsTime(_clock(), pace);
   }
 
-  bool canAutomaticallyEstimate(AiEnrichmentCandidate candidate) =>
-      automaticEstimateOpportunity &&
-      candidate.valid &&
-      _enrichment.attempted[candidate.taskId] != candidate.revision;
+  bool canAutomaticallyEstimate(AiEnrichmentCandidate candidate) {
+    final pace = _automaticPace();
+    return pace != null &&
+        candidate.valid &&
+        _enrichment.permits(
+          candidate,
+          _clock(),
+          pace,
+          allowLocalRetry: _settings.route == AiRoute.local,
+        );
+  }
 
   AiAutomaticPace? _automaticPace() {
     if (!_storageReady ||
@@ -656,9 +663,17 @@ class AiRuntime extends ChangeNotifier {
     if (_busy || _savingSettings) return status(AiRunStatus.busy);
     if (!_current(source, currentRevision)) return status(AiRunStatus.stale);
     final activeSettings = settings;
+    final automaticLocal =
+        automatic != null && activeSettings.route == AiRoute.local;
     final pace = automatic == null ? null : _automaticPace();
     if (automatic != null &&
-        (pace == null || !_enrichment.permits(automatic, _clock(), pace))) {
+        (pace == null ||
+            !_enrichment.permits(
+              automatic,
+              _clock(),
+              pace,
+              allowLocalRetry: automaticLocal,
+            ))) {
       return status(AiRunStatus.blocked);
     }
     final discretionary = work == AiWorkKind.discretionary;
@@ -780,15 +795,22 @@ class AiRuntime extends ChangeNotifier {
       if (claim == null) {
         return localReview('The current allowance cannot cover this request.');
       }
+      var retryingLocal = false;
       if (automatic != null) {
         final remembered = await _writeLane(() async {
           final now = _clock();
           if (!_foreground ||
               _cancelRequested ||
               !_current(source, currentRevision) ||
-              !_enrichment.permits(automatic, now, pace!)) {
+              !_enrichment.permits(
+                automatic,
+                now,
+                pace!,
+                allowLocalRetry: automaticLocal,
+              )) {
             return false;
           }
+          retryingLocal = automaticLocal && _enrichment.hasAttempted(automatic);
           return _writeEnrichment(_enrichment.withAttempt(automatic, now));
         });
         if (!remembered) {
@@ -799,6 +821,10 @@ class AiRuntime extends ChangeNotifier {
                 ? AiRunStatus.blocked
                 : AiRunStatus.storageUnavailable,
           );
+        }
+        if (automaticLocal && !await _verifyHead()) {
+          queue.cancel(id);
+          return status(AiRunStatus.storageUnavailable);
         }
         if (!_foreground || _cancelRequested) {
           queue.cancel(id);
@@ -850,6 +876,27 @@ class AiRuntime extends ChangeNotifier {
       }
       if (_cancelRequested || reply.failure == AiProviderFailure.cancelled) {
         return status(AiRunStatus.declined);
+      }
+      if (automatic != null &&
+          automaticLocal &&
+          !retryingLocal &&
+          (reply.failure == AiProviderFailure.transportFailed ||
+              (reply.failure == AiProviderFailure.providerRejected &&
+                  reply.statusCode == 503))) {
+        final remembered = await _writeLane(() async {
+          if (!_foreground ||
+              _cancelRequested ||
+              !_current(source, currentRevision)) {
+            return true;
+          }
+          return _writeEnrichment(
+            _enrichment.withLocalRetry(
+              automatic,
+              _clock().add(_localEstimateRetryDelay),
+            ),
+          );
+        });
+        if (!remembered) return status(AiRunStatus.storageUnavailable);
       }
       return localReview(
         vision == null
@@ -1025,6 +1072,7 @@ class AiRuntime extends ChangeNotifier {
 }
 
 const _reservationRecoveryDelay = Duration(minutes: 3);
+const _localEstimateRetryDelay = Duration(minutes: 30);
 final _requestRandom = Random.secure();
 
 AiEstimateInput _estimateInput(
