@@ -1,0 +1,127 @@
+name: Android uploaded review runtime
+
+on:
+  push:
+    branches: [proof/android-review-ecdc55a]
+    paths: [.github/workflows/android-review-runtime.yml]
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  EASY_SOURCE_SHA: ecdc55a553e83d8b357dc2651011f33f26099677
+  EASY_TOUCH_TOOLS_SHA: 74ad20f8f3c868c53d5a99c394d78b3284eb9dc1
+
+jobs:
+  installed-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the source stamped in the uploaded packages
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ env.EASY_SOURCE_SHA }}
+          persist-credentials: false
+
+      - name: Check out the verified touch harness separately
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ env.EASY_TOUCH_TOOLS_SHA }}
+          path: touch-harness
+          persist-credentials: false
+
+      - name: Verify exact archives, file hashes, source and lint
+        env:
+          ARTIFACT_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EASY_SOURCE_SHA"
+          test "$(git -C touch-harness rev-parse HEAD)" = "$EASY_TOUCH_TOOLS_SHA"
+          staging="$RUNNER_TEMP/easy-installed-review"
+          output="$RUNNER_TEMP/easy-review-runtime"
+          mkdir -p "$staging" "$output"
+          while read -r abi artifact_id archive_sha; do
+            archive="$staging/$abi.zip"
+            curl --fail --silent --show-error --location --max-time 120 --retry 2 \
+              --proto '=https' --proto-redir '=https' \
+              --header "Authorization: Bearer $ARTIFACT_TOKEN" \
+              --header 'Accept: application/vnd.github+json' \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" \
+              --output "$archive"
+            printf '%s  %s\n' "$archive_sha" "$archive" | sha256sum --check -
+            unzip -q "$archive" -d "$staging/$abi"
+            (
+              cd "$staging/$abi"
+              test "$(cat source-revision.txt)" = "$EASY_SOURCE_SHA"
+              sha256sum --check SHA256SUMS
+              if [[ "$abi" == arm64-v8a ]]; then
+                cat lint-results-release.txt
+                cp lint-results-release.txt "$output/lint-results-release.txt"
+              else
+                cmp lint-results-release.txt "$output/lint-results-release.txt"
+              fi
+              set -- ./*.apk
+              test "$#" -eq 1
+              sha256sum -- "$1" | tee -a "$output/APK-SHA256SUMS"
+            )
+          done <<'ARTIFACTS'
+          arm64-v8a 14901376881 62ebd25d32c2657f66bcfe8ed7089f191494db703d87c21ddad5a0f828e77f5b
+          armeabi-v7a 14900594599 e2d1122b6fb1e5527d12a345251bb0e5ec41cb9bb38e1dbc8e5355ddd6384fe7
+          x86_64 14900918873 a8f9ee44fa82738e9a2cdea4d002c6456b5a0058683879a954f4b4bad444489c
+          ARTIFACTS
+          printf '%s\n' "$EASY_SOURCE_SHA" > "$output/source-revision.txt"
+          printf '%s\n' "$EASY_TOUCH_TOOLS_SHA" > "$output/touch-harness-revision.txt"
+          printf '%s\n' '45352804011' > "$output/package-run-id.txt"
+
+      - name: Provision the verified AOSP 36 x86-64 device
+        run: |
+          test -c /dev/kvm
+          if [[ ! -w /dev/kvm ]]; then
+            sudo chown "$(id -u):$(id -g)" /dev/kvm
+            sudo chmod u+rw /dev/kvm
+          fi
+          test -r /dev/kvm && test -w /dev/kvm
+          export JAVA_HOME="$JAVA_HOME_21_X64"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          printf 'JAVA_HOME=%s\n' "$JAVA_HOME" >> "$GITHUB_ENV"
+          printf '%s/bin\n' "$JAVA_HOME" >> "$GITHUB_PATH"
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$sdkmanager" --licenses < <(yes)
+          "$sdkmanager" --channel=0 --install 'build-tools;36.0.0' \
+            emulator 'system-images;android-36;default;x86_64'
+          grep -Eq '^Pkg.Revision[[:space:]]*=[[:space:]]*37\.3\.10[[:space:]]*$' \
+            "$ANDROID_HOME/emulator/source.properties"
+          grep -Eq '^Pkg.Revision[[:space:]]*=[[:space:]]*2[[:space:]]*$' \
+            "$ANDROID_HOME/system-images/android-36/default/x86_64/source.properties"
+          "$ANDROID_HOME/emulator/emulator" -accel-check
+
+      - name: Start the original uploaded APK and exercise actual touch
+        timeout-minutes: 12
+        run: |
+          output="$RUNNER_TEMP/easy-review-runtime"
+          apk="$RUNNER_TEMP/easy-installed-review/x86_64/easy-android-review-ecdc55a-x86_64.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$apk"
+          analyzer="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
+          test "$("$analyzer" manifest application-id "$apk")" = app.launchsites.easy
+          test "$("$analyzer" manifest debuggable "$apk")" = false
+          python3 touch-harness/tool/benchmark/android_emulator_smoke.py \
+            "$apk" "$output/setup.png" --touch-review "$output/touch"
+          python3 - "$output/touch/touch-review.json" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          report = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert report["navigation_input"] in {"held-draganddrop", "motion-sequence"}, report
+          PY
+
+      - name: Store runtime screenshots and checksum evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: easy-android-review-ecdc55a-runtime
+          path: ${{ runner.temp }}/easy-review-runtime
+          if-no-files-found: error
+          retention-days: 7
