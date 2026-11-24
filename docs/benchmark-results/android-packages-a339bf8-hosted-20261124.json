@@ -1,0 +1,61 @@
+{
+  "app_revision": "a339bf85357448c8dbd29cd70d4663971cf3c7dc",
+  "package_run_id": 45348743492,
+  "runtime_run_id": 45350059663,
+  "runtime_artifact_id": 14899658283,
+  "touch_harness_revision": "74ad20f8f3c868c53d5a99c394d78b3284eb9dc1",
+  "development_signed": true,
+  "zip_and_elf_alignment_bytes": 16384,
+  "lint": {
+    "errors": 0,
+    "warnings": 1,
+    "warning": "AndroidGradlePluginVersion",
+    "configured_gradle": "9.5.0",
+    "available_gradle": "9.9.2"
+  },
+  "packages": {
+    "arm64-v8a": {
+      "artifact_id": 14899488111,
+      "apk_sha256": "3ac4dc115dae8afbe36b213fa8d69e390986f4c6037bd37cdfb2d2cbe468912d",
+      "archive_sha256": "14e3d4baef3c811559c3b059d827e80f01c5492c643971938eee4cef618445e2"
+    },
+    "armeabi-v7a": {
+      "artifact_id": 14900060517,
+      "apk_sha256": "2ede3e818df6d8dd2b14bf6fe0aeeeab790369427aeac3a3e1fcd8c228265d57",
+      "archive_sha256": "60e0e7ffb45d3cb781a67c6434baf3e24612c1ef293bcaea3a723a2cef5a5f27"
+    },
+    "x86_64": {
+      "artifact_id": 14898899999,
+      "apk_sha256": "ff8d753a3a3da1ccdeea70a41c92365b4b54e6f436de7c2293e6e9682949ba2b",
+      "archive_sha256": "6151eeb80963d6f5a05feed6ab4f1208438f154dd40336be8b6764f4636c327b"
+    }
+  },
+  "touch": {
+    "android_api": 36,
+    "calendar_day_after_swipe": "2026-11-25",
+    "calendar_day_before_swipe": "2026-11-24",
+    "capture_submit": "touch",
+    "device": "disposable AOSP x86-64 emulator",
+    "display_pixels": [
+      1080,
+      2400
+    ],
+    "event": {
+      "end": "2026-11-25T10:25:00.000Z",
+      "start": "2026-11-25T10:05:00.000Z",
+      "title": "Android touch review"
+    },
+    "fixture": "Full workspace with built-in samples",
+    "navigation_input": "held-draganddrop",
+    "saved_revision": 3,
+    "screenshots_sha256": {
+      "01-today.png": "152e00c63c880e36f1e681b9a0cfb4be0796f109bed53f7e397a76c5e039b97f",
+      "02-orbit.png": "e13c1afb32257e928f776f4f5f5763b0dbf0c9360f920f61729c18d857cf6b3a",
+      "03-calendar.png": "ffa7a85b39196f0dad778b367b315b04885b2f3f52efff5bc0e05611126dd7b0",
+      "04-following-day.png": "bb9edc48b265d355f58b8514d944f98e5011bb48e3dec9a408ee2c6607086c6c",
+      "05-event-draft.png": "f5bc9e18c06d9ee74ab033918876bc9bd5ad2e7a24635185cc98ba38c6affd01",
+      "06-saved.png": "b38182157937b1d631ee6f72d5f1baee33a7e4c7f4bff608f7cc38d8c59f15af"
+    },
+    "setup_revision": 2
+  }
+}

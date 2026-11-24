@@ -19,6 +19,8 @@ The hosted release at `975c6e8bd4653cad18d8d7dd3ca1d5363672ba62` completed Full 
 
 A separate AOSP API 36 release completed Full sample setup at 1080 × 2400. A continuous held drag from the bottom-left button selected Calendar. A horizontal touch swipe advanced the day. The bottom-right capture button and touch submit saved one timed event on the new day, moving the private workspace from revision 2 to 3. The other sample records retained their contents, and SQLite passed its integrity check. [Hosted touch run](https://github.com/launchsites/easy/actions/runs/45347390357) · [Verification results](benchmark-results/android-touch-3832097-20261124.json)
 
+The hosted `a339bf8` release produced all three development-signed review APKs. Each package passed signature, manifest, compiled policy, and 16 KiB ZIP and ELF alignment checks. Release lint reported zero errors and one notice about a newer available Gradle version. A second runner verified the exact uploaded archives and their internal checksums, then installed the uploaded x86-64 APK on AOSP 36. That APK completed setup, chose Calendar with the held drag, swiped forward one day, and saved the reviewed 10:05–10:25 event with touch input. [Hosted packages](https://github.com/launchsites/easy/actions/runs/45348743492) · [Hosted APK readback and runtime](https://github.com/launchsites/easy/actions/runs/45350059663) · [Verification results](benchmark-results/android-packages-a339bf8-hosted-20261124.json)
+
 ```sh
 flutter build apk --release --split-per-abi
 cd android
