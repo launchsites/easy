@@ -15,6 +15,7 @@ enum RecurringTaskStatus { pending, completed, skipped }
 
 enum RecurringTaskScheduleIssue {
   inactive('Reopen this task before scheduling it.'),
+  schedulingHold('Resolve this task’s planning hold first.'),
   unavailableClock('A task time falls in a daylight-saving gap.'),
   timeOrder('The due time must follow the earliest start.'),
   beforeEarliest('The block starts before the task is available.'),
@@ -98,7 +99,9 @@ class RecurringTaskOccurrence {
 
   String get id => task.id;
   bool get canSchedule =>
-      status == RecurringTaskStatus.pending && constraintIssue == null;
+      status == RecurringTaskStatus.pending &&
+      constraintIssue == null &&
+      task.schedulingHold == null;
 }
 
 /// One durable repeating task and sparse occurrence decisions.
@@ -419,6 +422,9 @@ class RecurringTaskSeries {
     if (occurrence.status != RecurringTaskStatus.pending) {
       return RecurringTaskScheduleIssue.inactive;
     }
+    if (occurrence.task.schedulingHold != null) {
+      return RecurringTaskScheduleIssue.schedulingHold;
+    }
     final issue = _placementIssue(occurrence, span, allowOutsideSoftDate);
     if (issue != null) return issue;
     if (!completedPrerequisiteIds.containsAll(
@@ -727,6 +733,7 @@ class _TaskTemplate {
       allowSplit: json['allowSplit'] as bool? ?? false,
       minimumChunkMinutes:
           json['minimumChunkMinutes'] as int? ?? defaultTaskChunkMinutes,
+      schedulingHold: TaskSchedulingHold.decode(json['schedulingHold']),
     );
     _TaskTemplate.capture(task, DateTime.utc(2000), _TaskClock(null), null);
     return _TaskTemplate(
@@ -761,6 +768,7 @@ class _TaskTemplate {
     if (task.allowSplit) 'allowSplit': true,
     if (task.minimumChunkMinutes != defaultTaskChunkMinutes)
       'minimumChunkMinutes': task.minimumChunkMinutes,
+    if (task.schedulingHold case final hold?) 'schedulingHold': hold.toJson(),
     if (softDateOffset != null) 'softDateOffset': softDateOffset,
     if (earliest != null) 'earliest': earliest!.toJson(),
     if (due != null) 'due': due!.toJson(),
@@ -789,6 +797,7 @@ class _TaskTemplate {
     dueAt: due,
     done: completedAt != null,
     completedAt: completedAt,
+    schedulingHold: task.schedulingHold,
   );
 }
 
@@ -803,6 +812,7 @@ TaskItem _taskFields(TaskItem task) => TaskItem(
   prerequisiteIds: List.unmodifiable(task.prerequisiteIds),
   allowSplit: task.allowSplit,
   minimumChunkMinutes: task.minimumChunkMinutes,
+  schedulingHold: task.schedulingHold,
 );
 
 class _TaskWallTime {

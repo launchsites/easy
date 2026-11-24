@@ -74,6 +74,7 @@ class _RecordEditorState extends State<RecordEditor> {
   String? _taskParentId;
   TaskPriority? _priority;
   DateTime? _earliestStart;
+  TaskSchedulingHold? _schedulingHold;
   String? _taskError;
   bool _showTaskDetails = false;
 
@@ -108,11 +109,13 @@ class _RecordEditorState extends State<RecordEditor> {
     _prerequisiteIds = [...?task?.prerequisiteIds];
     _allowSplit = task?.allowSplit ?? false;
     _dueAt = task?.dueAt?.toLocal();
+    _schedulingHold = task?.schedulingHold;
     _showTaskDetails =
         _taskParentId != null ||
         _priority != null ||
         _earliestStart != null ||
         _dueAt != null ||
+        _schedulingHold != null ||
         _allowSplit ||
         _prerequisiteIds.isNotEmpty ||
         _estimate.text.isNotEmpty ||
@@ -328,6 +331,15 @@ class _RecordEditorState extends State<RecordEditor> {
     });
   }
 
+  Future<void> _changeSchedulingHold() async {
+    final change = await showDialog<({TaskSchedulingHold? hold})>(
+      context: context,
+      builder: (_) => _TaskSchedulingHoldDialog(initial: _schedulingHold),
+    );
+    if (!mounted || change == null) return;
+    setState(() => _schedulingHold = change.hold);
+  }
+
   bool _validateTaskDetails(int? estimatedMinutes, int? minimumChunkMinutes) {
     final parentIssue = _taskParentId == _taskId
         ? TaskParentIssue.cycle
@@ -412,6 +424,7 @@ class _RecordEditorState extends State<RecordEditor> {
                 ? minimum
                 : defaultTaskChunkMinutes,
             dueAt: _dueAt,
+            schedulingHold: _schedulingHold,
           ),
         );
       case RecordKind.event:
@@ -838,6 +851,7 @@ class _RecordEditorState extends State<RecordEditor> {
     final start = _earliestStart;
     final dueAt = _dueAt;
     final parentId = _taskParentId;
+    final hold = _schedulingHold;
     final parent = widget.taskItems
         .where((task) => task.id == parentId)
         .firstOrNull;
@@ -853,6 +867,23 @@ class _RecordEditorState extends State<RecordEditor> {
     };
     return [
       _propertyPanel([
+        _propertyButton(
+          label: 'Planning hold',
+          value: hold?.reason.label ?? 'None',
+          icon: Icons.pause_circle_outline_rounded,
+          onPressed: _changeSchedulingHold,
+        ),
+        if (hold != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(13, 7, 13, 12),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(
+                [hold.message, ?hold.detail].join('\n'),
+                style: const TextStyle(color: muted, fontSize: 13),
+              ),
+            ),
+          ),
         MenuAnchor(
           builder: (context, controller, _) => _propertyButton(
             label: 'Priority',
@@ -1363,6 +1394,99 @@ class _NoteTargetPickerState extends State<_NoteTargetPicker> {
       ),
     );
   }
+}
+
+class _TaskSchedulingHoldDialog extends StatefulWidget {
+  const _TaskSchedulingHoldDialog({required this.initial});
+
+  final TaskSchedulingHold? initial;
+
+  @override
+  State<_TaskSchedulingHoldDialog> createState() =>
+      _TaskSchedulingHoldDialogState();
+}
+
+class _TaskSchedulingHoldDialogState extends State<_TaskSchedulingHoldDialog> {
+  final _form = GlobalKey<FormState>();
+  late final _detail = TextEditingController(text: widget.initial?.detail);
+  late var _reason =
+      widget.initial?.reason ?? TaskSchedulingHoldReason.appointmentTime;
+
+  @override
+  void dispose() {
+    _detail.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_form.currentState!.validate()) return;
+    final detail = _detail.text.trim();
+    Navigator.of(context).pop((
+      hold: TaskSchedulingHold(
+        reason: _reason,
+        detail: detail.isEmpty ? null : detail,
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
+    title: const Text('Planning hold'),
+    content: Form(
+      key: _form,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 12,
+        children: [
+          DropdownButtonFormField<TaskSchedulingHoldReason>(
+            isExpanded: true,
+            initialValue: _reason,
+            decoration: const InputDecoration(labelText: 'Still needed'),
+            items: [
+              for (final reason in TaskSchedulingHoldReason.values)
+                DropdownMenuItem(
+                  value: reason,
+                  child: Text(reason.label, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: (value) {
+              if (value != null) setState(() => _reason = value);
+            },
+          ),
+          TextFormField(
+            controller: _detail,
+            minLines: 1,
+            maxLines: 3,
+            maxLength: maxTaskSchedulingHoldDetailLength,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'Details (optional)',
+              counterText: '',
+            ),
+            validator: (value) =>
+                (value?.trim().length ?? 0) > maxTaskSchedulingHoldDetailLength
+                ? 'Use fewer characters.'
+                : null,
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Cancel'),
+      ),
+      if (widget.initial != null)
+        TextButton(
+          onPressed: () =>
+              Navigator.of(context).pop((hold: null as TaskSchedulingHold?)),
+          child: const Text('Resolve hold'),
+        ),
+      FilledButton(onPressed: _save, child: const Text('Save hold')),
+    ],
+  );
 }
 
 class _TaskPicker extends StatefulWidget {

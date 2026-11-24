@@ -9,6 +9,56 @@ enum TaskPriority {
 }
 
 const defaultTaskChunkMinutes = 15;
+const maxTaskSchedulingHoldDetailLength = 200;
+const _keepSchedulingHold = Object();
+
+enum TaskSchedulingHoldReason {
+  appointmentTime('Appointment time', 'Confirm the appointment date and time.'),
+  location('Location', 'Confirm the location.'),
+  details('Other details', 'Clarify the missing details.');
+
+  const TaskSchedulingHoldReason(this.label, this.message);
+
+  final String label;
+  final String message;
+}
+
+/// A fact the user needs before reserving calendar time for a task.
+final class TaskSchedulingHold {
+  const TaskSchedulingHold({required this.reason, this.detail});
+
+  final TaskSchedulingHoldReason reason;
+  final String? detail;
+
+  String get message => reason.message;
+
+  Map<String, Object?> toJson() => {
+    'reason': reason.name,
+    if (detail case final value? when value.trim().isNotEmpty)
+      'detail': value.trim(),
+  };
+
+  static TaskSchedulingHold? decode(Object? stored) {
+    if (stored == null) return null;
+    if (stored is! Map) {
+      return const TaskSchedulingHold(reason: TaskSchedulingHoldReason.details);
+    }
+    final reason = TaskSchedulingHoldReason.values
+        .where((value) => value.name == stored['reason'])
+        .firstOrNull;
+    final rawDetail = stored['detail'];
+    final detail = rawDetail is String ? rawDetail.trim() : null;
+    return TaskSchedulingHold(
+      reason: reason ?? TaskSchedulingHoldReason.details,
+      detail:
+          detail != null &&
+              detail.isNotEmpty &&
+              detail.length <= maxTaskSchedulingHoldDetailLength
+          ? detail
+          : null,
+    );
+  }
+}
 
 class TaskItem {
   const TaskItem({
@@ -27,6 +77,7 @@ class TaskItem {
     this.minimumChunkMinutes = defaultTaskChunkMinutes,
     this.dueAt,
     this.completedAt,
+    this.schedulingHold,
   });
 
   final String id;
@@ -44,6 +95,7 @@ class TaskItem {
   final int minimumChunkMinutes;
   final DateTime? dueAt;
   final DateTime? completedAt;
+  final TaskSchedulingHold? schedulingHold;
 
   TaskItem withDone(bool done, {DateTime? completedAt}) =>
       _with(done: done, parentId: parentId, completion: completedAt);
@@ -63,6 +115,9 @@ class TaskItem {
   TaskItem withEstimate(int minutes) =>
       _with(done: done, parentId: parentId, estimate: minutes);
 
+  TaskItem withSchedulingHold(TaskSchedulingHold? hold) =>
+      _with(done: done, parentId: parentId, updatedHold: hold);
+
   TaskItem _with({
     required bool done,
     required String? parentId,
@@ -70,6 +125,7 @@ class TaskItem {
     int? estimate,
     DateTime? completion,
     DateTime? rescheduledDate,
+    Object? updatedHold = _keepSchedulingHold,
   }) => TaskItem(
     id: id,
     title: title,
@@ -86,6 +142,9 @@ class TaskItem {
     minimumChunkMinutes: minimumChunkMinutes,
     dueAt: dueAt,
     completedAt: done ? completion ?? completedAt : null,
+    schedulingHold: identical(updatedHold, _keepSchedulingHold)
+        ? schedulingHold
+        : updatedHold as TaskSchedulingHold?,
   );
 }
 

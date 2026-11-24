@@ -12,6 +12,7 @@ enum ManualBlockProblem {
   missingBlock('This calendar block has changed.'),
   invalidDuration('Choose a block from 1 minute to 24 hours.'),
   pastStart('Choose a start time in the future.'),
+  needsDetails('This task needs more details before scheduling.'),
   earliestStart('The block starts before this task is available.'),
   deadline('The block ends after the hard deadline.'),
   prerequisite('A prerequisite must finish before this block.'),
@@ -258,6 +259,9 @@ _ManualProblem? _checkBlock(
 ) {
   _ManualProblem issue(ManualBlockProblem kind, [String? relatedTitle]) =>
       (kind: kind, relatedTitle: relatedTitle);
+  if (task.schedulingHold case final hold?) {
+    return issue(ManualBlockProblem.needsDetails, hold.message);
+  }
   if (span.length < const Duration(minutes: 1) ||
       span.length > const Duration(minutes: maxManualBlockMinutes) ||
       span.start.year < 1 ||
@@ -304,6 +308,7 @@ _ManualProblem? _checkBlock(
           (completion == null || !completion.isAfter(span.start));
       final estimate = prerequisite?.estimatedMinutes;
       final reserved =
+          prerequisite?.schedulingHold == null &&
           estimate != null &&
           estimate > 0 &&
           _reservedMinutes(reservations[id], notBefore, before: span.start) >=
@@ -554,6 +559,7 @@ String _taskSourceFor(TaskItem task) => jsonEncode([
   task.date?.toIso8601String(),
   task.earliestStart?.toIso8601String(),
   task.dueAt?.toIso8601String(),
+  task.schedulingHold?.toJson(),
   task.prerequisiteIds.toSet().toList()..sort(),
 ]);
 

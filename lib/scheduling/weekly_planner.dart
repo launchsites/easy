@@ -97,6 +97,7 @@ TaskItem _onOrAfter(TaskItem task, DateTime day) {
     minimumChunkMinutes: task.minimumChunkMinutes,
     dueAt: task.dueAt,
     completedAt: task.completedAt,
+    schedulingHold: task.schedulingHold,
   );
 }
 

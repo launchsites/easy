@@ -274,6 +274,7 @@ class WorkspaceData {
             completedAt: DateTime.tryParse(
               task['completedAt'] as String? ?? '',
             ),
+            schedulingHold: TaskSchedulingHold.decode(task['schedulingHold']),
             prerequisiteIds: List.unmodifiable(
               (task['prerequisiteIds'] as List?)?.cast<String>() ??
                   const <String>[],
@@ -339,6 +340,8 @@ class WorkspaceData {
             'dueAt': task.dueAt!.toUtc().toIso8601String(),
           if (task.completedAt != null)
             'completedAt': task.completedAt!.toUtc().toIso8601String(),
+          if (task.schedulingHold case final hold?)
+            'schedulingHold': hold.toJson(),
           if (task.prerequisiteIds.isNotEmpty)
             'prerequisiteIds': task.prerequisiteIds,
           if (task.allowSplit) 'allowSplit': true,

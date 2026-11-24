@@ -76,6 +76,7 @@ class PlanningTask {
     Set<String> prerequisites = const {},
     this.completed = false,
     this.needsDetails = false,
+    this.needsDetailsMessage,
   }) : prerequisites = Set.unmodifiable(prerequisites) {
     if (id.trim().isEmpty || title.trim().isEmpty) {
       throw ArgumentError('Planning tasks need an ID and title.');
@@ -97,6 +98,7 @@ class PlanningTask {
   final Set<String> prerequisites;
   final bool completed;
   final bool needsDetails;
+  final String? needsDetailsMessage;
 }
 
 sealed class PlanningDecision {

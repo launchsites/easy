@@ -507,7 +507,8 @@ class _WeeklyPlanSheetState extends State<WeeklyPlanSheet> {
             title: Text(entry.task.title),
             subtitle: Text(switch (entry.problem) {
               PlannerProblem.needsDuration => 'Add an estimated duration',
-              PlannerProblem.needsDetails => 'Needs more details',
+              PlannerProblem.needsDetails =>
+                entry.task.needsDetailsMessage ?? 'Needs more details',
               PlannerProblem.unavailableDependency =>
                 switch (titles[entry.prerequisiteId]) {
                   final title? => 'Waiting on $title',

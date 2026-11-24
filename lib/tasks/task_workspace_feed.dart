@@ -120,7 +120,11 @@ class TaskWorkspaceFeed {
     final start = _civilDay(day);
     final end = start.add(const Duration(days: 1));
     for (final row in _rows(start, end)) {
-      if (row.occurrence.canSchedule) yield row.task;
+      // The planner shows the reason for an explicit hold.
+      if (row.occurrence.status == RecurringTaskStatus.pending &&
+          row.occurrence.constraintIssue == null) {
+        yield row.task;
+      }
     }
   }
 

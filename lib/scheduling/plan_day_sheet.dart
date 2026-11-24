@@ -64,7 +64,8 @@ ScheduleProposal planWorkspaceDay({
   };
   final accepted = {
     for (final task in tasks)
-      if ((task.estimatedMinutes ?? 0) > 0 &&
+      if (task.schedulingHold == null &&
+          (task.estimatedMinutes ?? 0) > 0 &&
           (reservations[task.id]?.minutes ?? 0) >= task.estimatedMinutes!)
         task.id,
   };
@@ -77,7 +78,13 @@ ScheduleProposal planWorkspaceDay({
     }
     final estimate = task.estimatedMinutes;
     final planned = reservations[task.id]?.minutes ?? 0;
-    if (estimate != null && estimate > 0 && planned >= estimate) continue;
+    final hold = task.schedulingHold;
+    if (hold == null &&
+        estimate != null &&
+        estimate > 0 &&
+        planned >= estimate) {
+      continue;
+    }
 
     var earliest = task.earliestStart;
     for (final id in task.prerequisiteIds) {
@@ -92,7 +99,7 @@ ScheduleProposal planWorkspaceDay({
     final deadline =
         task.dueAt ??
         (day == null ? null : DateTime(day.year, day.month, day.day + 1));
-    final remaining = estimate == null || estimate <= 0
+    final remaining = estimate == null || estimate <= 0 || planned >= estimate
         ? null
         : estimate - planned;
     final minimum = task.minimumChunkMinutes;
@@ -112,6 +119,8 @@ ScheduleProposal planWorkspaceDay({
         allowSplit: task.allowSplit,
         minimumChunkMinutes: minimum > 0 ? minimum : defaultTaskChunkMinutes,
         prerequisites: task.prerequisiteIds.toSet(),
+        needsDetails: hold != null,
+        needsDetailsMessage: hold?.message,
       ),
     );
   }
@@ -588,7 +597,8 @@ class _PlanDaySheetState extends State<PlanDaySheet> {
 String _reason(UnscheduledTask issue, Map<String, String> titles) =>
     switch (issue.problem) {
       PlannerProblem.needsDuration => 'Add an estimated duration',
-      PlannerProblem.needsDetails => 'Needs more details',
+      PlannerProblem.needsDetails =>
+        issue.task.needsDetailsMessage ?? 'Needs more details',
       PlannerProblem.unavailableDependency =>
         switch (titles[issue.prerequisiteId]) {
           final title? => 'Waiting on $title',
