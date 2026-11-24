@@ -46,6 +46,7 @@ String planningIssueMessage(
   PlannerProblem.dependencyCycle => 'Prerequisite cycle',
   PlannerProblem.deadlinePassed => 'Due before this window',
   PlannerProblem.noFeasibleTime => 'No available block fits',
+  PlannerProblem.reservationsNeedReview => 'Review the existing time blocks',
 };
 
 class PlanReviewFrame extends StatelessWidget {

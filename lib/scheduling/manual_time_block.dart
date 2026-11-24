@@ -4,6 +4,7 @@ import '../calendar_page.dart';
 import '../task_model.dart';
 import 'availability_settings.dart';
 import 'planner.dart';
+import 'task_reservations.dart';
 
 const maxManualBlockMinutes = 24 * 60;
 
@@ -178,13 +179,11 @@ ManualBlockReview reviewManualTimeBlock({
   final relevantEvents = byId.values
       .where((event) => event.id != existingEventId)
       .toList();
-  final reservations = <String, List<CalendarEvent>>{};
-  for (final event in relevantEvents) {
-    if (event.plannedTaskId case final id?
-        when !event.isReadOnly && !event.allDay) {
-      (reservations[id] ??= []).add(event);
-    }
-  }
+  final reservations = reviewTaskReservations(
+    tasks: tasks,
+    events: relevantEvents,
+    cutoff: notBefore,
+  );
   final taskDate = task?.date?.toLocal();
   final dueDate = task?.dueAt?.toLocal();
   final dateStart = taskDate == null
@@ -205,7 +204,7 @@ ManualBlockReview reviewManualTimeBlock({
   final estimate = task?.estimatedMinutes;
   final remaining = estimate == null || estimate <= 0
       ? null
-      : (estimate - _reservedMinutes(reservations[taskId], notBefore)).clamp(
+      : (estimate - (reservations.reservations[taskId]?.minutes ?? 0)).clamp(
           0,
           estimate,
         );
@@ -252,7 +251,7 @@ _ManualProblem? _checkBlock(
   TimeSpan span,
   List<TaskItem> tasks,
   List<CalendarEvent> events,
-  Map<String, List<CalendarEvent>> reservations,
+  TaskReservationReview reservations,
   DateTime notBefore,
   SchedulingSettings? settings,
   CalendarEvent? existing,
@@ -280,40 +279,11 @@ _ManualProblem? _checkBlock(
   }
   if (task.prerequisiteIds.isNotEmpty) {
     final ids = task.prerequisiteIds.toSet();
-    if (taskPrerequisiteIssue(
-          tasks.map(
-            (record) => record.done && record.prerequisiteIds.isNotEmpty
-                ? record.withPrerequisites(const [])
-                : record,
-          ),
-          task.id,
-          ids.toList(),
-        ) !=
-        null) {
-      return issue(ManualBlockProblem.prerequisite);
-    }
-    final byId = <String, TaskItem>{};
-    for (final record in tasks) {
-      if (!ids.contains(record.id)) continue;
-      if (byId.containsKey(record.id)) {
-        return issue(ManualBlockProblem.prerequisite, record.title);
-      }
-      byId[record.id] = record;
-    }
     for (final id in ids) {
-      final prerequisite = byId[id];
-      final completion = prerequisite?.completedAt;
-      final completed =
-          prerequisite?.done == true &&
-          (completion == null || !completion.isAfter(span.start));
-      final estimate = prerequisite?.estimatedMinutes;
-      final reserved =
-          prerequisite?.schedulingHold == null &&
-          estimate != null &&
-          estimate > 0 &&
-          _reservedMinutes(reservations[id], notBefore, before: span.start) >=
-              estimate;
-      if (id == task.id || (!completed && !reserved)) {
+      if (id == task.id || !reservations.satisfiesAt(id, span.start)) {
+        final prerequisite = tasks
+            .where((record) => record.id == id)
+            .firstOrNull;
         return issue(ManualBlockProblem.prerequisite, prerequisite?.title);
       }
     }
@@ -327,8 +297,11 @@ _ManualProblem? _checkBlock(
   }
   final estimate = task.estimatedMinutes;
   if (existing != null && estimate != null && estimate > 0) {
-    final remaining = reservations[task.id] ?? const [];
-    final old = _EffortCoverage([...remaining, existing], notBefore);
+    final old = reviewTaskReservations(
+      tasks: tasks,
+      events: [...events, existing],
+      cutoff: notBefore,
+    );
     final replacement = CalendarEvent(
       id: existing.id,
       title: existing.title,
@@ -337,17 +310,24 @@ _ManualProblem? _checkBlock(
       category: existing.category,
       plannedTaskId: task.id,
     );
-    final updated = _EffortCoverage([...remaining, replacement], notBefore);
-    for (final dependent in tasks) {
-      if (dependent.done || !dependent.prerequisiteIds.contains(task.id)) {
-        continue;
-      }
-      for (final block in reservations[dependent.id] ?? const []) {
-        if (block.start.isBefore(notBefore)) continue;
-        if (old.minutes(before: block.start) >= estimate &&
-            updated.minutes(before: block.start) < estimate) {
-          return issue(ManualBlockProblem.dependent, dependent.title);
-        }
+    final updated = reviewTaskReservations(
+      tasks: tasks,
+      events: [...events, replacement],
+      cutoff: notBefore,
+    );
+    final dependants = {
+      for (final dependent in tasks)
+        if (!dependent.done && dependent.prerequisiteIds.contains(task.id))
+          dependent.id: dependent.title,
+    };
+    for (final block in events) {
+      final dependant = dependants[block.plannedTaskId];
+      if (dependant != null &&
+          isOwnedTaskReservation(block) &&
+          !block.start.isBefore(notBefore) &&
+          old.satisfiesAt(task.id, block.start) &&
+          !updated.satisfiesAt(task.id, block.start)) {
+        return issue(ManualBlockProblem.dependent, dependant);
       }
     }
   }
@@ -498,53 +478,6 @@ bool _covered(
     if (!cursor.isBefore(span.end)) return true;
   }
   return false;
-}
-
-int _reservedMinutes(
-  List<CalendarEvent>? events,
-  DateTime after, {
-  DateTime? before,
-}) => events == null || events.isEmpty
-    ? 0
-    : _EffortCoverage(events, after).minutes(before: before);
-
-class _EffortCoverage {
-  _EffortCoverage(List<CalendarEvent> events, DateTime after) {
-    final ordered = events.toList()..sort((a, b) => a.start.compareTo(b.start));
-    var cursor = after;
-    var total = Duration.zero;
-    for (final event in ordered) {
-      final start = event.start.isBefore(cursor) ? cursor : event.start;
-      if (!event.end.isAfter(start)) continue;
-      _segments.add((start: start, end: event.end, before: total));
-      total += event.end.difference(start);
-      cursor = event.end;
-    }
-    _total = total;
-  }
-
-  final _segments = <({DateTime start, DateTime end, Duration before})>[];
-  late final Duration _total;
-
-  int minutes({DateTime? before}) {
-    if (before == null) return _total.inMinutes;
-    var low = 0;
-    var high = _segments.length;
-    while (low < high) {
-      final mid = (low + high) ~/ 2;
-      if (_segments[mid].end.isAfter(before)) {
-        high = mid;
-      } else {
-        low = mid + 1;
-      }
-    }
-    if (low == _segments.length) return _total.inMinutes;
-    final segment = _segments[low];
-    final partial = before.isAfter(segment.start)
-        ? before.difference(segment.start)
-        : Duration.zero;
-    return (segment.before + partial).inMinutes;
-  }
 }
 
 String _taskSourceFor(TaskItem task) => jsonEncode([

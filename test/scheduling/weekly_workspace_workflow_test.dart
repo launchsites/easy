@@ -93,7 +93,10 @@ void main() {
       await tester.tap(find.text('Settings'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Plan week'));
-      await tester.tap(find.text('Plan week'));
+      await tester.pumpAndSettle();
+      final planWeek = find.text('Plan week').hitTestable();
+      expect(planWeek, findsOneWidget);
+      await tester.tap(planWeek);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Next week'));
       await tester.pumpAndSettle();

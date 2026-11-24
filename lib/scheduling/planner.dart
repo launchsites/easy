@@ -12,6 +12,7 @@ enum PlannerProblem {
   dependencyCycle,
   deadlinePassed,
   noFeasibleTime,
+  reservationsNeedReview,
 }
 
 class TimeSpan {
@@ -77,6 +78,7 @@ class PlanningTask {
     this.completed = false,
     this.needsDetails = false,
     this.needsDetailsMessage,
+    this.reservationsNeedReview = false,
   }) : prerequisites = Set.unmodifiable(prerequisites) {
     if (id.trim().isEmpty || title.trim().isEmpty) {
       throw ArgumentError('Planning tasks need an ID and title.');
@@ -99,6 +101,7 @@ class PlanningTask {
   final bool completed;
   final bool needsDetails;
   final String? needsDetailsMessage;
+  final bool reservationsNeedReview;
 }
 
 sealed class PlanningDecision {
@@ -277,6 +280,9 @@ PlanningDecision _place(
 ) {
   if (task.needsDetails) {
     return UnscheduledTask(task, PlannerProblem.needsDetails);
+  }
+  if (task.reservationsNeedReview) {
+    return UnscheduledTask(task, PlannerProblem.reservationsNeedReview);
   }
   final minutes = task.remainingMinutes;
   if (minutes == null) {

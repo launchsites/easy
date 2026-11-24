@@ -7,6 +7,7 @@ import '../ui_theme.dart';
 import 'availability_settings.dart';
 import 'plan_review_frame.dart';
 import 'planner.dart';
+import 'task_reservations.dart';
 
 class PlanSelection {
   PlanSelection({
@@ -34,7 +35,6 @@ ScheduleProposal planWorkspaceDay({
   final placed = <PlacedCommitment>[];
   final placeIds =
       settings?.places.map((place) => place.id).toSet() ?? const <String>{};
-  final reserved = <String, List<TimeSpan>>{};
   for (final event in events) {
     if (!event.end.isAfter(event.start)) continue;
     final eventSpan = TimeSpan(event.start, event.end);
@@ -50,25 +50,18 @@ ScheduleProposal planWorkspaceDay({
         ),
       );
     }
-    final id = event.plannedTaskId;
-    if (id == null || !event.end.isAfter(cutoff)) continue;
-    final from = event.start.isBefore(cutoff) ? cutoff : event.start;
-    (reserved[id] ??= []).add(TimeSpan(from, event.end));
   }
 
-  final reservations = reserved.map(
-    (id, spans) => MapEntry(id, _combineReservations(spans)),
+  final evidence = reviewTaskReservations(
+    tasks: tasks,
+    events: events,
+    cutoff: cutoff,
   );
-  final completed = {
-    for (final task in tasks)
-      if (task.done) task.id,
-  };
+  final reservations = evidence.reservations;
+  final completed = evidence.completedAt;
   final accepted = {
-    for (final task in tasks)
-      if (task.schedulingHold == null &&
-          (task.estimatedMinutes ?? 0) > 0 &&
-          (reservations[task.id]?.minutes ?? 0) >= task.estimatedMinutes!)
-        task.id,
+    for (final entry in reservations.entries)
+      if (entry.value.coveredAt != null) entry.key,
   };
   final planning = <PlanningTask>[];
   for (final task in tasks) {
@@ -80,17 +73,15 @@ ScheduleProposal planWorkspaceDay({
     final estimate = task.estimatedMinutes;
     final planned = reservations[task.id]?.minutes ?? 0;
     final hold = task.schedulingHold;
-    if (hold == null &&
-        estimate != null &&
-        estimate > 0 &&
-        planned >= estimate) {
-      continue;
-    }
+    if (accepted.contains(task.id)) continue;
 
     var earliest = task.earliestStart;
     for (final id in task.prerequisiteIds) {
-      if (completed.contains(id)) continue;
-      final alreadyPlannedThrough = reservations[id]?.end;
+      if (completed.containsKey(id)) continue;
+      final prior = reservations[id];
+      final alreadyPlannedThrough = prior?.requiresReview == true
+          ? prior?.coveredAt
+          : prior?.lastEnd;
       if (alreadyPlannedThrough != null &&
           (earliest == null || alreadyPlannedThrough.isAfter(earliest))) {
         earliest = alreadyPlannedThrough;
@@ -122,6 +113,7 @@ ScheduleProposal planWorkspaceDay({
         prerequisites: task.prerequisiteIds.toSet(),
         needsDetails: hold != null,
         needsDetailsMessage: hold?.message,
+        reservationsNeedReview: reservations[task.id]?.requiresReview ?? false,
       ),
     );
   }
@@ -135,7 +127,7 @@ ScheduleProposal planWorkspaceDay({
     availability: inputs?.availability ?? [PlanningWindow(window)],
     commitments: inputs?.commitments ?? commitments,
     tasks: planning,
-    completedPrerequisites: {...completed, ...accepted},
+    completedPrerequisites: {...completed.keys, ...accepted},
   );
   if (inputs == null) return result;
   return ScheduleProposal(
@@ -154,24 +146,6 @@ ScheduleProposal planWorkspaceDay({
         'Some commitments leave too little travel time.',
     ],
   );
-}
-
-({int minutes, DateTime end}) _combineReservations(List<TimeSpan> spans) {
-  spans.sort((a, b) => a.start.compareTo(b.start));
-  var start = spans.first.start;
-  var end = spans.first.end;
-  var total = Duration.zero;
-  for (final span in spans.skip(1)) {
-    if (span.start.isAfter(end)) {
-      total += end.difference(start);
-      start = span.start;
-      end = span.end;
-    } else if (span.end.isAfter(end)) {
-      end = span.end;
-    }
-  }
-  total += end.difference(start);
-  return (minutes: total.inMinutes, end: end);
 }
 
 typedef _PlanInput = ({
