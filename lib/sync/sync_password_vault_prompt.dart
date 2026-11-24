@@ -29,6 +29,7 @@ class _SyncPasswordPrompt extends StatefulWidget {
 class _SyncPasswordPromptState extends State<_SyncPasswordPrompt> {
   final _passphrase = TextEditingController();
   final _repeat = TextEditingController();
+  final _passphraseFocus = FocusNode();
   final _repeatFocus = FocusNode();
   String? _error;
   bool _opening = false;
@@ -38,6 +39,7 @@ class _SyncPasswordPromptState extends State<_SyncPasswordPrompt> {
   void dispose() {
     _passphrase.dispose();
     _repeat.dispose();
+    _passphraseFocus.dispose();
     _repeatFocus.dispose();
     super.dispose();
   }
@@ -74,7 +76,21 @@ class _SyncPasswordPromptState extends State<_SyncPasswordPrompt> {
     } on SyncVaultException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } finally {
-      if (mounted) setState(() => _opening = false);
+      if (mounted) {
+        setState(() => _opening = false);
+        if (_error != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || _opening || _error == null) return;
+            _passphraseFocus.requestFocus();
+            if (!widget.forSetup) {
+              _passphrase.selection = TextSelection(
+                baseOffset: 0,
+                extentOffset: _passphrase.text.length,
+              );
+            }
+          });
+        }
+      }
     }
   }
 
@@ -98,6 +114,7 @@ class _SyncPasswordPromptState extends State<_SyncPasswordPrompt> {
           TextField(
             autofocus: true,
             controller: _passphrase,
+            focusNode: _passphraseFocus,
             obscureText: !_showPassphrase,
             autocorrect: false,
             enableSuggestions: false,

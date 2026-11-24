@@ -166,8 +166,20 @@ void main() {
       await _waitFor(tester, () => error.evaluate().isNotEmpty);
       expect(results, isEmpty);
       expect(File(path).readAsBytesSync(), original);
-      await tester.enterText(field, _passphrase);
-      await tester.tap(find.text('Unlock'));
+      await tester.pump();
+      final retry = tester.widget<EditableText>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      );
+      expect(retry.focusNode.hasFocus, isTrue);
+      expect(
+        retry.controller.selection,
+        const TextSelection(
+          baseOffset: 0,
+          extentOffset: 'Synthetic wrong passphrase'.length,
+        ),
+      );
+      tester.testTextInput.enterText(_passphrase);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
       await _waitFor(tester, () => results.isNotEmpty);
       await tester.runAsync(results.single!.close);
       expect(tester.takeException(), isNull);
