@@ -41,7 +41,7 @@ void main() {
               'recurring': false,
               'startMilliseconds': start.millisecondsSinceEpoch,
               'endMilliseconds': end.millisecondsSinceEpoch,
-              if (availability != null) 'availability': availability,
+              'availability': ?availability,
             },
         ];
       });
