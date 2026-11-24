@@ -1,0 +1,204 @@
+{
+  "recorded_at_utc": "2026-11-24T04:44:07.512065+00:00",
+  "app_revision": "908c53adcbe53369c4cd11426dbec25367b0147c",
+  "executable_sha256": "feb1d5a0301b750f9344ff1fa7ce2441a39a66bb408b9a26d3cd933bdbd49743",
+  "aot_library_sha256": "ef158e3493b3ddd0aa39fd9965ed4ad413478bf5f91df78b657b33a50817336d",
+  "status": "passed",
+  "checks": {
+    "desktop-today": {
+      "screenshot_sha256": "15e22fc280b1c7178c8986e62ccb8130dfc360778ce628db417ff7ecfa5bba64"
+    },
+    "desktop-calendar": {
+      "screenshot_sha256": "855e22e02efc410be6c67cdb15567168fa5213fd85ff7ee8c3218c4d8ea73ab1"
+    },
+    "desktop-tasks": {
+      "screenshot_sha256": "faa1228d3601e2bc0807905d98068c1f781fad492feec4dcdb9a974c063c6d92"
+    },
+    "desktop-notes": {
+      "screenshot_sha256": "4ecda45cb9d685d51b7be1a2594d4262219a0bc4ec2297cc169a7a220315340d"
+    },
+    "desktop-task-capture": {
+      "screenshot_sha256": "eccdfc8712335bf61f8f83e639696b94a758d314d4e8c89397bf9e1295a5e894"
+    },
+    "desktop-task-saved": {
+      "screenshot_sha256": "25cc8367b3fa38fef7bfe11d26b211ec08544944d0989d5d7d05bba65829a629"
+    },
+    "desktop-search": {
+      "screenshot_sha256": "c4a3b815f6c98add37ab3ec4d53ba607c097c81e988a4227d410530d59064ae5"
+    },
+    "desktop-search-result": {
+      "screenshot_sha256": "75f55f4e740a1bb5494f60b9667718e3e218d80fcd8d910b1bbc1605e04fb020"
+    },
+    "mobile-orbit-calendar": {
+      "screenshot_sha256": "33c25978d663af67da3fe4f13a4131c69d9b6403f396993b02ba326d5e7ed99a"
+    },
+    "mobile-calendar-next-day": {
+      "screenshot_sha256": "5ac84510cd0b82891ca54a0c2367365d6da32d5d613ce18643e293f471878f42"
+    },
+    "mobile-gym": {
+      "screenshot_sha256": "cd86161f9fc49693004b0d0143fd3cdfc0d10d484ddf29b8d967c6ccf091e481"
+    },
+    "mobile-gym-history": {
+      "screenshot_sha256": "9fd8761a1286a6144c20fc9e2187048e8c761c28bd21c38529af60a94568059f"
+    },
+    "mobile-gym-progress": {
+      "screenshot_sha256": "1f6edc42a70ffd456a985e114806769688a775a72b462e3eea253b4886d5f84e"
+    },
+    "compact-gym-progress": {
+      "screenshot_sha256": "4eff6fbe176c17df6f6e92644c9562115520c90b251dcf08c9c51342f66808ef"
+    },
+    "mobile-gym-record-picker": {
+      "screenshot_sha256": "425464fdb91e341a4f4809eb65d14bfd7a36068e398998db8b6493fc937ee126"
+    },
+    "mobile-gym-measured-weight": {
+      "screenshot_sha256": "4ea1e9f7016570c877dc2019e2951cbd0ba9faea85815348d0ab67e4fcfa01cd"
+    },
+    "mobile-gym-return": {
+      "screenshot_sha256": "07ebf63347cbfa9e7efb004cd3a9b0ef7fdd83a7d5bf6e175feea334494631b8"
+    },
+    "mobile-settings": {
+      "screenshot_sha256": "7e1cd99505e225c25176467859d4a1cebbe97ed408ec0486c27088c31ae2123d"
+    },
+    "mobile-feature-privacy": {
+      "screenshot_sha256": "7279563ae4fb5268e58fa044e7cc9c57276e4084ec2aa7f8e65b3136615bc98f"
+    },
+    "reopened-workspace": {
+      "screenshot_sha256": "4d469b164d5732a2c1e62157e7683e9cffbe3f00348ac96d962857e69219c995"
+    },
+    "reopened-task": {
+      "screenshot_sha256": "4d469b164d5732a2c1e62157e7683e9cffbe3f00348ac96d962857e69219c995"
+    },
+    "reopened-gym-history": {
+      "screenshot_sha256": "9fd8761a1286a6144c20fc9e2187048e8c761c28bd21c38529af60a94568059f"
+    },
+    "reopened-gym-progress": {
+      "screenshot_sha256": "7128fedfec88784db00de803302f2f669576b7548ac3500bbc1ded1dda9e0ef3"
+    },
+    "onboarding-skip-blank": {
+      "screenshot_sha256": "0ac9d700f397cb492dac86b4d1794cba4d60ae3d745e4893396e821d8e8da8d1"
+    },
+    "onboarding-skip-today": {
+      "screenshot_sha256": "6e6b9cf327a6ad6d5429e6497062f2b62d209665d865408f1fc166384ddc9db0"
+    },
+    "onboarding-skip-reopened": {
+      "screenshot_sha256": "6e6b9cf327a6ad6d5429e6497062f2b62d209665d865408f1fc166384ddc9db0"
+    },
+    "onboarding-samples-blank": {
+      "screenshot_sha256": "ee76a902b2eab5a72324c98a40c1dce0de632a5903efd93279ee939ebd673f2b"
+    },
+    "onboarding-samples-today": {
+      "screenshot_sha256": "7bb0febc8dcfa632ce9124aee27dbe411a3775da14cd3b72790c54766a092dae"
+    },
+    "onboarding-samples-reopened": {
+      "screenshot_sha256": "7bb0febc8dcfa632ce9124aee27dbe411a3775da14cd3b72790c54766a092dae"
+    }
+  },
+  "before": {
+    "revision": 1,
+    "digest": "3b87f6f085f287cb71bd2d570a2066fe47fc5f64346a630019f0c517d887232a",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 2,
+      "tasks": 1,
+      "notes": 2
+    },
+    "quick_check": "ok"
+  },
+  "after": {
+    "revision": 3,
+    "digest": "61f6b189d813bb874a0211bd21c00c686cafb0d5168d260a149e880689c5b024",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 2,
+      "tasks": 2,
+      "notes": 2
+    },
+    "quick_check": "ok"
+  },
+  "health_measurements_hidden_and_retained": true,
+  "onboarding": {
+    "skip": {
+      "before": {
+        "revision": 2,
+        "digest": "6d95c327b46956b91ef8088d870041ae3d584eedcbcda31bc1b67dd23b5f2740",
+        "storage_format": "chunked",
+        "counts": {
+          "events": 0,
+          "tasks": 0,
+          "notes": 0
+        },
+        "quick_check": "ok",
+        "enabled_features": [],
+        "workout_plan_ids": []
+      },
+      "after": {
+        "revision": 2,
+        "digest": "6d95c327b46956b91ef8088d870041ae3d584eedcbcda31bc1b67dd23b5f2740",
+        "storage_format": "chunked",
+        "counts": {
+          "events": 0,
+          "tasks": 0,
+          "notes": 0
+        },
+        "quick_check": "ok",
+        "enabled_features": [],
+        "workout_plan_ids": []
+      }
+    },
+    "samples": {
+      "before": {
+        "revision": 2,
+        "digest": "69d935c1bb3fe6a513dce953d8abdb27690ec07886251589d09c6ac8a0549c48",
+        "storage_format": "chunked",
+        "counts": {
+          "events": 6,
+          "tasks": 8,
+          "notes": 5
+        },
+        "quick_check": "ok",
+        "enabled_features": [
+          "activity",
+          "ai",
+          "captureMedia",
+          "externalCalendars",
+          "health",
+          "insights",
+          "nutrition",
+          "planning",
+          "reviews",
+          "workouts"
+        ],
+        "workout_plan_ids": [
+          "sample-upper-body"
+        ]
+      },
+      "after": {
+        "revision": 2,
+        "digest": "69d935c1bb3fe6a513dce953d8abdb27690ec07886251589d09c6ac8a0549c48",
+        "storage_format": "chunked",
+        "counts": {
+          "events": 6,
+          "tasks": 8,
+          "notes": 5
+        },
+        "quick_check": "ok",
+        "enabled_features": [
+          "activity",
+          "ai",
+          "captureMedia",
+          "externalCalendars",
+          "health",
+          "insights",
+          "nutrition",
+          "planning",
+          "reviews",
+          "workouts"
+        ],
+        "workout_plan_ids": [
+          "sample-upper-body"
+        ]
+      }
+    }
+  },
+  "elapsed_seconds": 174.74
+}
