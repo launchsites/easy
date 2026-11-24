@@ -47,7 +47,8 @@ class CaptureArchiveEntry {
     return CaptureArchiveEntry(
       id: json['id'] as String,
       text: json['text'] as String,
-      capturedAt: DateTime.parse(json['capturedAt'] as String),
+      // Relative-date review uses the capture's local clock components.
+      capturedAt: DateTime.parse(json['capturedAt'] as String).toLocal(),
       revision: json['revision'] as int? ?? 1,
       applied: json['applied'] as bool? ?? false,
       audio: ref,
@@ -57,7 +58,7 @@ class CaptureArchiveEntry {
   Map<String, dynamic> toJson() => {
     'id': id,
     'text': text,
-    'capturedAt': capturedAt.toIso8601String(),
+    'capturedAt': capturedAt.toUtc().toIso8601String(),
     'revision': revision,
     'applied': applied,
     if (audio != null) 'audio': audio!.toJson(),

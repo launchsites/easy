@@ -48,7 +48,7 @@ class GymLogEntry {
   Map<String, Object?> _toJson() => {
     'id': id,
     'title': title,
-    'loggedAt': loggedAt.toIso8601String(),
+    'loggedAt': loggedAt.toUtc().toIso8601String(),
     'actual': actual,
     'exerciseId': exerciseId,
     'afterExerciseId': ?afterExerciseId,
@@ -160,7 +160,7 @@ class GymSession {
   GymSession._fromJson(Map<String, dynamic> json)
     : this._(
         planned: json['planned'] as bool,
-        startedAt: DateTime.parse(json['startedAt'] as String),
+        startedAt: DateTime.parse(json['startedAt'] as String).toLocal(),
         finishedAt: DateTime.tryParse(json['finishedAt'] as String? ?? ''),
         planId: json['planId'] as String?,
         planName: json['planName'] as String?,
@@ -191,8 +191,8 @@ class GymSession {
 
   Map<String, Object?> _toJson() => {
     'planned': planned,
-    'startedAt': startedAt.toIso8601String(),
-    'finishedAt': finishedAt?.toIso8601String(),
+    'startedAt': startedAt.toUtc().toIso8601String(),
+    'finishedAt': finishedAt?.toUtc().toIso8601String(),
     'entries': entries.map((entry) => entry._toJson()).toList(),
     if (planId != null) 'planId': planId,
     if (_planName != null) 'planName': _planName,
