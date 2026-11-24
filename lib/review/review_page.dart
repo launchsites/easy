@@ -504,7 +504,7 @@ class _ReviewPageState extends State<ReviewPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(label, style: contentMetadataStyle),
-                SelectableText(value),
+                SelectionArea(child: Text(value)),
               ],
             ),
           ),

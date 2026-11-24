@@ -243,6 +243,12 @@ void main() {
         data.dayFor(day).reflections.single.achieved,
         'Fixed the checklist',
       );
+      final entry = find.byType(ExpansionTile);
+      await tester.ensureVisible(entry);
+      await tester.pumpAndSettle();
+      await tester.tap(entry);
+      await tester.pumpAndSettle();
+      expect(find.text('Fixed the checklist'), findsOneWidget);
       await tester.tap(find.widgetWithText(ChoiceChip, 'History'));
       await tester.pumpAndSettle();
       expect(find.textContaining('1 reflection ·'), findsOneWidget);
@@ -324,6 +330,42 @@ void main() {
     await tester.tap(find.text('Move task'));
     await tester.pumpAndSettle();
     expect(moved, [('flexible', '2026-11-25')]);
+  });
+
+  testWidgets('monthly history can use a cached activity lookup', (
+    tester,
+  ) async {
+    _phone(tester);
+    final day = DateTime(2026, 11, 24, 19);
+    var agendaCalls = 0;
+    var historyCalls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: easyTheme(),
+        home: ReviewPage(
+          data: ReviewData(),
+          clock: () => day,
+          agendaForDay: (_) {
+            agendaCalls++;
+            return const ReviewAgenda();
+          },
+          activityMinutesForDay: (date) {
+            historyCalls++;
+            return date.day == day.day ? 35 : null;
+          },
+          onChanged: (_) async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final initialCalls = agendaCalls;
+    await tester.tap(find.widgetWithText(ChoiceChip, 'History'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show month'));
+    await tester.pumpAndSettle();
+    expect(agendaCalls, initialCalls);
+    expect(historyCalls, greaterThanOrEqualTo(37));
+    expect(find.textContaining('35 min logged'), findsWidgets);
   });
 }
 
