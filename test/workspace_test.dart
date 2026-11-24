@@ -1,4 +1,5 @@
 import 'package:easy/calendar_page.dart';
+import 'package:easy/gym_mode_ui.dart';
 import 'package:easy/gym_session.dart';
 import 'package:easy/list_pages.dart';
 import 'package:easy/main.dart';
@@ -6,6 +7,7 @@ import 'package:easy/mobile_home.dart';
 import 'package:easy/orbit_navigation.dart';
 import 'package:easy/quick_capture.dart';
 import 'package:easy/record_editor.dart';
+import 'package:easy/workout_plan.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -65,7 +67,7 @@ void main() {
   });
 
   testWidgets(
-    'Gym mode focuses home while No mode restores the daily overview',
+    'Gym shows the workout while No mode restores the daily overview',
     (tester) async {
       _setViewport(tester, const Size(390, 844));
       await tester.pumpWidget(const EasyApp());
@@ -76,18 +78,87 @@ void main() {
 
       await _pickMode(tester, 'Gym');
       expect(find.text('Keep the warm-up repeatable'), findsOneWidget);
-      expect(find.text('Objectives'), findsOneWidget);
-      expect(find.text('Log today’s working sets'), findsOneWidget);
-      expect(find.text('Review the last session'), findsOneWidget);
+      expect(find.byType(GymWorkoutOverview), findsOneWidget);
+      expect(find.text('Upper body'), findsOneWidget);
+      expect(find.text('Treadmill'), findsOneWidget);
+      expect(find.text('Bench press'), findsOneWidget);
+      expect(find.text('Objectives'), findsNothing);
+      expect(find.text('Upcoming today'), findsNothing);
+      expect(find.text('Log today’s working sets'), findsNothing);
       expect(find.text('Send the project outline'), findsNothing);
+      expect(
+        tester.widget<MobileModeFrame>(find.byType(MobileModeFrame)).mode,
+        'gym',
+      );
       expect(find.text('Get the outline out first'), findsNothing);
 
       await _pickMode(tester, 'No mode');
       expect(find.text('Get the outline out first'), findsOneWidget);
       expect(find.text('Tasks due today'), findsOneWidget);
       expect(find.text('Objectives'), findsNothing);
+      expect(
+        tester.widget<MobileModeFrame>(find.byType(MobileModeFrame)).mode,
+        isNull,
+      );
     },
   );
+
+  testWidgets('Finishing today’s workout advances the recurring plan', (
+    tester,
+  ) async {
+    _setViewport(tester, const Size(390, 844));
+    final today = DateUtils.dateOnly(DateTime.now());
+    final plan = WorkoutPlan(
+      id: 'interval-plan',
+      name: 'Two-day rotation',
+      schedule: WorkoutSchedule(
+        kind: WorkoutScheduleKind.interval,
+        startDate: today,
+        intervalDays: 2,
+      ),
+      exercises: [
+        WorkoutExercise(
+          id: 'cardio',
+          name: 'Treadmill',
+          kind: WorkoutExerciseKind.cardio,
+          minutes: 8,
+        ),
+      ],
+    );
+    await SharedPreferencesAsync().setStringList('easy.workout-plans.v1', [
+      plan.encode(),
+    ]);
+    await tester.pumpWidget(const EasyApp());
+    await tester.pumpAndSettle();
+    await _pickMode(tester, 'Gym');
+    expect(find.text('Two-day rotation'), findsOneWidget);
+    await tester.tap(find.text('Start'));
+    await tester.pumpAndSettle();
+    expect(find.byType(GymSessionPage), findsOneWidget);
+    expect(find.text('Treadmill'), findsOneWidget);
+
+    await tester.tap(find.text('Finish'));
+    await tester.pumpAndSettle();
+    if (find.widgetWithText(FilledButton, 'Finish').evaluate().isNotEmpty) {
+      await tester.tap(find.widgetWithText(FilledButton, 'Finish'));
+      await tester.pumpAndSettle();
+    }
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    final overview = tester.widget<GymWorkoutOverview>(
+      find.byType(GymWorkoutOverview),
+    );
+    final localizations = MaterialLocalizations.of(
+      tester.element(find.byType(GymWorkoutOverview)),
+    );
+    expect(overview.workoutName, 'Two-day rotation');
+    expect(overview.canStart, isFalse);
+    expect(
+      overview.scheduleLabel,
+      localizations.formatMediumDate(DateUtils.addDaysToDate(today, 2)),
+    );
+  });
 
   testWidgets('Existing notes load and a new note to self survives relaunch', (
     tester,
@@ -125,11 +196,9 @@ void main() {
     await tester.pumpWidget(const EasyApp());
     await tester.pumpAndSettle();
     await _pickMode(tester, 'Gym');
-    await tester.tap(find.text('Start session'));
-    await tester.pumpAndSettle();
-    expect(find.byType(GymSessionPage), findsOneWidget);
     await tester.tap(find.text('Freestyle'));
     await tester.pumpAndSettle();
+    expect(find.byType(GymSessionPage), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'Stretch');
     await tester.tap(find.byTooltip('Log entry'));
     await tester.pumpAndSettle();
@@ -139,7 +208,7 @@ void main() {
     await tester.pumpWidget(const EasyApp());
     await tester.pumpAndSettle();
     await _pickMode(tester, 'Gym');
-    await tester.tap(find.text('Resume session'));
+    await tester.tap(find.text('Resume'));
     await tester.pumpAndSettle();
     expect(find.text('Stretch'), findsOneWidget);
   });

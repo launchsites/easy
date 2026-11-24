@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'calendar_page.dart';
+import 'gym_mode_ui.dart';
 import 'gym_session.dart';
 import 'list_pages.dart';
 import 'mobile_home.dart';
@@ -12,6 +13,8 @@ import 'orbit_navigation.dart';
 import 'quick_capture.dart';
 import 'record_editor.dart';
 import 'today_page.dart';
+import 'workout_plan.dart';
+import 'workout_plans_page.dart';
 import 'workspace_data.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
@@ -46,6 +49,7 @@ enum _Destination {
 
 const _storageKey = 'easy.workspace.v1';
 const _gymStorageKey = 'easy.gym-sessions.v1';
+const _workoutPlansKey = 'easy.workout-plans.v1';
 
 class _Workspace extends StatefulWidget {
   const _Workspace();
@@ -59,6 +63,7 @@ class _WorkspaceState extends State<_Workspace> {
   Future<void> _pendingSave = Future.value();
   late WorkspaceData _data;
   List<GymSession>? _gymSessions;
+  List<WorkoutPlan>? _workoutPlans;
   var _calendarDate = dateOnly(DateTime.now());
   DateTime get _today => dateOnly(DateTime.now());
   var _destination = _Destination.today;
@@ -76,6 +81,7 @@ class _WorkspaceState extends State<_Workspace> {
 
   Future<void> _load() async {
     final gymSessions = _readGymSessions();
+    final workoutPlans = _readWorkoutPlans();
     try {
       final raw = await _storage.getString(_storageKey);
       final data = raw == null
@@ -83,10 +89,12 @@ class _WorkspaceState extends State<_Workspace> {
           : WorkspaceData.decode(raw);
       if (raw == null) await _storage.setString(_storageKey, data.encode());
       final sessions = await gymSessions;
+      final plans = await workoutPlans;
       if (!mounted) return;
       setState(() {
         _data = data;
         _gymSessions = sessions;
+        _workoutPlans = plans;
         _loading = false;
         _loadFailed = false;
       });
@@ -102,6 +110,55 @@ class _WorkspaceState extends State<_Workspace> {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<List<WorkoutPlan>?> _readWorkoutPlans() async {
+    try {
+      final saved = await _storage.getStringList(_workoutPlansKey);
+      if (saved != null) return saved.map(WorkoutPlan.decode).toList();
+      final plans = [_sampleWorkoutPlan(_today)];
+      await _storage.setStringList(
+        _workoutPlansKey,
+        plans.map((plan) => plan.encode()).toList(),
+      );
+      return plans;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _openWorkoutPlans() async {
+    final plans = _workoutPlans ?? await _readWorkoutPlans();
+    if (!mounted) return;
+    if (plans == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Workout plans could not be opened.')),
+      );
+      return;
+    }
+    setState(() => _workoutPlans = plans);
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => MobileModeFrame(
+          mode: 'gym',
+          child: WorkoutPlansPage(plans: plans, onChanged: _saveWorkoutPlans),
+        ),
+      ),
+    );
+  }
+
+  void _saveWorkoutPlans(List<WorkoutPlan> plans) {
+    if (!mounted) return;
+    setState(() => _workoutPlans = List.unmodifiable(plans));
+    _persistWorkoutPlans();
+  }
+
+  void _persistWorkoutPlans() {
+    final snapshot = _workoutPlans!.map((plan) => plan.encode()).toList();
+    _queueSave(
+      () => _storage.setStringList(_workoutPlansKey, snapshot),
+      _persistWorkoutPlans,
+    );
   }
 
   void _update(WorkspaceData data) {
@@ -129,7 +186,7 @@ class _WorkspaceState extends State<_Workspace> {
     });
   }
 
-  Future<void> _openGymSession() async {
+  Future<void> _openGymSession({WorkoutPlan? plan}) async {
     final sessions = _gymSessions ?? await _readGymSessions();
     if (!mounted) return;
     if (sessions == null) {
@@ -139,13 +196,79 @@ class _WorkspaceState extends State<_Workspace> {
       return;
     }
     _gymSessions = sessions;
+    final latest = sessions.lastOrNull;
+    final GymSession session;
+    if (latest != null && !latest.finished) {
+      session = latest;
+    } else {
+      session = GymSession.start(plan: plan);
+      _saveGymSession(session);
+    }
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => GymSessionPage(
-          session: sessions.lastOrNull,
-          onChanged: _saveGymSession,
+        builder: (_) => MobileModeFrame(
+          mode: 'gym',
+          child: GymSessionPage(session: session, onChanged: _saveGymSession),
         ),
       ),
+    );
+  }
+
+  ({WorkoutPlan plan, DateTime date})? _nextWorkout() {
+    ({WorkoutPlan plan, DateTime date})? next;
+    for (final plan in _workoutPlans ?? const <WorkoutPlan>[]) {
+      var date = plan.schedule.nextOnOrAfter(_today);
+      while (date != null && _completedWorkout(plan.id, date)) {
+        date = plan.schedule.nextOnOrAfter(plusDays(date, 1));
+      }
+      if (date != null && (next == null || date.isBefore(next.date))) {
+        next = (plan: plan, date: date);
+      }
+    }
+    return next;
+  }
+
+  bool _completedWorkout(String planId, DateTime date) =>
+      _gymSessions?.any(
+        (session) =>
+            session.finished &&
+            session.planId == planId &&
+            sameDay(session.startedAt.toLocal(), date),
+      ) ??
+      false;
+
+  Widget _gymOverview(BuildContext context) {
+    final session = _gymSessions?.lastOrNull;
+    final active = session != null && !session.finished;
+    final next = active ? null : _nextWorkout();
+    final today = next != null && sameDay(next.date, _today);
+    return GymWorkoutOverview(
+      workoutName: active ? session.workoutTitle : next?.plan.name,
+      scheduleLabel: active
+          ? 'In progress'
+          : next == null
+          ? null
+          : today
+          ? 'Today'
+          : MaterialLocalizations.of(context).formatMediumDate(next.date),
+      exercises: active
+          ? [
+              for (final name in session.upcomingExercises)
+                (name: name, detail: ''),
+            ]
+          : [
+              for (final exercise
+                  in next?.plan.exercises ?? const <WorkoutExercise>[])
+                (
+                  name: exercise.name,
+                  detail: _workoutExerciseSummary(exercise),
+                ),
+            ],
+      active: active,
+      canStart: today,
+      onWorkout: () => _openGymSession(plan: next?.plan),
+      onPlans: _openWorkoutPlans,
+      onFreestyle: _openGymSession,
     );
   }
 
@@ -470,25 +593,7 @@ class _WorkspaceState extends State<_Workspace> {
                 onModeChanged: _changeSpace,
               ),
               note: todayNote,
-              modeAction: space == 'gym'
-                  ? Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: FilledButton.tonalIcon(
-                        onPressed: _openGymSession,
-                        icon: const Icon(
-                          Icons.fitness_center_outlined,
-                          size: 17,
-                        ),
-                        label: Text(
-                          switch (_gymSessions?.lastOrNull?.finished) {
-                            false => 'Resume session',
-                            true => 'Gym session',
-                            null => 'Start session',
-                          },
-                        ),
-                      ),
-                    )
-                  : null,
+              focusedContent: space == 'gym' ? _gymOverview(context) : null,
               events: events,
               tasks: tasks,
               onNoteTap: () => _openHomeNote(todayNote),
@@ -532,105 +637,149 @@ class _WorkspaceState extends State<_Workspace> {
       bindings: shortcuts,
       child: Focus(
         autofocus: true,
-        child: Scaffold(
-          backgroundColor: mobile ? paper : shell,
-          body: SafeArea(
-            bottom: !mobile,
-            child: mobile
-                ? Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Column(
-                        children: [
-                          if (_destination != _Destination.today &&
-                              (_destination != _Destination.calendar ||
-                                  space != null))
-                            _MobileHeader(
-                              space: space,
-                              displayBrand:
-                                  _destination != _Destination.calendar,
-                              onSpaceChanged: _changeSpace,
-                              onSearch: _search,
-                            ),
-                          Expanded(child: page),
-                        ],
-                      ),
-                      Positioned(
-                        right: 20,
-                        bottom: MediaQuery.paddingOf(context).bottom + 20,
-                        child: FloatingActionButton(
-                          heroTag: 'capture',
-                          tooltip: 'Add item',
-                          onPressed: _capture,
-                          backgroundColor: accent,
-                          foregroundColor: Colors.white,
-                          shape: const CircleBorder(),
-                          elevation: 3,
-                          highlightElevation: 1,
-                          hoverElevation: 5,
-                          child: const Icon(Icons.add_rounded, size: 27),
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: OrbitNavigation(
-                          destinations: [
-                            for (final destination in _Destination.values)
-                              OrbitDestination(
-                                destination.label,
-                                destination.icon,
-                              ),
-                          ],
-                          selectedIndex: _destination.index,
-                          onSelected: (index) =>
-                              _navigate(_Destination.values[index]),
-                        ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      _DesktopHeader(onSearch: _search, onCapture: _capture),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 14, 14),
-                          child: Row(
-                            children: [
-                              _Sidebar(
-                                destination: _destination,
-                                compact: compact,
+        child: MobileModeFrame(
+          mode: space,
+          child: Scaffold(
+            backgroundColor: mobile ? paper : shell,
+            body: SafeArea(
+              bottom: !mobile,
+              child: mobile
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Column(
+                          children: [
+                            if (_destination != _Destination.today &&
+                                (_destination != _Destination.calendar ||
+                                    space != null))
+                              _MobileHeader(
                                 space: space,
-                                onNavigate: _navigate,
+                                displayBrand:
+                                    _destination != _Destination.calendar,
                                 onSpaceChanged: _changeSpace,
+                                onSearch: _search,
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(child: _Surface(child: page)),
-                              if (_inspected != null && width >= 1000) ...[
-                                const SizedBox(width: 12),
-                                SizedBox(
-                                  width: width >= 1250 ? 294 : 264,
-                                  child: _Surface(
-                                    child: _RecordDetails(
-                                      record: _inspected!,
-                                      onClose: () =>
-                                          setState(() => _inspected = null),
-                                      onEdit: () => _editRecord(_inspected!),
-                                      onDelete: () =>
-                                          _deleteRecord(_inspected!),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
+                            Expanded(child: page),
+                          ],
+                        ),
+                        Positioned(
+                          right: 20,
+                          bottom: MediaQuery.paddingOf(context).bottom + 20,
+                          child: FloatingActionButton(
+                            heroTag: 'capture',
+                            tooltip: 'Add item',
+                            onPressed: _capture,
+                            backgroundColor: accent,
+                            foregroundColor: Colors.white,
+                            shape: const CircleBorder(),
+                            elevation: 3,
+                            highlightElevation: 1,
+                            hoverElevation: 5,
+                            child: const Icon(Icons.add_rounded, size: 27),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                        Positioned.fill(
+                          child: OrbitNavigation(
+                            destinations: [
+                              for (final destination in _Destination.values)
+                                OrbitDestination(
+                                  destination.label,
+                                  destination.icon,
+                                ),
+                            ],
+                            selectedIndex: _destination.index,
+                            onSelected: (index) =>
+                                _navigate(_Destination.values[index]),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        _DesktopHeader(onSearch: _search, onCapture: _capture),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 0, 14, 14),
+                            child: Row(
+                              children: [
+                                _Sidebar(
+                                  destination: _destination,
+                                  compact: compact,
+                                  space: space,
+                                  onNavigate: _navigate,
+                                  onSpaceChanged: _changeSpace,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(child: _Surface(child: page)),
+                                if (_inspected != null && width >= 1000) ...[
+                                  const SizedBox(width: 12),
+                                  SizedBox(
+                                    width: width >= 1250 ? 294 : 264,
+                                    child: _Surface(
+                                      child: _RecordDetails(
+                                        record: _inspected!,
+                                        onClose: () =>
+                                            setState(() => _inspected = null),
+                                        onEdit: () => _editRecord(_inspected!),
+                                        onDelete: () =>
+                                            _deleteRecord(_inspected!),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+WorkoutPlan _sampleWorkoutPlan(DateTime today) => WorkoutPlan(
+  id: 'sample-upper-body',
+  name: 'Upper body',
+  schedule: WorkoutSchedule(
+    kind: WorkoutScheduleKind.weekdays,
+    startDate: today,
+    weekdays: [today.weekday],
+  ),
+  exercises: [
+    WorkoutExercise(
+      id: 'sample-treadmill',
+      name: 'Treadmill',
+      kind: WorkoutExerciseKind.cardio,
+      distanceKm: 0.5,
+      minutes: 5,
+      inclinePercent: 2,
+    ),
+    WorkoutExercise(
+      id: 'sample-bench',
+      name: 'Bench press',
+      kind: WorkoutExerciseKind.strength,
+      sets: [
+        for (var index = 1; index <= 3; index++)
+          WorkoutSet(id: 'sample-bench-$index', weightKg: 50, reps: 8),
+      ],
+    ),
+  ],
+);
+
+String _workoutExerciseSummary(WorkoutExercise exercise) {
+  if (exercise.kind == WorkoutExerciseKind.strength) {
+    final count = exercise.sets.length;
+    return '$count ${count == 1 ? 'set' : 'sets'}';
+  }
+  String number(double value) => value == value.roundToDouble()
+      ? value.toStringAsFixed(0)
+      : value.toString();
+  return '${number(exercise.distanceKm)} km · ${exercise.minutes} min · '
+      '${number(exercise.inclinePercent)}%';
 }
 
 class _Surface extends StatelessWidget {

@@ -99,7 +99,7 @@ void main() {
     expect(toggledTask, same(due));
   });
 
-  testWidgets('Gym focuses on current objectives and its own note', (
+  testWidgets('Gym shows custom workout content below its own note', (
     tester,
   ) async {
     final date = DateTime(2030, 1, 10);
@@ -108,12 +108,12 @@ void main() {
       title: 'Log working weights',
       category: 'gym',
     );
-    TaskItem? opened;
     await _show(
       tester,
       MobileHome(
         date: date,
         mode: 'gym',
+        focusedContent: const Text('Upper body workout'),
         modeControl: const Text('Mode control'),
         note: NoteItem(
           id: 'gym-note',
@@ -144,7 +144,7 @@ void main() {
         onNoteTap: () {},
         onCalendarTap: () {},
         onEventTap: (_) {},
-        onTaskTap: (task) => opened = task,
+        onTaskTap: (_) {},
         onTaskToggle: (_) {},
       ),
     );
@@ -153,12 +153,13 @@ void main() {
     expect(find.text('Warm-up'), findsOneWidget);
     expect(find.text('Tasks due today'), findsNothing);
     expect(find.text('Book next week'), findsNothing);
+    expect(find.text('Log working weights'), findsNothing);
+    expect(find.text('Objectives'), findsNothing);
+    expect(find.text('Schedule'), findsNothing);
     expect(
-      tester.getTopLeft(find.text('Objectives')).dy,
-      lessThan(tester.getTopLeft(find.text('Schedule')).dy),
+      tester.getTopLeft(find.text('Warm-up')).dy,
+      lessThan(tester.getTopLeft(find.text('Upper body workout')).dy),
     );
-    await tester.tap(find.text('Log working weights'));
-    expect(opened, same(weights));
   });
 
   testWidgets('a mode omits missing note and schedule sections', (

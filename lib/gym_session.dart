@@ -3,6 +3,12 @@ import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
 
 import 'ui_theme.dart';
+import 'workout_plan.dart';
+
+enum GymProgress { pending, done, skipped }
+
+String _progressKey(String exerciseId, [String? setId]) =>
+    jsonEncode([exerciseId, ?setId]);
 
 @immutable
 class GymLogEntry {
@@ -42,15 +48,69 @@ class GymSession {
     required this.planned,
     required this.startedAt,
     this.finishedAt,
+    this.planId,
+    this._planName,
     Iterable<GymLogEntry> entries = const [],
-  }) : entries = List.unmodifiable(entries);
+    Iterable<WorkoutExercise>? structuredExercises,
+    Map<String, GymProgress> progress = const {},
+  }) : entries = List.unmodifiable(entries),
+       _structuredExercises = structuredExercises == null
+           ? null
+           : List.unmodifiable(structuredExercises),
+       _progress = Map.unmodifiable(progress);
+
+  factory GymSession.start({WorkoutPlan? plan, DateTime? now}) => GymSession._(
+    planned: plan != null,
+    startedAt: now ?? DateTime.now(),
+    planId: plan?.id,
+    planName: plan?.name,
+    structuredExercises: plan?.exercises ?? const [],
+  );
 
   final bool planned;
   final DateTime startedAt;
   final DateTime? finishedAt;
   final List<GymLogEntry> entries;
+  final String? planId;
+  final String? _planName;
+  final List<WorkoutExercise>? _structuredExercises;
+  final Map<String, GymProgress> _progress;
 
   bool get finished => finishedAt != null;
+  bool get structured => _structuredExercises != null;
+  List<WorkoutExercise> get exercises => _structuredExercises ?? const [];
+  String get workoutTitle =>
+      _planName ?? (planned ? 'Planned workout' : 'Freestyle');
+
+  GymProgress progressFor(String exerciseId, {String? setId}) =>
+      _progress[_progressKey(exerciseId, setId)] ?? GymProgress.pending;
+
+  List<String> get upcomingExercises {
+    if (finished) return const [];
+    if (!structured) {
+      final logged = entries.map((entry) => entry.exerciseId).toSet();
+      return [
+        if (planned)
+          for (final exercise in _legacyExercises)
+            if (!logged.contains(exercise.id)) exercise.title,
+      ];
+    }
+    return [
+      for (final exercise in exercises)
+        if (switch (exercise.kind) {
+          WorkoutExerciseKind.cardio =>
+            progressFor(exercise.id) == GymProgress.pending,
+          WorkoutExerciseKind.strength =>
+            exercise.sets.isEmpty ||
+                exercise.sets.any(
+                  (set) =>
+                      progressFor(exercise.id, setId: set.id) ==
+                      GymProgress.pending,
+                ),
+        })
+          exercise.name,
+    ];
+  }
 
   factory GymSession.decode(String source) =>
       GymSession._fromJson(jsonDecode(source) as Map<String, dynamic>);
@@ -60,9 +120,20 @@ class GymSession {
         planned: json['planned'] as bool,
         startedAt: DateTime.parse(json['startedAt'] as String),
         finishedAt: DateTime.tryParse(json['finishedAt'] as String? ?? ''),
+        planId: json['planId'] as String?,
+        planName: json['planName'] as String?,
         entries: (json['entries'] as List<dynamic>).map(
           (entry) => GymLogEntry._fromJson(entry as Map<String, dynamic>),
         ),
+        structuredExercises: (json['exercises'] as List<dynamic>?)?.map(
+          (exercise) =>
+              WorkoutExercise.fromJson(exercise as Map<String, dynamic>),
+        ),
+        progress: {
+          for (final entry
+              in (json['progress'] as Map<String, dynamic>? ?? {}).entries)
+            entry.key: GymProgress.values.byName(entry.value as String),
+        },
       );
 
   String encode() => jsonEncode(_toJson());
@@ -72,21 +143,64 @@ class GymSession {
     'startedAt': startedAt.toIso8601String(),
     'finishedAt': finishedAt?.toIso8601String(),
     'entries': entries.map((entry) => entry._toJson()).toList(),
+    if (planId != null) 'planId': planId,
+    if (_planName != null) 'planName': _planName,
+    if (_structuredExercises case final exercises?)
+      'exercises': exercises.map((exercise) => exercise.toJson()).toList(),
+    if (_progress.isNotEmpty)
+      'progress': _progress.map((key, value) => MapEntry(key, value.name)),
   };
 
-  GymSession _withEntries(List<GymLogEntry> entries) => GymSession._(
+  GymSession _copy({
+    DateTime? finishedAt,
+    List<GymLogEntry>? entries,
+    List<WorkoutExercise>? exercises,
+    Map<String, GymProgress>? progress,
+  }) => GymSession._(
     planned: planned,
     startedAt: startedAt,
-    finishedAt: finishedAt,
-    entries: entries,
+    finishedAt: finishedAt ?? this.finishedAt,
+    planId: planId,
+    planName: _planName,
+    entries: entries ?? this.entries,
+    structuredExercises: exercises ?? _structuredExercises,
+    progress: progress ?? _progress,
   );
 
-  GymSession _finish(DateTime date) => GymSession._(
-    planned: planned,
-    startedAt: startedAt,
-    finishedAt: date,
-    entries: entries,
-  );
+  GymSession _withEntries(List<GymLogEntry> entries) => _copy(entries: entries);
+
+  GymSession _finish(DateTime date) => _copy(finishedAt: date);
+
+  GymSession _withExercises(List<WorkoutExercise> exercises) {
+    final keys = {
+      for (final exercise in exercises) ...[
+        _progressKey(exercise.id),
+        for (final set in exercise.sets) _progressKey(exercise.id, set.id),
+      ],
+    };
+    return _copy(
+      exercises: exercises,
+      progress: {
+        for (final entry in _progress.entries)
+          if (keys.contains(entry.key)) entry.key: entry.value,
+      },
+    );
+  }
+
+  GymSession _withProgress(
+    String exerciseId,
+    String? setId,
+    GymProgress value,
+  ) {
+    final key = _progressKey(exerciseId, setId);
+    final updated = {..._progress};
+    if (updated[key] == value) {
+      updated.remove(key);
+    } else {
+      updated[key] = value;
+    }
+    return _copy(progress: updated);
+  }
 }
 
 class GymSessionPage extends StatefulWidget {
@@ -105,10 +219,31 @@ class GymSessionPage extends StatefulWidget {
 
 typedef _Exercise = ({String id, String title, String target});
 
-const _exercises = <_Exercise>[
+const _legacyExercises = <_Exercise>[
   (id: 'treadmill', title: 'Treadmill', target: '0.5 km · 5 min · 2% incline'),
   (id: 'bench', title: 'Bench press', target: '50 kg × 8, 8, 8'),
 ];
+
+enum _Metric {
+  distance('Distance', 'km'),
+  incline('Incline', '%'),
+  minutes('Duration', 'min', integer: true),
+  weight('Weight', 'kg'),
+  reps('Reps', 'reps', integer: true);
+
+  const _Metric(this.label, this.unit, {this.integer = false});
+
+  final String label;
+  final String unit;
+  final bool integer;
+}
+
+typedef _MetricTarget = ({
+  String exerciseId,
+  String? setId,
+  _Metric metric,
+  String title,
+});
 
 class _GymSessionPageState extends State<GymSessionPage> {
   final _input = TextEditingController();
@@ -116,10 +251,15 @@ class _GymSessionPageState extends State<GymSessionPage> {
   late GymSession? _session = widget.session;
   GymLogEntry? _editingEntry;
   _Exercise? _editingExercise;
+  _MetricTarget? _editingMetric;
+  String? _metricInitial;
   String _extraDraft = '';
   String? _error;
 
-  bool get _editing => _editingEntry != null || _editingExercise != null;
+  bool get _editing =>
+      _editingEntry != null ||
+      _editingExercise != null ||
+      _editingMetric != null;
   bool get _active => _session != null && !_session!.finished;
 
   @override
@@ -141,12 +281,17 @@ class _GymSessionPageState extends State<GymSessionPage> {
   }
 
   void _begin(bool planned) {
-    _update(GymSession._(planned: planned, startedAt: DateTime.now()));
+    _update(
+      planned
+          ? GymSession._(planned: true, startedAt: DateTime.now())
+          : GymSession.start(),
+    );
   }
 
   Future<void> _finish() async {
     final session = _session!;
     final initialEdit =
+        _metricInitial ??
         _editingEntry?.actual ??
         _editingEntry?.title ??
         _editingExercise?.target;
@@ -207,6 +352,8 @@ class _GymSessionPageState extends State<GymSessionPage> {
       if (!_editing) _extraDraft = _input.text;
       _editingEntry = entry;
       _editingExercise = exercise;
+      _editingMetric = null;
+      _metricInitial = null;
       _error = null;
       _input.value = TextEditingValue(
         text: value,
@@ -216,10 +363,29 @@ class _GymSessionPageState extends State<GymSessionPage> {
     _focus.requestFocus();
   }
 
+  void _editMetric(_MetricTarget target, num current) {
+    final value = _number(current);
+    setState(() {
+      if (!_editing) _extraDraft = _input.text;
+      _editingEntry = null;
+      _editingExercise = null;
+      _editingMetric = target;
+      _metricInitial = value;
+      _error = null;
+      _input.value = TextEditingValue(
+        text: value,
+        selection: TextSelection(baseOffset: 0, extentOffset: value.length),
+      );
+    });
+    _focus.requestFocus();
+  }
+
   void _cancelEdit() {
     setState(() {
       _editingEntry = null;
       _editingExercise = null;
+      _editingMetric = null;
+      _metricInitial = null;
       _error = null;
       _input.value = TextEditingValue(
         text: _extraDraft,
@@ -237,7 +403,9 @@ class _GymSessionPageState extends State<GymSessionPage> {
       _focus.requestFocus();
       return;
     }
-    if (_editingEntry case final entry?) {
+    if (_editingMetric case final target?) {
+      if (!_saveMetric(target, value)) return;
+    } else if (_editingEntry case final entry?) {
       _replaceEntry(entry, value);
     } else if (_editingExercise case final exercise?) {
       _logExercise(exercise, value);
@@ -250,6 +418,145 @@ class _GymSessionPageState extends State<GymSessionPage> {
     } else {
       _input.clear();
     }
+  }
+
+  String _number(num value) =>
+      value == value.toInt() ? value.toInt().toString() : value.toString();
+
+  bool _saveMetric(_MetricTarget target, String text) {
+    final metric = target.metric;
+    final value = metric.integer
+        ? int.tryParse(text)
+        : double.tryParse(text.replaceAll(',', '.'));
+    if (value == null ||
+        !value.isFinite ||
+        (metric != _Metric.incline && value < 0)) {
+      setState(
+        () => _error = metric.integer
+            ? 'Enter a whole number.'
+            : 'Enter a number.',
+      );
+      _focus.requestFocus();
+      return false;
+    }
+    final exercise = _session!.exercises
+        .where((exercise) => exercise.id == target.exerciseId)
+        .firstOrNull;
+    if (exercise == null) return true;
+    final changed = switch (metric) {
+      _Metric.distance => exercise.copyWith(distanceKm: value.toDouble()),
+      _Metric.incline => exercise.copyWith(inclinePercent: value.toDouble()),
+      _Metric.minutes => exercise.copyWith(minutes: value.toInt()),
+      _Metric.weight || _Metric.reps => exercise.copyWith(
+        sets: [
+          for (final set in exercise.sets)
+            if (set.id != target.setId)
+              set
+            else if (metric == _Metric.weight)
+              set.copyWith(weightKg: value.toDouble())
+            else
+              set.copyWith(reps: value.toInt()),
+        ],
+      ),
+    };
+    _replaceExercise(changed);
+    return true;
+  }
+
+  void _replaceExercise(WorkoutExercise changed) {
+    final session = _session!;
+    _update(
+      session._withExercises([
+        for (final exercise in session.exercises)
+          exercise.id == changed.id ? changed : exercise,
+      ]),
+    );
+  }
+
+  void _addSet(WorkoutExercise exercise) {
+    final previous = exercise.sets.lastOrNull;
+    _replaceExercise(
+      exercise.copyWith(
+        sets: [
+          ...exercise.sets,
+          previous?.copyWith(id: newWorkoutId()) ??
+              WorkoutSet(id: newWorkoutId()),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addExercise() async {
+    final result = await showDialog<WorkoutExercise>(
+      context: context,
+      builder: (_) => const _AddSessionExercise(),
+    );
+    if (!mounted || result == null || !_active) return;
+    final session = _session!;
+    _update(session._withExercises([...session.exercises, result]));
+  }
+
+  Future<bool> _confirmRemoval(String label) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Remove $label?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    return mounted && result == true;
+  }
+
+  Future<void> _removeSet(
+    WorkoutExercise exercise,
+    WorkoutSet set,
+    int index,
+  ) async {
+    final progress = _session!.progressFor(exercise.id, setId: set.id);
+    if (progress != GymProgress.pending &&
+        !await _confirmRemoval('set ${index + 1}')) {
+      return;
+    }
+    if (!_active) return;
+    if (_editingMetric?.setId == set.id) _cancelEdit();
+    final current = _session!.exercises
+        .where((item) => item.id == exercise.id)
+        .firstOrNull;
+    if (current == null) return;
+    _replaceExercise(
+      current.copyWith(
+        sets: current.sets.where((item) => item.id != set.id).toList(),
+      ),
+    );
+  }
+
+  Future<void> _removeExercise(WorkoutExercise exercise) async {
+    final session = _session!;
+    final hasResult =
+        session.progressFor(exercise.id) != GymProgress.pending ||
+        exercise.sets.any(
+          (set) =>
+              session.progressFor(exercise.id, setId: set.id) !=
+              GymProgress.pending,
+        );
+    if (hasResult && !await _confirmRemoval(exercise.name)) return;
+    if (!_active) return;
+    if (_editingMetric?.exerciseId == exercise.id) _cancelEdit();
+    final current = _session!;
+    _update(
+      current._withExercises(
+        current.exercises.where((item) => item.id != exercise.id).toList(),
+      ),
+    );
   }
 
   void _replaceEntry(GymLogEntry entry, String value) {
@@ -382,6 +689,261 @@ class _GymSessionPageState extends State<GymSessionPage> {
     );
   }
 
+  Widget _metric(
+    WorkoutExercise exercise,
+    _Metric metric,
+    num value, {
+    WorkoutSet? set,
+    int? index,
+  }) {
+    final numeral = _number(value);
+    final display = metric == _Metric.incline
+        ? '$numeral%'
+        : '$numeral ${metric.unit}';
+    if (!_active) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Text(display, style: const TextStyle(color: muted)),
+      );
+    }
+    final target = index == null
+        ? exercise.name
+        : '${exercise.name}, set ${index + 1}';
+    return Tooltip(
+      message: 'Edit ${metric.label.toLowerCase()} for $target',
+      child: TextButton(
+        style: TextButton.styleFrom(
+          minimumSize: const Size.square(48),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+          foregroundColor: ink,
+          backgroundColor: raisedPaper,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(color: line),
+          ),
+        ),
+        onPressed: () => _editMetric((
+          exerciseId: exercise.id,
+          setId: set?.id,
+          metric: metric,
+          title: '${metric.label} · $target',
+        ), value),
+        child: Text(display, textAlign: TextAlign.center),
+      ),
+    );
+  }
+
+  Widget _progressControls(String label, String exerciseId, [String? setId]) {
+    final session = _session!;
+    final progress = session.progressFor(exerciseId, setId: setId);
+    const doneColor = Color(0xff365f43);
+    const skipColor = Color(0xff8f4438);
+    if (!_active) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7),
+        child: Text(
+          switch (progress) {
+            GymProgress.pending => 'Pending',
+            GymProgress.done => 'Done',
+            GymProgress.skipped => 'Skipped',
+          },
+          style: TextStyle(
+            color: switch (progress) {
+              GymProgress.pending => muted,
+              GymProgress.done => doneColor,
+              GymProgress.skipped => skipColor,
+            },
+          ),
+        ),
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (action, title, icon, color) in [
+          (
+            GymProgress.done,
+            'Mark $label done',
+            Icons.check_rounded,
+            doneColor,
+          ),
+          (GymProgress.skipped, 'Skip $label', Icons.close_rounded, skipColor),
+        ])
+          IconButton(
+            isSelected: progress == action,
+            tooltip: progress == action
+                ? 'Clear ${action.name} for $label'
+                : title,
+            onPressed: () =>
+                _update(_session!._withProgress(exerciseId, setId, action)),
+            style: IconButton.styleFrom(
+              minimumSize: const Size.square(48),
+              foregroundColor: progress == action ? Colors.white : color,
+              backgroundColor: progress == action ? color : null,
+            ),
+            icon: Icon(icon, size: 21),
+          ),
+      ],
+    );
+  }
+
+  Widget _metricLine({
+    Widget? leading,
+    required List<Widget> values,
+    required Widget progress,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final valuesRow = Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: values,
+        );
+        if (constraints.maxWidth < 232 ||
+            MediaQuery.textScalerOf(context).scale(14) > 20) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  ?leading,
+                  Expanded(child: valuesRow),
+                ],
+              ),
+              Align(alignment: AlignmentDirectional.centerEnd, child: progress),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            ?leading,
+            Expanded(child: valuesRow),
+            progress,
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _structuredExercise(WorkoutExercise exercise) {
+    final cardio = exercise.kind == WorkoutExerciseKind.cardio;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  exercise.name,
+                  style: const TextStyle(
+                    color: ink,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (_active)
+                PopupMenuButton<String>(
+                  tooltip: 'Options for ${exercise.name}',
+                  icon: const Icon(Icons.more_horiz_rounded, color: muted),
+                  onSelected: (_) => _removeExercise(exercise),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'remove',
+                      child: Text('Remove exercise'),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 11, top: 3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (cardio)
+                  _metricLine(
+                    values: [
+                      _metric(exercise, _Metric.distance, exercise.distanceKm),
+                      _metric(
+                        exercise,
+                        _Metric.incline,
+                        exercise.inclinePercent,
+                      ),
+                      _metric(exercise, _Metric.minutes, exercise.minutes),
+                    ],
+                    progress: _progressControls(exercise.name, exercise.id),
+                  )
+                else ...[
+                  for (var index = 0; index < exercise.sets.length; index++)
+                    _setLine(exercise, index),
+                  if (_active)
+                    TextButton.icon(
+                      onPressed: () => _addSet(exercise),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Add set'),
+                    ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 7),
+          const Divider(height: 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _setLine(WorkoutExercise exercise, int index) {
+    final number = index + 1;
+    final set = exercise.sets[index];
+    final setLabel = _active
+        ? PopupMenuButton<String>(
+            tooltip: 'Set $number options for ${exercise.name}',
+            padding: EdgeInsets.zero,
+            icon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('$number', style: const TextStyle(color: muted)),
+                const SizedBox(width: 3),
+                const Icon(Icons.more_horiz_rounded, size: 13, color: muted),
+              ],
+            ),
+            onSelected: (_) => _removeSet(exercise, set, index),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'remove', child: Text('Remove set')),
+            ],
+          )
+        : Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text('$number', style: const TextStyle(color: muted)),
+          );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: _metricLine(
+        leading: setLabel,
+        values: [
+          _metric(
+            exercise,
+            _Metric.weight,
+            set.weightKg,
+            set: set,
+            index: index,
+          ),
+          _metric(exercise, _Metric.reps, set.reps, set: set, index: index),
+        ],
+        progress: _progressControls(
+          '${exercise.name} set $number',
+          exercise.id,
+          set.id,
+        ),
+      ),
+    );
+  }
+
   Widget _entryRow(GymLogEntry entry, {required bool editable}) {
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 0, right: 1),
@@ -420,6 +982,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
   }
 
   Widget _inputBar(double side) {
+    final metric = _editingMetric;
     final exercise =
         _editingExercise?.title ??
         (_editingEntry?.exerciseId == null ? null : _editingEntry?.title);
@@ -439,7 +1002,10 @@ class _GymSessionPageState extends State<GymSessionPage> {
                 children: [
                   Expanded(
                     child: Text(
-                      exercise == null ? 'Edit entry' : 'Actual · $exercise',
+                      metric?.title ??
+                          (exercise == null
+                              ? 'Edit entry'
+                              : 'Actual · $exercise'),
                       style: const TextStyle(
                         color: ink,
                         fontWeight: FontWeight.w600,
@@ -464,6 +1030,12 @@ class _GymSessionPageState extends State<GymSessionPage> {
               controller: _input,
               focusNode: _focus,
               textCapitalization: TextCapitalization.sentences,
+              keyboardType: metric == null
+                  ? TextInputType.text
+                  : TextInputType.numberWithOptions(
+                      decimal: !metric.metric.integer,
+                      signed: metric.metric == _Metric.incline,
+                    ),
               textInputAction: TextInputAction.done,
               onEditingComplete: () {},
               onSubmitted: (_) => _submit(),
@@ -471,7 +1043,13 @@ class _GymSessionPageState extends State<GymSessionPage> {
                 if (_error != null) setState(() => _error = null);
               },
               decoration: InputDecoration(
-                hintText: _editing ? 'Enter actual' : 'Add an exercise or note',
+                hintText: metric == null
+                    ? _editing
+                          ? 'Enter actual'
+                          : _session?.structured == true
+                          ? 'Add a note or extra'
+                          : 'Add an exercise or note'
+                    : metric.metric.unit,
                 errorText: _error,
                 filled: true,
                 fillColor: raisedPaper,
@@ -488,7 +1066,11 @@ class _GymSessionPageState extends State<GymSessionPage> {
                 suffixIcon: Padding(
                   padding: const EdgeInsets.all(4),
                   child: IconButton.filled(
-                    tooltip: _editing ? 'Save entry' : 'Log entry',
+                    tooltip: metric != null
+                        ? 'Save value'
+                        : _editing
+                        ? 'Save entry'
+                        : 'Log entry',
                     onPressed: _submit,
                     icon: Icon(
                       _editing
@@ -512,13 +1094,17 @@ class _GymSessionPageState extends State<GymSessionPage> {
     final logged = {
       for (final entry in session?.entries ?? []) entry.exerciseId,
     };
-    final pending = session?.planned == true
-        ? _exercises.where((exercise) => !logged.contains(exercise.id)).toList()
+    final pending = session?.planned == true && !session!.structured
+        ? _legacyExercises
+              .where((exercise) => !logged.contains(exercise.id))
+              .toList()
         : const <_Exercise>[];
     final side = MediaQuery.sizeOf(context).width < 600 ? 20.0 : 30.0;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gym session'),
+        title: Text(
+          session?.structured == true ? session!.workoutTitle : 'Gym session',
+        ),
         backgroundColor: paper,
         surfaceTintColor: Colors.transparent,
         actions: [
@@ -544,8 +1130,25 @@ class _GymSessionPageState extends State<GymSessionPage> {
                     padding: EdgeInsets.fromLTRB(side, 18, side, 22),
                     children: [
                       if (session != null) ...[
-                        if (session.finished) ...[
-                          _heading('Session complete'),
+                        if (session.finished) ...[_heading('Session complete')],
+                        if (session.structured) ...[
+                          for (final exercise in session.exercises)
+                            _structuredExercise(exercise),
+                          if (_active)
+                            Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: TextButton.icon(
+                                onPressed: _addExercise,
+                                icon: const Icon(Icons.add_rounded, size: 19),
+                                label: const Text('Add exercise'),
+                              ),
+                            ),
+                          if (session.entries.isNotEmpty) ...[
+                            const SizedBox(height: 15),
+                            _heading('Session log'),
+                            _entries(session, editable: _active),
+                          ],
+                        ] else if (session.finished) ...[
                           _entries(session, editable: false),
                           const SizedBox(height: 24),
                         ] else ...[
@@ -558,7 +1161,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
                           _entries(session, editable: true),
                         ],
                       ],
-                      if (!_active) ...[
+                      if (!_active && session?.structured != true) ...[
                         if (session != null) _heading('Start another session'),
                         _choice(
                           title: 'Planned session',
@@ -583,6 +1186,91 @@ class _GymSessionPageState extends State<GymSessionPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AddSessionExercise extends StatefulWidget {
+  const _AddSessionExercise();
+
+  @override
+  State<_AddSessionExercise> createState() => _AddSessionExerciseState();
+}
+
+class _AddSessionExerciseState extends State<_AddSessionExercise> {
+  final _form = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  WorkoutExerciseKind _kind = WorkoutExerciseKind.strength;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_form.currentState!.validate()) return;
+    Navigator.pop(
+      context,
+      WorkoutExercise(
+        id: newWorkoutId(),
+        name: _name.text.trim(),
+        kind: _kind,
+        sets: [
+          if (_kind == WorkoutExerciseKind.strength)
+            WorkoutSet(id: newWorkoutId()),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      title: const Text('Add exercise'),
+      content: Form(
+        key: _form,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextFormField(
+              controller: _name,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Name'),
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _save(),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Enter an exercise name.'
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              children: [
+                for (final (kind, label) in [
+                  (WorkoutExerciseKind.strength, 'Strength'),
+                  (WorkoutExerciseKind.cardio, 'Cardio'),
+                ])
+                  ChoiceChip(
+                    label: Text(label),
+                    selected: _kind == kind,
+                    onSelected: (_) => setState(() => _kind = kind),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('Add')),
+      ],
     );
   }
 }

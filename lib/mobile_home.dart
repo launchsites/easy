@@ -15,7 +15,7 @@ class MobileHome extends StatelessWidget {
     required this.tasks,
     required this.onNoteTap,
     required this.onCalendarTap,
-    this.modeAction,
+    this.focusedContent,
     required this.onEventTap,
     required this.onTaskTap,
     required this.onTaskToggle,
@@ -25,7 +25,7 @@ class MobileHome extends StatelessWidget {
   final DateTime date;
   final String? mode;
   final Widget modeControl;
-  final Widget? modeAction;
+  final Widget? focusedContent;
   final NoteItem? note;
   final List<CalendarEvent> events;
   final List<TaskItem> tasks;
@@ -198,15 +198,13 @@ class MobileHome extends StatelessWidget {
           ),
           const SizedBox(height: 24),
         ],
-        if (activeMode == null) ...[
+        if (focusedContent case final content?)
+          content
+        else if (activeMode == null) ...[
           schedule,
           const SizedBox(height: 23),
           taskList,
         ] else ...[
-          if (modeAction case final action?) ...[
-            action,
-            const SizedBox(height: 24),
-          ],
           taskList,
           if (dayEvents.isNotEmpty) ...[const SizedBox(height: 23), schedule],
         ],
