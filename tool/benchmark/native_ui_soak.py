@@ -206,7 +206,14 @@ def run_cycle(args, window, scratch, index):
         navigate(y)
         if index % args.check_every == 0:
             send("mousemove", "--window", window, 1256, 49)
-            page_checks[name] = check_desktop_route(window, scratch, y, heading, args)
+            first = check_desktop_route(window, scratch, y, heading, args, timeout=3)
+            if first["selected"]:
+                page_checks[name] = {**first, "click_attempts": 1}
+            else:
+                navigate(y)
+                send("mousemove", "--window", window, 1256, 49)
+                second = check_desktop_route(window, scratch, y, heading, args)
+                page_checks[name] = {**second, "click_attempts": 2, "first_click": first}
         if name != "Today":
             scroll(665, 530, 5)
             scroll(665, 530, 4)
@@ -218,8 +225,8 @@ def run_cycle(args, window, scratch, index):
         wait_for_resize(window, False, args.x11_capture)
         send(
             "mousemove", "--window", window, 48, height - 48, "mousedown", 1,
-            "sleep", 0.48, "mousemove", "--window", window, 108, height - 151,
-            "sleep", 0.18, "mouseup", 1,
+            "sleep", 0.85, "mousemove", "--window", window, 108, height - 151,
+            "sleep", 0.27, "mouseup", 1,
         )
         orbit_check = check_visible_page(
             window, scratch,
@@ -311,6 +318,7 @@ def main():
         ]
         evidence["desktop_route_checks"] = len(desktop_checks)
         evidence["desktop_route_mismatches"] = sum(not check["selected"] for check in desktop_checks)
+        evidence["desktop_retried_clicks"] = sum(check["click_attempts"] > 1 for check in desktop_checks)
         evidence["desktop_headings_visible"] = sum(check["heading_visible"] for check in desktop_checks)
         orbit_checks = [
             observation["mobile_orbit_calendar"]

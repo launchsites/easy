@@ -110,12 +110,16 @@ The same frozen release completed 269 navigation cycles in 1,801 seconds on one 
 
 The 11,721-record synthetic workspace had the same revision and digest at both ends and both SQLite integrity checks passed. Process RSS moved from 294 to 449 MiB and peak RSS was 487 MiB. Sampled RSS was 385 to 394 MiB in the middle and last third of the loop. These measurements describe this run, with software rendering on a shared host. [Original navigation soak](benchmark-results/native-soak-heading-probes-epyc-20261124.json)
 
+A second release frozen at `2890b145f7781e59aa4a0e8d3bd285a9418465fc` completed 270 cycles in 1,801.75 seconds on one virtual CPU. All 156 sampled desktop sections showed the expected selected sidebar state on the first click. All 24 sampled mobile orbit gestures opened Calendar. The Today heading was outside the sampled image in 38 checks. The workspace used chunked storage and retained all 11,721 records, the same logical digest and the same revision. Both SQLite integrity checks passed. [Selected-route navigation soak](benchmark-results/native-soak-route-probes-epyc-20261124.json)
+
+Process RSS moved from 320 to 470 MiB with a 479 MiB peak. The third of samples nearest the end ranged from 371 to 445 MiB. The shared cgroup recorded allocation pressure and zero OOM kills. The tested viewports ranged from 320×568 to 1280×900. [Selected-route memory samples](benchmark-results/native-soak-route-probes-epyc-20261124.json)
+
 On a disposable X11 display, launch the release with one permitted CPU and an isolated synthetic workspace. Run the probe in the same display after the window appears. It requires `xdotool`, ImageMagick and Tesseract.
 
 ```sh
 python3 tool/benchmark/native_ui_soak.py \
   --seconds 1800 --minimum-cycles 100 --check-every 7 \
-  --app-revision 8670be647657925862931c2b3b58683656ca2ef7 \
+  --app-revision 2890b145f7781e59aa4a0e8d3bd285a9418465fc \
   --workspace-database "$easy_ui_dir/data/app.launchsites.easy/easy/workspace.sqlite3" \
   --output "$easy_ui_dir/native-soak.json"
 ```

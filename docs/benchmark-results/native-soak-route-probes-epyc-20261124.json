@@ -1,0 +1,2308 @@
+{
+  "run_at_utc": "2026-11-24T03:55:33.027739+00:00",
+  "app_revision": "2890b145f7781e59aa4a0e8d3bd285a9418465fc",
+  "executable_sha256": "420da06cb184d088a5b9679c87de77b52d795d8d35e1ea51e68af2c7c4266c84",
+  "aot_library_sha256": "ffec8b4feff856733c6da2b7876effb943e21576db046e4568bee46c08f849a2",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "host_memory_kib": 18440100,
+    "cgroup_cpu_max": "400000 100000",
+    "cgroup_memory_max": "17179869184",
+    "cgroup_memory_events_before": "low 0\nhigh 0\nmax 94927\noom 0\noom_kill 0\noom_group_kill 0",
+    "cgroup_memory_events_after": "low 0\nhigh 0\nmax 132734\noom 0\noom_kill 0\noom_group_kill 0"
+  },
+  "viewports": [
+    [
+      390,
+      844
+    ],
+    [
+      320,
+      568
+    ],
+    [
+      719,
+      860
+    ],
+    [
+      760,
+      860
+    ],
+    [
+      1280,
+      900
+    ]
+  ],
+  "target_seconds": 1800,
+  "minimum_cycles": 100,
+  "affinity": [
+    4
+  ],
+  "cycles": 270,
+  "observations": [
+    {
+      "cycle": 1,
+      "elapsed_seconds": 16.19,
+      "memory_kib": {
+        "VmHWM": 412228,
+        "VmRSS": 340368
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "68242061d8456a456d8c264a8da701be1c436c02663990389efc558028531f73"
+      }
+    },
+    {
+      "cycle": 8,
+      "elapsed_seconds": 67.35,
+      "memory_kib": {
+        "VmHWM": 448176,
+        "VmRSS": 399808
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "551fd583513cff17f9b6660d852c71c2a0963e4b57808597677668975de700bd",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "de4a79fd4d49856b9daeeeb920c00837cdf1dec2797c20c751764fd4b85b3581",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "b207d50a8d232d8d5d09df996b44a00269012e75e46739698759535df18127ce"
+      }
+    },
+    {
+      "cycle": 15,
+      "elapsed_seconds": 117.82,
+      "memory_kib": {
+        "VmHWM": 453952,
+        "VmRSS": 414100
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "6548f258d8e5d256c46c4310c80bc3c879b4aaf8ec63e272623afffb830760a1",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "c61de3a2f849001f6cd69f2f4ba718ca28743f0a21ac815df335ae57701a15b9",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 22,
+      "elapsed_seconds": 164.47,
+      "memory_kib": {
+        "VmHWM": 453952,
+        "VmRSS": 363108
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            44,
+            55,
+            45
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "a056010ec9f32667eb099ce208fdd8b13a7a94a3798d3e222e55b0bc10225975",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "c61de3a2f849001f6cd69f2f4ba718ca28743f0a21ac815df335ae57701a15b9",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "7c7b606783ac340d3a8cd1602ab44bac5a0d351de26e1dc1bc9dd8868fb19a9a"
+      }
+    },
+    {
+      "cycle": 29,
+      "elapsed_seconds": 206.37,
+      "memory_kib": {
+        "VmHWM": 453952,
+        "VmRSS": 409980
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "a056010ec9f32667eb099ce208fdd8b13a7a94a3798d3e222e55b0bc10225975",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "de4a79fd4d49856b9daeeeb920c00837cdf1dec2797c20c751764fd4b85b3581",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "98e6809b9621175d84504677370eb3b508503e7cb7c85c4367936e8236e90d79",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 36,
+      "elapsed_seconds": 254.34,
+      "memory_kib": {
+        "VmHWM": 453952,
+        "VmRSS": 391056
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            44,
+            56,
+            46
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "a056010ec9f32667eb099ce208fdd8b13a7a94a3798d3e222e55b0bc10225975",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "de4a79fd4d49856b9daeeeb920c00837cdf1dec2797c20c751764fd4b85b3581",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "98e6809b9621175d84504677370eb3b508503e7cb7c85c4367936e8236e90d79",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "b56a8acce4a048e879c83a2252c8331018a5f4dd5cf1b2738710ff65369fd90b"
+      }
+    },
+    {
+      "cycle": 43,
+      "elapsed_seconds": 306.53,
+      "memory_kib": {
+        "VmHWM": 453952,
+        "VmRSS": 400972
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "64a70156b6efdd3487ea9d2590699622cde01e5068cf0058829e39908e99ef38",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "dad080df11af7d563ae8a379e4369cd6066a901616958a0e639bc17a36e20929",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "4da4b40d96a08fbe1aa7031d3b8e0838fc3305df7930be00edf0c1d91617ebb7"
+      }
+    },
+    {
+      "cycle": 50,
+      "elapsed_seconds": 352.65,
+      "memory_kib": {
+        "VmHWM": 453952,
+        "VmRSS": 424124
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "64a70156b6efdd3487ea9d2590699622cde01e5068cf0058829e39908e99ef38",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "a1b8a95f4026db94cb503593cd36176383d786e353c208a7498cc1a895979f4f",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 57,
+      "elapsed_seconds": 399.09,
+      "memory_kib": {
+        "VmHWM": 457800,
+        "VmRSS": 395988
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "37a772858fcf09380ad96bd8f72fc499e95a7226c94c15b092107d26d3676016",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "de4a79fd4d49856b9daeeeb920c00837cdf1dec2797c20c751764fd4b85b3581",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "7c7b606783ac340d3a8cd1602ab44bac5a0d351de26e1dc1bc9dd8868fb19a9a"
+      }
+    },
+    {
+      "cycle": 64,
+      "elapsed_seconds": 443.37,
+      "memory_kib": {
+        "VmHWM": 460428,
+        "VmRSS": 399328
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "37a772858fcf09380ad96bd8f72fc499e95a7226c94c15b092107d26d3676016",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "869a71b4eabece0457b87449dda07c32d442cb76c6035cf152148178a22ec608",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 71,
+      "elapsed_seconds": 484.28,
+      "memory_kib": {
+        "VmHWM": 466104,
+        "VmRSS": 365120
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "37a772858fcf09380ad96bd8f72fc499e95a7226c94c15b092107d26d3676016",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "dad080df11af7d563ae8a379e4369cd6066a901616958a0e639bc17a36e20929",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "511c044b68c67042ad07667ce2df27ba955daa0e28e0344ee10a34282c69c77c"
+      }
+    },
+    {
+      "cycle": 78,
+      "elapsed_seconds": 528.8,
+      "memory_kib": {
+        "VmHWM": 466632,
+        "VmRSS": 409584
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "37a772858fcf09380ad96bd8f72fc499e95a7226c94c15b092107d26d3676016",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "de4a79fd4d49856b9daeeeb920c00837cdf1dec2797c20c751764fd4b85b3581",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "0f7343d06c37799b3796b8ccba934fa1210344e30c86e557f793dab5206627d4",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "b207d50a8d232d8d5d09df996b44a00269012e75e46739698759535df18127ce"
+      }
+    },
+    {
+      "cycle": 85,
+      "elapsed_seconds": 573.71,
+      "memory_kib": {
+        "VmHWM": 466632,
+        "VmRSS": 417100
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "bfe0c70ce6745e2ca074da46995bb45eae19917d12b905e32ee57710ebba86ee",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "869a71b4eabece0457b87449dda07c32d442cb76c6035cf152148178a22ec608",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 92,
+      "elapsed_seconds": 626.43,
+      "memory_kib": {
+        "VmHWM": 466632,
+        "VmRSS": 360108
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "f206ceb2aee100ba0a566910fb5a5e76ab38dfefd4095d3178455a957f6385a4",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "7c7b606783ac340d3a8cd1602ab44bac5a0d351de26e1dc1bc9dd8868fb19a9a"
+      }
+    },
+    {
+      "cycle": 99,
+      "elapsed_seconds": 675.05,
+      "memory_kib": {
+        "VmHWM": 466632,
+        "VmRSS": 435828
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "f206ceb2aee100ba0a566910fb5a5e76ab38dfefd4095d3178455a957f6385a4",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 106,
+      "elapsed_seconds": 722.77,
+      "memory_kib": {
+        "VmHWM": 466632,
+        "VmRSS": 401340
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "f206ceb2aee100ba0a566910fb5a5e76ab38dfefd4095d3178455a957f6385a4",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "d87ce9f534f975e4d6ca7c8ec0e4e4781ab661d54e3ada665360071b5607eee9",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "68242061d8456a456d8c264a8da701be1c436c02663990389efc558028531f73"
+      }
+    },
+    {
+      "cycle": 113,
+      "elapsed_seconds": 771.28,
+      "memory_kib": {
+        "VmHWM": 466632,
+        "VmRSS": 422904
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "f206ceb2aee100ba0a566910fb5a5e76ab38dfefd4095d3178455a957f6385a4",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "d87ce9f534f975e4d6ca7c8ec0e4e4781ab661d54e3ada665360071b5607eee9",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "b207d50a8d232d8d5d09df996b44a00269012e75e46739698759535df18127ce"
+      }
+    },
+    {
+      "cycle": 120,
+      "elapsed_seconds": 817.55,
+      "memory_kib": {
+        "VmHWM": 466632,
+        "VmRSS": 434544
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "f206ceb2aee100ba0a566910fb5a5e76ab38dfefd4095d3178455a957f6385a4",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "d87ce9f534f975e4d6ca7c8ec0e4e4781ab661d54e3ada665360071b5607eee9",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 127,
+      "elapsed_seconds": 863.75,
+      "memory_kib": {
+        "VmHWM": 468360,
+        "VmRSS": 411368
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "f206ceb2aee100ba0a566910fb5a5e76ab38dfefd4095d3178455a957f6385a4",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "d87ce9f534f975e4d6ca7c8ec0e4e4781ab661d54e3ada665360071b5607eee9",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            55,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "7c7b606783ac340d3a8cd1602ab44bac5a0d351de26e1dc1bc9dd8868fb19a9a"
+      }
+    },
+    {
+      "cycle": 134,
+      "elapsed_seconds": 907.59,
+      "memory_kib": {
+        "VmHWM": 470428,
+        "VmRSS": 395544
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "f206ceb2aee100ba0a566910fb5a5e76ab38dfefd4095d3178455a957f6385a4",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "d87ce9f534f975e4d6ca7c8ec0e4e4781ab661d54e3ada665360071b5607eee9",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            55,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 141,
+      "elapsed_seconds": 955.26,
+      "memory_kib": {
+        "VmHWM": 470428,
+        "VmRSS": 373204
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "f206ceb2aee100ba0a566910fb5a5e76ab38dfefd4095d3178455a957f6385a4",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "d87ce9f534f975e4d6ca7c8ec0e4e4781ab661d54e3ada665360071b5607eee9",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "68242061d8456a456d8c264a8da701be1c436c02663990389efc558028531f73"
+      }
+    },
+    {
+      "cycle": 148,
+      "elapsed_seconds": 998.59,
+      "memory_kib": {
+        "VmHWM": 472936,
+        "VmRSS": 421964
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            44,
+            55,
+            45
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "b31b2d21987deb82e75da6bbd08470ab2aefd827c8b7d4edd36ceab6aa64c776",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "869a71b4eabece0457b87449dda07c32d442cb76c6035cf152148178a22ec608",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "b207d50a8d232d8d5d09df996b44a00269012e75e46739698759535df18127ce"
+      }
+    },
+    {
+      "cycle": 155,
+      "elapsed_seconds": 1039.12,
+      "memory_kib": {
+        "VmHWM": 480028,
+        "VmRSS": 426268
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "7123252af1efec179bdbf2ef61a8c98cda6eeef6a838822fb2124ada2e1f2608",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            44,
+            56,
+            46
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "d87ce9f534f975e4d6ca7c8ec0e4e4781ab661d54e3ada665360071b5607eee9",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 162,
+      "elapsed_seconds": 1082.76,
+      "memory_kib": {
+        "VmHWM": 480028,
+        "VmRSS": 370192
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "7123252af1efec179bdbf2ef61a8c98cda6eeef6a838822fb2124ada2e1f2608",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            44,
+            56,
+            46
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "02d17732850d66d8369757aab8bf10b63c168ea822e10c5c699577df924236f3",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "7c7b606783ac340d3a8cd1602ab44bac5a0d351de26e1dc1bc9dd8868fb19a9a"
+      }
+    },
+    {
+      "cycle": 169,
+      "elapsed_seconds": 1121.96,
+      "memory_kib": {
+        "VmHWM": 480028,
+        "VmRSS": 436020
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "7123252af1efec179bdbf2ef61a8c98cda6eeef6a838822fb2124ada2e1f2608",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "02d17732850d66d8369757aab8bf10b63c168ea822e10c5c699577df924236f3",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 176,
+      "elapsed_seconds": 1163.95,
+      "memory_kib": {
+        "VmHWM": 480028,
+        "VmRSS": 412932
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "7123252af1efec179bdbf2ef61a8c98cda6eeef6a838822fb2124ada2e1f2608",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "02d17732850d66d8369757aab8bf10b63c168ea822e10c5c699577df924236f3",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "68242061d8456a456d8c264a8da701be1c436c02663990389efc558028531f73"
+      }
+    },
+    {
+      "cycle": 183,
+      "elapsed_seconds": 1204.89,
+      "memory_kib": {
+        "VmHWM": 480028,
+        "VmRSS": 434192
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "7123252af1efec179bdbf2ef61a8c98cda6eeef6a838822fb2124ada2e1f2608",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            56,
+            45
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "02d17732850d66d8369757aab8bf10b63c168ea822e10c5c699577df924236f3",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "b207d50a8d232d8d5d09df996b44a00269012e75e46739698759535df18127ce"
+      }
+    },
+    {
+      "cycle": 190,
+      "elapsed_seconds": 1247.48,
+      "memory_kib": {
+        "VmHWM": 480028,
+        "VmRSS": 444308
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "7123252af1efec179bdbf2ef61a8c98cda6eeef6a838822fb2124ada2e1f2608",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "c61de3a2f849001f6cd69f2f4ba718ca28743f0a21ac815df335ae57701a15b9",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 197,
+      "elapsed_seconds": 1293.4,
+      "memory_kib": {
+        "VmHWM": 480028,
+        "VmRSS": 410928
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "7123252af1efec179bdbf2ef61a8c98cda6eeef6a838822fb2124ada2e1f2608",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "c61de3a2f849001f6cd69f2f4ba718ca28743f0a21ac815df335ae57701a15b9",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "7c7b606783ac340d3a8cd1602ab44bac5a0d351de26e1dc1bc9dd8868fb19a9a"
+      }
+    },
+    {
+      "cycle": 204,
+      "elapsed_seconds": 1339.25,
+      "memory_kib": {
+        "VmHWM": 481036,
+        "VmRSS": 419172
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "37f46fc699f0bc91e6b6aa5afe47db4a0b07c19d467518432e3dbf3cbeba7a37",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "de4a79fd4d49856b9daeeeb920c00837cdf1dec2797c20c751764fd4b85b3581",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 211,
+      "elapsed_seconds": 1384.26,
+      "memory_kib": {
+        "VmHWM": 481036,
+        "VmRSS": 385136
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "37f46fc699f0bc91e6b6aa5afe47db4a0b07c19d467518432e3dbf3cbeba7a37",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "a1b8a95f4026db94cb503593cd36176383d786e353c208a7498cc1a895979f4f",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "68242061d8456a456d8c264a8da701be1c436c02663990389efc558028531f73"
+      }
+    },
+    {
+      "cycle": 218,
+      "elapsed_seconds": 1429.16,
+      "memory_kib": {
+        "VmHWM": 481036,
+        "VmRSS": 430076
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "37f46fc699f0bc91e6b6aa5afe47db4a0b07c19d467518432e3dbf3cbeba7a37",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "a1b8a95f4026db94cb503593cd36176383d786e353c208a7498cc1a895979f4f",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "b207d50a8d232d8d5d09df996b44a00269012e75e46739698759535df18127ce"
+      }
+    },
+    {
+      "cycle": 225,
+      "elapsed_seconds": 1477.28,
+      "memory_kib": {
+        "VmHWM": 481188,
+        "VmRSS": 437232
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "37f46fc699f0bc91e6b6aa5afe47db4a0b07c19d467518432e3dbf3cbeba7a37",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "a1b8a95f4026db94cb503593cd36176383d786e353c208a7498cc1a895979f4f",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 232,
+      "elapsed_seconds": 1525.23,
+      "memory_kib": {
+        "VmHWM": 485968,
+        "VmRSS": 380012
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "37f46fc699f0bc91e6b6aa5afe47db4a0b07c19d467518432e3dbf3cbeba7a37",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "a1b8a95f4026db94cb503593cd36176383d786e353c208a7498cc1a895979f4f",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            43,
+            54,
+            44
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "7c7b606783ac340d3a8cd1602ab44bac5a0d351de26e1dc1bc9dd8868fb19a9a"
+      }
+    },
+    {
+      "cycle": 239,
+      "elapsed_seconds": 1573.99,
+      "memory_kib": {
+        "VmHWM": 485968,
+        "VmRSS": 437612
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "37f46fc699f0bc91e6b6aa5afe47db4a0b07c19d467518432e3dbf3cbeba7a37",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "841f3fbcccf2bd79c9e947654daaaba926ebed14be0cf175b2e783ecd8c90e80",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 246,
+      "elapsed_seconds": 1625.35,
+      "memory_kib": {
+        "VmHWM": 489804,
+        "VmRSS": 428744
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "401d5ddb84fd14ea7a1647122280f7ae0168befd790e937f292dd4b6dc9939aa",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "23a7ed287d4d4ae34a963fa3c0769179d75ef4dced5c8eb1d801b1c146843b9e",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "68242061d8456a456d8c264a8da701be1c436c02663990389efc558028531f73"
+      }
+    },
+    {
+      "cycle": 253,
+      "elapsed_seconds": 1678.48,
+      "memory_kib": {
+        "VmHWM": 489804,
+        "VmRSS": 439112
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "401d5ddb84fd14ea7a1647122280f7ae0168befd790e937f292dd4b6dc9939aa",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            53,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "bdcc69db5d82f8ee6e861538059cbb1b4b023e03ed321be219a1a35ad3ef03f2",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "b207d50a8d232d8d5d09df996b44a00269012e75e46739698759535df18127ce"
+      }
+    },
+    {
+      "cycle": 260,
+      "elapsed_seconds": 1727.19,
+      "memory_kib": {
+        "VmHWM": 490916,
+        "VmRSS": 455400
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "6c47be562fdfa3c1b7336ca3ee404390856ce4a3a80c508f910006f57d25635a",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "23a7ed287d4d4ae34a963fa3c0769179d75ef4dced5c8eb1d801b1c146843b9e",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": null
+    },
+    {
+      "cycle": 267,
+      "elapsed_seconds": 1782.79,
+      "memory_kib": {
+        "VmHWM": 490916,
+        "VmRSS": 404876
+      },
+      "desktop_routes": {
+        "Today": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": false,
+          "screenshot_sha256": "e71960daff18209db30403044c8fad4c2a0fd9e1a9264630beedd4c36e7bce91",
+          "click_attempts": 1
+        },
+        "Calendar": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac",
+          "click_attempts": 1
+        },
+        "Tasks": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "b98aff99fb2cdcacff2cbb36f97c48b99cc1340568d28d7c2411cc69dc338e81",
+          "click_attempts": 1
+        },
+        "Notes": {
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6",
+          "click_attempts": 1
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "7c7b606783ac340d3a8cd1602ab44bac5a0d351de26e1dc1bc9dd8868fb19a9a"
+      }
+    }
+  ],
+  "start_memory_kib": {
+    "VmHWM": 330344,
+    "VmRSS": 328060
+  },
+  "workspace_before": {
+    "revision": 1,
+    "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 7320,
+      "tasks": 3100,
+      "notes": 1301
+    },
+    "quick_check": "ok"
+  },
+  "status": "complete",
+  "elapsed_seconds": 1801.75,
+  "final_memory_kib": {
+    "VmHWM": 490916,
+    "VmRSS": 481348
+  },
+  "desktop_route_checks": 156,
+  "desktop_route_mismatches": 0,
+  "desktop_retried_clicks": 0,
+  "desktop_headings_visible": 118,
+  "orbit_checks": 24,
+  "orbit_mismatches": 0,
+  "workspace_after": {
+    "revision": 1,
+    "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 7320,
+      "tasks": 3100,
+      "notes": 1301
+    },
+    "quick_check": "ok"
+  },
+  "workspace_verified": true
+}
