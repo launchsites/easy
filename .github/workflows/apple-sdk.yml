@@ -1,0 +1,53 @@
+name: Apple SDK check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apple-sdk-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  DART_SUPPRESS_ANALYTICS: 'true'
+
+jobs:
+  apple:
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the requested revision
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Verify the checkout and Apple SDKs
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+          xcrun --sdk macosx --show-sdk-version
+
+      - name: Install pinned Flutter
+        run: bash .github/scripts/bootstrap-flutter.sh
+
+      - name: Restore locked Dart dependencies
+        run: |
+          flutter pub get --enforce-lockfile
+          git diff --exit-code -- pubspec.lock
+
+      - name: Build for the iOS simulator
+        run: flutter build ios --simulator --debug --no-codesign --no-pub
+
+      - name: Build unsigned macOS release
+        env:
+          FLUTTER_XCODE_CODE_SIGNING_ALLOWED: 'NO'
+          FLUTTER_XCODE_CODE_SIGNING_REQUIRED: 'NO'
+        run: flutter build macos --release --no-pub
