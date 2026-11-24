@@ -44,6 +44,7 @@ _Query _parse(String input) {
       }
       continue;
     }
+    if (terms.length >= _queryTermLimit) continue;
     final fields = switch (modifier) {
       'title' => _title,
       'body' => _body,
@@ -56,7 +57,6 @@ _Query _parse(String input) {
       }
       if (terms.length >= _queryTermLimit) break;
     }
-    if (terms.length >= _queryTermLimit) break;
   }
   return (terms: terms.toList(), kinds: kinds, impossible: impossible);
 }
@@ -179,32 +179,10 @@ class SearchIndex {
           _postings[b.value]?.length ?? 0,
         ),
       );
-    Map<int, int>? scores;
-    for (final term in parsedTerms) {
-      final prior = scores;
-      final matches = <int, int>{};
-      for (final key in _matchingTermKeys(term.value)) {
-        final bonus = key == term.value ? 5 : 1;
-        for (final value in _postings[key]!) {
-          final slot = value >> _postingShift;
-          final fields = value & _everyField & term.fields;
-          if (fields == 0 ||
-              (prior == null ? !allowed(slot) : !prior.containsKey(slot))) {
-            continue;
-          }
-          final score = _fieldScore(fields) + bonus;
-          final previous = matches[slot];
-          if (previous == null || score > previous) matches[slot] = score;
-        }
-      }
-      if (matches.isEmpty) return const [];
-      scores = prior == null
-          ? matches
-          : {
-              for (final entry in matches.entries)
-                entry.key: entry.value + prior[entry.key]!,
-            };
-    }
+    final scored = parsedTerms.isEmpty
+        ? null
+        : _scoreTerms(parsedTerms, allowed);
+    if (scored?.slots.isEmpty ?? false) return const [];
 
     final phrase = parsed.terms.every((term) => term.fields & _title != 0)
         ? parsed.terms.map((term) => term.value).join(' ')
@@ -217,17 +195,16 @@ class SearchIndex {
     }
 
     final ranking = SplayTreeSet<({int slot, int score})>(compare);
-    Iterable<MapEntry<int, int>> unranked() sync* {
+    Iterable<int> unranked() sync* {
       for (var slot = 0; slot < _documents.length; slot++) {
-        if (allowed(slot)) yield MapEntry(slot, 0);
+        if (allowed(slot)) yield slot;
       }
     }
 
-    final candidates = scores?.entries ?? unranked();
-    for (final entry in candidates) {
-      final document = _documents[entry.key];
-      final normalizedTitle = _titlePhrases[entry.key];
-      var value = entry.value;
+    for (final slot in scored?.slots ?? unranked()) {
+      final document = _documents[slot];
+      final normalizedTitle = _titlePhrases[slot];
+      var value = scored?.scores[slot] ?? 0;
       if (phrase.isNotEmpty) {
         if (normalizedTitle == phrase) {
           value += 38;
@@ -237,13 +214,17 @@ class SearchIndex {
       }
       if (document.pinned) value += 2;
       if (favourites.contains(document.key)) value += 2;
-      final candidate = (slot: entry.key, score: value);
-      if (ranking.length == maximum && compare(candidate, ranking.last) >= 0)
+      final candidate = (slot: slot, score: value);
+      if (ranking.length == maximum && compare(candidate, ranking.last) >= 0) {
         continue;
+      }
       ranking.add(candidate);
       if (ranking.length > maximum) ranking.remove(ranking.last);
     }
-    final terms = parsed.terms.map((term) => term.value).toSet();
+    final terms = {
+      for (final term in parsed.terms)
+        if (term.fields & _body != 0) term.value,
+    };
     return [
       for (final ranked in ranking)
         SearchHit(
@@ -254,7 +235,59 @@ class SearchIndex {
     ];
   }
 
-  Iterable<String> _matchingTermKeys(String prefix) sync* {
+  ({List<int> slots, Uint16List scores}) _scoreTerms(
+    List<_Term> terms,
+    bool Function(int slot) allowed,
+  ) {
+    final firstStart = _firstVocabularyMatch(terms.first.value);
+    if (firstStart == null) return (slots: const [], scores: Uint16List(0));
+    final scores = Uint16List(_documents.length);
+    final matches = Uint16List(_documents.length);
+    var slots = <int>[];
+    for (final (position, term) in terms.indexed) {
+      final first = position == 0;
+      final prior = slots;
+      slots = <int>[];
+      for (final key in _matchingTermKeys(
+        term.value,
+        first ? firstStart : null,
+      )) {
+        final postings = _postings[key]!;
+        final bonus = key == term.value ? 5 : 1;
+        void score(int slot, int packed) {
+          final fields = packed & _everyField & term.fields;
+          if (fields == 0) return;
+          final previous = matches[slot];
+          if (previous == 0) slots.add(slot);
+          final candidate = _fieldScore(fields) + bonus;
+          if (candidate > previous) matches[slot] = candidate;
+        }
+
+        if (!first && prior.length * 18 < postings.length) {
+          for (final slot in prior) {
+            final value = _findPosting(postings, slot);
+            if (value != null) score(slot, value);
+          }
+        } else {
+          for (final value in postings) {
+            final slot = value >> _postingShift;
+            if (first ? allowed(slot) : scores[slot] != 0) score(slot, value);
+          }
+        }
+      }
+      if (slots.isEmpty) break;
+      for (final slot in prior) {
+        if (matches[slot] == 0) scores[slot] = 0;
+      }
+      for (final slot in slots) {
+        scores[slot] += matches[slot];
+        matches[slot] = 0;
+      }
+    }
+    return (slots: slots, scores: scores);
+  }
+
+  int? _firstVocabularyMatch(String prefix) {
     var start = 0;
     var end = _vocabulary.length;
     while (start < end) {
@@ -265,16 +298,38 @@ class SearchIndex {
         end = middle;
       }
     }
-    for (
-      var offset = 0;
-      offset < _prefixLimit && start + offset < _vocabulary.length;
-      offset++
-    ) {
-      final key = _vocabulary[start + offset];
+    return start < _vocabulary.length && _vocabulary[start].startsWith(prefix)
+        ? start
+        : null;
+  }
+
+  Iterable<String> _matchingTermKeys(String prefix, int? start) sync* {
+    final first = start ?? _firstVocabularyMatch(prefix);
+    if (first == null) return;
+    final end = math.min(_vocabulary.length, first + _prefixLimit);
+    for (var index = first; index < end; index++) {
+      final key = _vocabulary[index];
       if (!key.startsWith(prefix)) break;
       yield key;
     }
   }
+}
+
+int? _findPosting(Uint32List postings, int slot) {
+  var start = 0;
+  var end = postings.length;
+  while (start < end) {
+    final middle = (start + end) ~/ 2;
+    final value = postings[middle];
+    final candidate = value >> _postingShift;
+    if (candidate == slot) return value;
+    if (candidate < slot) {
+      start = middle + 1;
+    } else {
+      end = middle;
+    }
+  }
+  return null;
 }
 
 int _fieldScore(int flags) => switch (flags) {

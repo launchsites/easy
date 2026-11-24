@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:easy/search/search.dart';
 import 'package:easy/ui_theme.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -219,6 +221,68 @@ void main() {
       isEmpty,
     );
   });
+
+  test(
+    'posting intersections agree with direct matching across query orders',
+    () {
+      final random = Random(70285);
+      final fields = ['project', 'provider', 'progress', 'studio', 'sturdy'];
+      final records = [
+        for (var slot = 0; slot < 580; slot++)
+          (
+            title: List.generate(
+              2,
+              (_) => fields[random.nextInt(fields.length)],
+            ),
+            body: List.generate(
+              3,
+              (_) => fields[random.nextInt(fields.length)],
+            ),
+            key: SearchKey(SearchRecordKind.values[slot % 3], 'record-$slot'),
+            category: slot % 4 == 0 ? 'studio' : 'study',
+          ),
+      ];
+      final index = SearchIndex.build([
+        for (final record in records)
+          SearchDocument(
+            key: record.key,
+            title: record.title.join(' '),
+            body: record.body.join(' '),
+            categoryId: record.category,
+          ),
+      ]);
+      for (final title in ['proj', 'prov', 'progre']) {
+        for (final body in ['stu', 'study', 'pro']) {
+          final expected = {
+            for (final record in records)
+              if (record.key.kind == SearchRecordKind.event &&
+                  record.category == 'studio' &&
+                  record.title.any((term) => term.startsWith(title)) &&
+                  record.body.any((term) => term.startsWith(body)) &&
+                  record.body.contains('provider'))
+                record.key,
+          };
+          for (final text in [
+            'type:event title:$title body:$body body:provider',
+            'body:provider body:$body title:$title type:event',
+          ]) {
+            final query = WorkspaceSearchQuery(
+              text,
+              allowedCategories: {'studio'},
+            );
+            expect(
+              index
+                  .search(query, limit: 100)
+                  .map((hit) => hit.document.key)
+                  .toSet(),
+              expected,
+              reason: text,
+            );
+          }
+        }
+      }
+    },
+  );
 
   testWidgets(
     'compact search shows pinned records, filters, and records a chosen result',
