@@ -178,6 +178,23 @@ TZ=Europe/London dart run tool/benchmark/speech_capture_replay.dart \
   3b0e345e3aa7ff7a389d895bf6e35e3b668386ad /tmp/easy-speech-capture.json
 ```
 
+### Native voice capture and review
+
+A Linux release frozen at `3c9741962567f512cef151518acbcad413542334` ran both one-handed gestures in a 390×844 X11 window with one virtual CPU. A private PulseAudio server exposed a remapped null-sink monitor as the only capture input. Its fixture played a synthetic shopping-list note while the app's IP sockets were denied. Slide-left release discarded all audio and kept the workspace revision at 1. Holding and releasing saved 3.61 seconds of PCM audio. Sliding up locked the recorder across pointer release and an outside tap. The explicit Stop and save action then saved 5.00 seconds. [Held release evidence](benchmark-results/native-voice-capture-held-epyc-20261124.json) · [Locked recorder evidence](benchmark-results/native-voice-capture-locked-epyc-20261124.json)
+
+Whisper Base transcribed the held and locked recordings in 5.39 and 5.35 seconds respectively. Both transcripts produced the Personal note preview while Gym stayed active. Each note appeared only after confirmation. The workspace and exact WAV bytes survived a new process, and both SQLite integrity checks passed. A separate tap-to-record run also completed through the same local transcriber and review. Physical microphones and phone touch input require device testing. [Tap-to-record evidence](benchmark-results/native-voice-capture-button-epyc-20261124.json)
+
+With Xvfb, xdotool, ImageMagick, Tesseract and PulseAudio installed, run the native synthetic fixture against the frozen release bundle. The same runner accepts `--interaction lock` or `--interaction button`.
+
+```sh
+cc -std=c17 -O2 -Wall -Wextra -Werror tool/benchmark/deny_ip_sockets.c -o /tmp/easy-deny-ip-sockets
+dbus-run-session -- python3 tool/benchmark/native_voice_capture.py \
+  --binary "$easy_bundle/easy" --app-revision 3c9741962567f512cef151518acbcad413542334 \
+  --whisper "$easy_bench_dir/whisper-bin-ubuntu-x64/whisper-cli" \
+  --model "$easy_bench_dir/ggml-base.en.bin" --block-ip /tmp/easy-deny-ip-sockets \
+  --interaction hold --output /tmp/easy-native-held-voice.json
+```
+
 ## Application provider V2 metadata pilot
 
 The standalone Dart harness exercises the real loopback provider and validator at `db1a78f`. The frozen 19-case fixture checks cross-focus categories, explicit titles, a literal note, two-item capture, missing event details and unresolved or destructive inputs. Eight cases had no eligible model clause and made zero provider calls. The device parser handled the running, biology homework and shop social-plan examples in those controls. The remaining cases offered 11 model requests per profile. [V2 fixture](../tool/benchmark/provider_metadata_cases.json)
