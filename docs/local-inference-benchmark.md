@@ -146,6 +146,18 @@ python3 tool/benchmark/local_speech.py \
   --output "$easy_bench_dir/speech-results.json"
 ```
 
+### Speech-to-review replay
+
+The capture interpreter at `3b0e345e3aa7ff7a389d895bf6e35e3b668386ad` processed the 64 existing Tiny and Base transcripts and their eight reference phrases directly. The synthetic contexts deliberately used a different active focus for the work deadline and study note. Two reference phrases produced a ready draft. The others surfaced as unrecognized, including the cancellation request. [Speech-to-review evidence](benchmark-results/speech-capture-replay-20261124.json)
+
+Tiny produced one ready draft from 32 clips. Its noisy deadline dropped the actual due date and changed the task wording. Base produced three ready drafts from 32 clips. Two clean clips yielded the intended coffee time of 10:00–11:00 the next day. A study note replaced “lemma” with “limit” and retained the active Gym suggestion. All eight cancellation recordings produced zero drafts. None of the speech drafts matched the parsed reference in every projected field. The replay stopped at the editable review and performed zero workspace writes.
+
+```sh
+TZ=Europe/London dart run tool/benchmark/speech_capture_replay.dart \
+  docs/benchmark-results/local-speech-epyc-20261124.json \
+  3b0e345e3aa7ff7a389d895bf6e35e3b668386ad /tmp/easy-speech-capture.json
+```
+
 ## Application provider V2 metadata pilot
 
 The standalone Dart harness exercises the real loopback provider and validator at `db1a78f`. The frozen 19-case fixture checks cross-focus categories, explicit titles, a literal note, two-item capture, missing event details and unresolved or destructive inputs. Eight cases had no eligible model clause and made zero provider calls. The device parser handled the running, biology homework and shop social-plan examples in those controls. The remaining cases offered 11 model requests per profile. [V2 fixture](../tool/benchmark/provider_metadata_cases.json)
