@@ -39,7 +39,7 @@ def run(args):
         "--threads-batch", threads, "--ctx-size", "2048", "--parallel", "1",
         "--batch-size", "256", "--ubatch-size", "128", "--n-gpu-layers", "0",
         "--no-warmup", "--no-cache-prompt", "--cache-ram", "0", "--no-webui",
-        "--no-webui-mcp-proxy", "--temp", "0", "--seed", "42",
+        "--no-webui-mcp-proxy", "--offline", "--temp", "0", "--seed", "42",
     ]
     if args.disable_thinking:
         launch += ["--chat-template-kwargs", '{"enable_thinking":false}']
@@ -73,6 +73,7 @@ def run(args):
                 (args.json_object, "--json-object"),
                 (args.experimental_schema, "--experimental-schema"),
                 (args.experimental_history_guide, "--experimental-history-guide"),
+                (args.compare_ranges, "--compare-ranges"),
             ):
                 if enabled:
                     command.append(flag)
@@ -102,6 +103,7 @@ def main():
     wire.add_argument("--json-object", action="store_true")
     wire.add_argument("--experimental-schema", action="store_true")
     parser.add_argument("--experimental-history-guide", action="store_true")
+    parser.add_argument("--compare-ranges", action="store_true")
     run(parser.parse_args())
 
 

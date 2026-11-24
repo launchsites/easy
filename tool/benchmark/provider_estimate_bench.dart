@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:easy/activities/activity_model.dart';
 import 'package:easy/ai/ai_budget.dart';
+import 'package:easy/ai/duration_evidence_estimate.dart';
 import 'package:easy/ai/inference_jobs.dart';
 import 'package:easy/ai/provider/ai_provider.dart';
 import 'package:easy/task_context/task_context_index.dart';
@@ -21,6 +22,7 @@ Future<void> main(List<String> args) async {
   final jsonObject = flags.contains('--json-object');
   final schema = flags.contains('--experimental-schema');
   final historyGuide = flags.contains('--experimental-history-guide');
+  final compareRanges = flags.contains('--compare-ranges');
   if (args.length < 5 ||
       flags.length != flags.toSet().length ||
       flags.any(
@@ -28,13 +30,16 @@ Future<void> main(List<String> args) async {
           '--json-object',
           '--experimental-schema',
           '--experimental-history-guide',
+          '--compare-ranges',
         }.contains(flag),
       ) ||
-      jsonObject && schema) {
+      jsonObject && schema ||
+      compareRanges && (jsonObject || schema || historyGuide)) {
     stderr.writeln(
       'Usage: dart run tool/benchmark/provider_estimate_bench.dart '
       'LOOPBACK_V1 MODEL CASES_JSON OUTPUT_JSON SOURCE_REVISION '
-      '[--json-object | --experimental-schema] [--experimental-history-guide]',
+      '[--json-object | --experimental-schema] [--experimental-history-guide] '
+      '[--compare-ranges]',
     );
     exitCode = 2;
     return;
@@ -72,6 +77,9 @@ Future<void> main(List<String> args) async {
     },
   );
   final results = <Map<String, Object?>>[];
+  final labels = compareRanges
+      ? const ['point_only', 'range_requested']
+      : const ['without_history', 'with_history'];
   try {
     for (final (index, entry) in cases.indexed) {
       final id = entry['id'] as String;
@@ -79,16 +87,20 @@ Future<void> main(List<String> args) async {
       final actual = entry['actual'] as int;
       final tolerance = entry['tolerance'] as int;
       final history = durationEvidenceForCase(entry, clock);
+      final comparableHistory = estimateFromConfirmedHistory(history) == null
+          ? null
+          : history;
+      final offeredHistory = compareRanges ? comparableHistory : history;
       final runs = <String, Object?>{};
       // Both members of each pair share a request identity and model seed.
       // Alternating which variant comes first limits systematic order effects.
-      for (final includeHistory in [index.isOdd, index.isEven]) {
+      for (final variant in [index.isOdd, index.isEven]) {
+        final includeRange = compareRanges && variant;
+        final sentHistory = compareRanges || variant ? offeredHistory : null;
         final input = AiEstimateInput(
           title: title,
-          durationHistory: includeHistory ? history : null,
-          sampleDurationsMinutes: includeHistory
-              ? history?.compatibleMinutes ?? const []
-              : const [],
+          durationHistory: sentHistory,
+          sampleDurationsMinutes: sentHistory?.compatibleMinutes ?? const [],
         );
         final request = AiInferenceRequest(
           id: 'duration-$id',
@@ -107,12 +119,14 @@ Future<void> main(List<String> args) async {
           claim: queue.claimNext(currentRevision: current)!,
           input: input,
           currentRevision: current,
+          includeRange: includeRange,
         );
         final minutes = result.value?.duration.inMinutes;
-        final label = includeHistory ? 'with_history' : 'without_history';
+        final label = labels[variant ? 1 : 0];
         if (minutes != null && !result.value!.requiresReview) {
           throw StateError('A local estimate must require review.');
         }
+        final range = result.value?.details.range;
         runs[label] = {
           'status': result.succeeded ? 'review' : result.failure?.name,
           'wall_ms': watch.elapsedMicroseconds / 1000,
@@ -121,6 +135,14 @@ Future<void> main(List<String> args) async {
             'absolute_minutes_error': (minutes - actual).abs(),
           if (minutes != null)
             'within_tolerance': (minutes - actual).abs() <= tolerance,
+          if (compareRanges)
+            'disclosed_duration_count': sentHistory?.sampleCount ?? 0,
+          if (range != null) ...{
+            'range_minutes': range.toJson(),
+            'range_width_minutes': range.upperMinutes - range.lowerMinutes,
+            'holdout_within_range':
+                actual >= range.lowerMinutes && actual <= range.upperMinutes,
+          },
         };
         stdout.writeln('$id $label ${result.failure?.name ?? minutes}');
       }
@@ -128,7 +150,10 @@ Future<void> main(List<String> args) async {
         'id': id,
         'holdout_minutes': actual,
         'tolerance_minutes': tolerance,
-        'history_first': index.isOdd,
+        if (compareRanges)
+          'range_requested_first': index.isOdd
+        else
+          'history_first': index.isOdd,
         'history': history?.optionalMetadata(),
         'offline_history_median_minutes': history?.median.inMinutes,
         ...runs,
@@ -144,6 +169,7 @@ Future<void> main(List<String> args) async {
     'json_object_mode': jsonObject,
     'experimental_schema': schema,
     'experimental_history_guide': historyGuide,
+    if (compareRanges) 'compare_ranges': true,
     'maximum_output_tokens': outputTokens,
     'request_timeout_seconds': 30,
     'synthetic_only': true,

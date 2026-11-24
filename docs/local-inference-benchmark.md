@@ -259,7 +259,7 @@ An experimental response grammar and prompt about sample age and units gave the 
 
 The guide alone produced zero accepted 1.5B responses on 24 calls. Adding the schema gave 12 accepted title-only responses and 11 with history. Seven and eight met tolerance respectively. The stale recipe history still moved the estimate from 45 to 27 minutes, and broad category history moved the client update estimate from 1 to 125 minutes. This motivated testing an explicit evidence gate before using historical durations. [1.5B guide results](benchmark-results/provider-estimate-qwen15-guide-epyc-20261124.json) · [1.5B guided schema results](benchmark-results/provider-estimate-qwen15-schema-guide-epyc-20261124.json)
 
-The launcher pins inference to the requested CPUs, disables GPU use and prompt caching, verifies the weights digest and starts the real provider client over literal loopback. The runs used a 160-token response ceiling, 2,048-token context and 30-second deadline. No paid requests ran. For the pinned regression, copy the Dart benchmark into an archive of `4c329d2` before compiling. [Dart benchmark](../tool/benchmark/provider_estimate_bench.dart)
+The launcher pins inference to the requested CPUs, disables GPU use and prompt caching, verifies the weights digest and starts the real provider client over literal loopback. The runs used a 160-token response ceiling, 2,048-token context and 30-second deadline. No paid requests ran. For the pinned regression, copy the Dart benchmark from `70ecc3471e8ec408f484eebf4d229b57caa3e1b3` into an archive of `4c329d2` before compiling. [Dart benchmark](../tool/benchmark/provider_estimate_bench.dart)
 
 ```sh
 dart compile exe tool/benchmark/provider_estimate_bench.dart -o /tmp/easy-estimate-bench
@@ -279,4 +279,27 @@ The estimate helper at `70e8e868d993a370a6ad22d5426eaed49fbfb851` replayed the s
 dart run tool/benchmark/history_duration_replay.dart \
   tool/benchmark/provider_estimate_cases.json /tmp/easy-duration-history.json \
   70e8e868d993a370a6ad22d5426eaed49fbfb851
+```
+
+### Optional planning ranges
+
+The paired benchmark exercised the provider from `3e2a6e41c37be74a5747a9e7efff05b52a9328cd` through llama.cpp b12657. Each of the 12 synthetic tasks used the same title, request identity and input fields for a point-only request and a request allowing an optional range. The order alternated by task. Six cases supplied recent comparable timing evidence through the same history gate used by Easy. Both variants had a 160-token output limit and a 30-second deadline. [Synthetic duration cases](../tool/benchmark/provider_estimate_cases.json)
+
+| Local profile | Accepted points, point only / range requested | Within tolerance, point only / range requested | Valid ranges / covering holdout | Client median, point only / range requested | Peak server RSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Qwen2.5 0.5B, one CPU, 1.5 GiB address space | 4/12 · 3/12 | 0/12 · 2/12 | 0 · 0 | 7.58 s · 8.36 s | 594 MiB |
+| Qwen2.5 1.5B, two CPUs, 2.5 GiB address space | 5/12 · 3/12 | 3/12 · 2/12 | 0 · 0 | 28.12 s · 26.04 s | 1,801 MiB |
+
+The 0.5B point-only prompt produced 1,440 minutes for all four accepted replies. The 1.5B profile timed out on six point-only calls and four calls requesting an optional range during concurrent desktop tests and builds. Every accepted reply to the range prompt contained the point value alone. Median client time includes rejected replies and timeouts. Both profiles used literal loopback and recorded zero OOM kills. [0.5B paired evidence](benchmark-results/provider-estimate-range-qwen05-epyc-20261124.json) · [1.5B paired evidence](benchmark-results/provider-estimate-range-qwen15-epyc-20261124.json)
+
+Copy the current `provider_estimate_bench.dart` and `provider_estimate_local.py` into a source archive of `3e2a6e4` and compile the Dart runner there. Run the launcher with the pinned runtime and model from the reproduction instructions. Select CPU numbers available to the process. For the 1.5B profile use its verified checkpoint with `--cpu 3 --cpu 4 --address-space-mib 2560`.
+
+```sh
+dart compile exe tool/benchmark/provider_estimate_bench.dart -o /tmp/easy-estimate-range
+python3 tool/benchmark/provider_estimate_local.py \
+  --server "$easy_bench_dir/llama-b12657/llama-server" \
+  --model "$easy_bench_dir/qwen2.5-0.5b-instruct-q4_k_m.gguf" \
+  --model-sha256 74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db \
+  --client /tmp/easy-estimate-range --source-revision 3e2a6e41c37be74a5747a9e7efff05b52a9328cd \
+  --cpu 4 --address-space-mib 1536 --compare-ranges --output /tmp/easy-estimate-range-qwen05.json
 ```
