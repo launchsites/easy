@@ -285,11 +285,16 @@ def run(args, stage):
                         wait_for_recording()
                         command(env, args.paplay, "--latency-msec=25", "--device", VIRTUAL_SINK, clean["path"])
                         time.sleep(0.4)
-                        if cancel:
+                        if cancel and args.interaction == "resize":
+                            screen.send("windowsize", "--sync", screen.window, 960, HEIGHT)
+                            until(lambda: not sources_for_recording(), "the recorder stopping on removal of the plus button")
+                        elif cancel:
                             screen.move(WIDTH - 130, HEIGHT - 48)
                             until(lambda: screen.find("Release to cancel"), "the slide-to-cancel cue", seconds=5)
                     finally:
                         screen.send("mouseup", 1)
+                    if cancel and args.interaction == "resize":
+                        screen.send("windowsize", "--sync", screen.window, WIDTH, HEIGHT)
                 until(lambda: not sources_for_recording(), "the recorder stopping")
 
             take(cancel=True)
@@ -380,7 +385,7 @@ def main():
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--cpu", type=int)
-    parser.add_argument("--interaction", choices=("hold", "lock", "button"), default="hold")
+    parser.add_argument("--interaction", choices=("hold", "lock", "button", "resize"), default="hold")
     parser.add_argument("--espeak", default="espeak-ng")
     parser.add_argument("--espeak-data", type=Path)
     parser.add_argument("--ffmpeg", default="ffmpeg")

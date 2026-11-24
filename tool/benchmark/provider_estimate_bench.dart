@@ -78,7 +78,7 @@ Future<void> main(List<String> args) async {
       final title = entry['title'] as String;
       final actual = entry['actual'] as int;
       final tolerance = entry['tolerance'] as int;
-      final history = _durationEvidence(entry, clock);
+      final history = durationEvidenceForCase(entry, clock);
       final runs = <String, Object?>{};
       // Both members of each pair share a request identity and model seed.
       // Alternating which variant comes first limits systematic order effects.
@@ -218,7 +218,7 @@ sourceRevision, contextRevision and estimated minutes as an integer from 1 to
   void close() => _inner.close();
 }
 
-TaskDurationEvidence? _durationEvidence(
+TaskDurationEvidence? durationEvidenceForCase(
   Map<String, Object?> entry,
   DateTime now,
 ) {

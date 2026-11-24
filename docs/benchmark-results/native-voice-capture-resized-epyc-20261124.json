@@ -1,0 +1,61 @@
+{
+  "status": "passed",
+  "run_at_utc": "2026-11-24T04:39:41.535459+00:00",
+  "app_revision": "eaa338ed018c164a3ecc264d4af74bc85d8cdc1f",
+  "executable_sha256": "58a5a57a865a4078a7a77935a91bbcb6ce3a444672883f7457a600ee770e3f1d",
+  "aot_library_sha256": "f84bf3e3593ca75045abe2db005945a85e3dcbd8e426fea5a65e81d3c8f6e9d0",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "host_memory_kib": 18440100,
+    "cgroup_cpu_max": "400000 100000",
+    "cgroup_memory_max": "17179869184",
+    "cgroup_memory_events_before": "low 0\nhigh 0\nmax 132734\noom 0\noom_kill 0\noom_group_kill 0"
+  },
+  "app_cpu": 3,
+  "viewport": [
+    390,
+    844
+  ],
+  "audio_modules": [
+    "module-native-protocol-unix",
+    "module-null-sink",
+    "module-remap-source"
+  ],
+  "only_virtual_audio": true,
+  "capture_interaction": "resize",
+  "app_ip_socket_guard": true,
+  "recorded_wav": {
+    "sha256": "819e392fe6d214e59425cf362182ec37ff7b10b77a71dc31481d03a56d05a010",
+    "bytes": 123946,
+    "samples": 61951,
+    "duration_ms": 3871.94,
+    "rms": 2699.86
+  },
+  "synthetic_wav_sha256": "5f1fa0273d8ad00edd33e22d03ee9d66d75cfb14a5292781d7e23d64b0d90ac6",
+  "whisper_sha256": "83dc7b79be42a240583f83ee7f8ebfe7b5e06b527a8f217c18a1d4101d215dff",
+  "model_sha256": "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002",
+  "transcript": "For a personal note, get the weekend shopping list.",
+  "transcription_ms": 4906.28,
+  "cancel_preserved_workspace": true,
+  "saved_before_transcription": true,
+  "review_required": true,
+  "active_focus_after_confirmation": "gym",
+  "note_category": "personal",
+  "workspace_revisions": [
+    1,
+    1,
+    2,
+    4
+  ],
+  "workspace_digest_after_restart": "a3277d30b9f56fd44863896e514c8f1ac6244d1fad68d69fd8dd559093617a5b",
+  "workspace_quick_check": "ok",
+  "seconds": 38.36
+}

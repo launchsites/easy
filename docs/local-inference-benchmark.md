@@ -184,7 +184,11 @@ A Linux release frozen at `3c9741962567f512cef151518acbcad413542334` ran both on
 
 Whisper Base transcribed the held and locked recordings in 5.39 and 5.35 seconds respectively. Both transcripts produced the Personal note preview while Gym stayed active. Each note appeared only after confirmation. The workspace and exact WAV bytes survived a new process, and both SQLite integrity checks passed. A separate tap-to-record run also completed through the same local transcriber and review. Physical microphones and phone touch input require device testing. [Tap-to-record evidence](benchmark-results/native-voice-capture-button-epyc-20261124.json)
 
+The desktop resize regression starts the virtual recording at 390 pixels wide, supplies audio and grows the window to 960 pixels while the original pointer stays down. The previous `3c97419` release kept the recorder open through the 20-second stop check. At `eaa338e` the recorder stopped before pointer release, the workspace stayed at revision 1 and the app stored no audio from the interrupted hold. A second mobile hold in the same process saved and reviewed normally, and its audio and confirmed Personal note survived restart. [Resize regression evidence](benchmark-results/native-voice-capture-resized-epyc-20261124.json)
+
 With Xvfb, xdotool, ImageMagick, Tesseract and PulseAudio installed, run the native synthetic fixture against the frozen release bundle. The same runner accepts `--interaction lock` or `--interaction button`.
+
+Use an `eaa338e` bundle and `--interaction resize` for the desktop breakpoint regression.
 
 ```sh
 cc -std=c17 -O2 -Wall -Wextra -Werror tool/benchmark/deny_ip_sockets.c -o /tmp/easy-deny-ip-sockets
@@ -249,6 +253,8 @@ Qwen3 4B had five 30-second timeouts in each input variant while sharing the hos
 
 An experimental response grammar and prompt about sample age and units gave the 0.5B model 12 accepted responses in each input variant. Each variant produced two estimates within tolerance. The history variant produced seven maximum-duration guesses. The same production response validator ran in both cases. [0.5B guided schema results](benchmark-results/provider-estimate-qwen05-schema-guide-epyc-20261124.json)
 
+The guide alone produced zero accepted 1.5B responses on 24 calls. Adding the schema gave 12 accepted title-only responses and 11 with history. Seven and eight met tolerance respectively. The stale recipe history still moved the estimate from 45 to 27 minutes, and broad category history moved the client update estimate from 1 to 125 minutes. This motivated testing an explicit evidence gate before using historical durations. [1.5B guide results](benchmark-results/provider-estimate-qwen15-guide-epyc-20261124.json) · [1.5B guided schema results](benchmark-results/provider-estimate-qwen15-schema-guide-epyc-20261124.json)
+
 The launcher pins inference to the requested CPUs, disables GPU use and prompt caching, verifies the weights digest and starts the real provider client over literal loopback. The runs used a 160-token response ceiling, 2,048-token context and 30-second deadline. No paid requests ran. For the pinned regression, copy the Dart benchmark into an archive of `4c329d2` before compiling. [Dart benchmark](../tool/benchmark/provider_estimate_bench.dart)
 
 ```sh
@@ -259,4 +265,14 @@ python3 tool/benchmark/provider_estimate_local.py \
   --model-sha256 6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e \
   --client /tmp/easy-estimate-bench --source-revision 4c329d2b80dfae8012646be2607bb32b7b979e05 \
   --cpu 0 --address-space-mib 2560 --output /tmp/easy-provider-estimate.json
+```
+
+### Deterministic proposals from confirmed history
+
+The estimate helper at `70e8e868d993a370a6ad22d5426eaed49fbfb851` replayed the same 12 fixtures with no network. It offered six exact cohort medians and all six met the held-out tolerance. It withheld category-only, stale or single-sample history, as well as tasks without history. The unrestricted historical median met tolerance on seven of the ten tasks with any observations. The gated proposal intentionally covers cases with comparable recent work and remains reviewable. [Deterministic replay](benchmark-results/confirmed-history-estimate-replay-20261124.json)
+
+```sh
+dart run tool/benchmark/history_duration_replay.dart \
+  tool/benchmark/provider_estimate_cases.json /tmp/easy-duration-history.json \
+  70e8e868d993a370a6ad22d5426eaed49fbfb851
 ```
