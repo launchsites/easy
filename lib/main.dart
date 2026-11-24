@@ -71,6 +71,8 @@ import 'reminders/workspace_record_reminders.dart';
 import 'review/review.dart';
 import 'scheduling/availability_settings.dart';
 import 'scheduling/availability_settings_page.dart';
+import 'scheduling/manual_time_block.dart';
+import 'scheduling/manual_time_block_sheet.dart';
 import 'scheduling/plan_day_sheet.dart';
 import 'scheduling/planner.dart';
 import 'scheduling/weekly_plan_sheet.dart';
@@ -78,6 +80,7 @@ import 'scheduling/weekly_planner.dart';
 import 'search/search.dart';
 import 'settings_page.dart';
 import 'storage/attachment_store.dart';
+import 'storage/media_backup.dart';
 import 'storage/workspace_backup_page.dart';
 import 'storage/workspace_store.dart';
 import 'tasks/recurring_task.dart';
@@ -99,6 +102,7 @@ part 'workspace_search.dart';
 part 'workspace_task_actions.dart';
 part 'workspace_reminders.dart';
 part 'workspace_planner.dart';
+part 'workspace_manual_plan.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -1111,8 +1115,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       return;
     }
     final now = DateTime.now();
-    if (now.difference(_lastWorkspaceInput) < const Duration(seconds: 25))
+    if (now.difference(_lastWorkspaceInput) < const Duration(seconds: 25)) {
       return;
+    }
     final pulse =
         now.millisecondsSinceEpoch ~/ (2 * Duration.millisecondsPerMinute);
     if (pulse == _lastEstimateCheck) return;
@@ -1508,6 +1513,13 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           pickBackup: _pickBackup,
           exportBackup: _exportBackup,
           onRestored: _loadRevision,
+          media: kIsWeb
+              ? null
+              : WorkspaceMediaBackupUiSupport(
+                  loadAttachments: _openAttachments,
+                  pickBackupFile: () => openFile(),
+                  saveMediaArchive: _saveMediaBackup,
+                ),
         ),
       ),
     );
@@ -1534,12 +1546,21 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   Future<void> _exportBackup(Uint8List bytes, String filename) =>
       _exportFile(bytes, filename, 'application/octet-stream');
 
-  Future<void> _exportFile(
-    Uint8List bytes,
-    String filename,
-    String mimeType,
-  ) async {
-    final file = XFile.fromData(bytes, mimeType: mimeType);
+  Future<void> _exportFile(Uint8List bytes, String filename, String mimeType) =>
+      _saveOrShareFile(XFile.fromData(bytes, mimeType: mimeType), filename);
+
+  Future<void> _saveMediaBackup(WorkspaceMediaBackupFile archive) =>
+      _saveOrShareFile(
+        XFile(archive.nativePath, mimeType: 'application/octet-stream'),
+        archive.suggestedName,
+        retainFilename: true,
+      );
+
+  Future<void> _saveOrShareFile(
+    XFile file,
+    String filename, {
+    bool retainFilename = false,
+  }) async {
     if (!kIsWeb &&
         const {
           TargetPlatform.linux,
@@ -1556,7 +1577,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final result = await SharePlus.instance.share(
       ShareParams(
         files: [file],
-        fileNameOverrides: [filename],
+        fileNameOverrides: retainFilename ? null : [filename],
         sharePositionOrigin: Rect.fromCenter(
           center: center,
           width: 1,
@@ -3475,6 +3496,14 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   Future<void> _editRecord(Object existing) async {
     if (existing is CalendarEvent && existing.isReadOnly) return;
+    if (existing is CalendarEvent && existing.plannedTaskId != null) {
+      if (!_allows(EasyFeature.planning)) {
+        _inform('Enable planning in Settings to move this time block.');
+        return;
+      }
+      await _openManualBlock(existing);
+      return;
+    }
     if (existing is CalendarEvent && existing.recurringSeriesId != null) {
       await _editOccurrence(existing);
       return;
@@ -3596,6 +3625,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             onReminder: _recordReminderTarget(record) != null
                 ? () => Navigator.pop(context, 'reminder')
                 : null,
+            onSchedule: _canScheduleTask(record)
+                ? () => Navigator.pop(context, 'schedule')
+                : null,
           ),
         ),
       ),
@@ -3624,6 +3656,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       await _breakDownTask(record);
     }
     if (action == 'reminder') await _editRecordReminder(record);
+    if (action == 'schedule') await _openManualBlock(record);
   }
 
   bool _canRepeatEvent(Object? record) =>
@@ -4344,6 +4377,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                                                       ) !=
                                                       null
                                                   ? () => _editRecordReminder(
+                                                      _inspected!,
+                                                    )
+                                                  : null,
+                                              onSchedule:
+                                                  _canScheduleTask(_inspected)
+                                                  ? () => _openManualBlock(
                                                       _inspected!,
                                                     )
                                                   : null,

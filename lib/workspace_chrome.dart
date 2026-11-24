@@ -488,6 +488,7 @@ class _RecordDetails extends StatelessWidget {
     this.onBreakdown,
     this.onReminder,
     this.reminderSet = false,
+    this.onSchedule,
   });
 
   final Object record;
@@ -505,6 +506,7 @@ class _RecordDetails extends StatelessWidget {
   final VoidCallback? onBreakdown;
   final VoidCallback? onReminder;
   final bool reminderSet;
+  final VoidCallback? onSchedule;
 
   @override
   Widget build(BuildContext context) {
@@ -623,7 +625,11 @@ class _RecordDetails extends StatelessWidget {
                   if (item is! TaskItem || !repeatingTask || !item.done) ...[
                     FilledButton.tonal(
                       onPressed: onEdit,
-                      child: const Text('Edit'),
+                      child: Text(
+                        item is CalendarEvent && item.plannedTaskId != null
+                            ? 'Move block'
+                            : 'Edit',
+                      ),
                     ),
                     TextButton(
                       onPressed: onDelete,
@@ -679,6 +685,11 @@ class _RecordDetails extends StatelessWidget {
                       child: Text(
                         reminderSet ? 'Edit reminder' : 'Set reminder',
                       ),
+                    ),
+                  if (onSchedule != null)
+                    TextButton(
+                      onPressed: onSchedule,
+                      child: const Text('Schedule'),
                     ),
                 ],
               ),
