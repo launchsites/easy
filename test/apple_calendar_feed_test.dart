@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:easy/calendar_sources/apple_calendar_feed.dart';
 import 'package:easy/calendar_sources/calendar_directory.dart';
 import 'package:easy/calendar_sources/event_kit_calendar_adapter.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _first = CalendarIdentity(accountId: 'apple-account', calendarId: 'a');
@@ -10,6 +11,35 @@ const _second = CalendarIdentity(accountId: 'apple-account', calendarId: 'b');
 final _day = DateTime(2026, 11, 24);
 
 void main() {
+  test(
+    'revocation during a native query evicts the previous permission scope',
+    () async {
+      final adapter = _Adapter();
+      final feed = AppleCalendarFeed(adapter: adapter);
+      addTearDown(feed.dispose);
+      await feed.refresh(day: _day, selected: {_first});
+      expect(feed.events, hasLength(1));
+      expect(feed.covers(_day), isTrue);
+      expect(feed.hasVerifiedAccess, isTrue);
+
+      // Native access was full at the start of this request. EventKit can lose
+      // access before the subsequent read actually runs.
+      adapter.eventError = PlatformException(code: 'calendar_access');
+      await feed.refresh(day: _day, selected: {_first}, force: true);
+      expect(feed.events, isEmpty);
+      expect(feed.sources, isEmpty);
+      expect(feed.covers(_day), isFalse);
+      expect(feed.hasVerifiedAccess, isFalse);
+      expect(feed.problem, 'Review Apple Calendar access in Settings.');
+
+      adapter.eventError = null;
+      await feed.refresh(day: _day, selected: {_first});
+      expect(feed.hasVerifiedAccess, isTrue);
+      expect(feed.covers(_day), isTrue);
+      expect(feed.events, hasLength(1));
+    },
+  );
+
   test('no chosen calendar performs no native calls', () async {
     final adapter = _Adapter();
     final feed = AppleCalendarFeed(adapter: adapter);
@@ -78,6 +108,7 @@ void main() {
 }
 
 class _Adapter extends EventKitCalendarAdapter {
+  Object? eventError;
   Completer<EventKitCalendarAccess>? nextAccess;
   EventKitCalendarAccess access = EventKitCalendarAccess.full;
   List<CalendarIdentity> sources = [_first, _second];
@@ -117,6 +148,7 @@ class _Adapter extends EventKitCalendarAdapter {
   }) async {
     final query = calendars!.toSet();
     queries.add(query);
+    if (eventError case final error?) throw error;
     return [
       for (final calendar in [_first, _second, _first, _second])
         SourcedCalendarEvent(

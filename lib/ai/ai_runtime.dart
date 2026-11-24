@@ -144,6 +144,7 @@ class AiRuntime extends ChangeNotifier {
   bool _loaded = false;
   bool _storageReady = false;
   bool _busy = false;
+  bool _savingSettings = false;
   bool _automaticInFlight = false;
   bool _disposed = false;
   bool _cancelRequested = false;
@@ -274,72 +275,100 @@ class AiRuntime extends ChangeNotifier {
     await load();
     return _writeLane(() async {
       if (_busy) return AiSettingsSaveStatus.busy;
-      if (!_storageReady || _disposed) {
-        return AiSettingsSaveStatus.storageUnavailable;
+      _savingSettings = true;
+      try {
+        return await _saveAuthorizedSettings(next, apiKey, authorizeAutomatic);
+      } finally {
+        _savingSettings = false;
       }
-      final reference = next.apiCredentialReference;
-      if (!next.valid ||
-          (apiKey != null && (reference == null || !validAiKey(apiKey)))) {
+    });
+  }
+
+  Future<AiSettingsSaveStatus> _saveAuthorizedSettings(
+    AiRuntimeSettings next,
+    String? apiKey,
+    AiAuthorizeAutomatic? authorizeAutomatic,
+  ) async {
+    if (!_storageReady || _disposed) {
+      return AiSettingsSaveStatus.storageUnavailable;
+    }
+    final reference = next.apiCredentialReference;
+    if (!next.valid ||
+        (apiKey != null && (reference == null || !validAiKey(apiKey)))) {
+      return AiSettingsSaveStatus.invalid;
+    }
+    if (_automaticNeedsConsent(_settings, next)) {
+      final config = next.provider!;
+      final callback = authorizeAutomatic;
+      if (callback == null) return AiSettingsSaveStatus.authorizationRequired;
+      if (!await _readHead()) return AiSettingsSaveStatus.storageUnavailable;
+      if (next.route == AiRoute.api &&
+          apiKey == null &&
+          !await _keyAvailable(reference)) {
+        return AiSettingsSaveStatus.vaultUnavailable;
+      }
+      final preview = AiAutomaticPreview._(
+        route: next.route,
+        endpoint: config.completionsEndpoint!,
+        model: config.model,
+        includeOptionalMetadata: next.includeOptionalMetadata,
+        adaptiveEstimatePacing: next.adaptiveEstimatePacing,
+        reserveMicros: next.route == AiRoute.api
+            ? _ledger.maximumCost(
+                config.budgetRequest('preview', work: AiWorkKind.discretionary),
+              )
+            : null,
+        monthlyCapMicros: next.monthlyCapMicros,
+      );
+      if (next.route == AiRoute.api && preview.reserveMicros == null) {
         return AiSettingsSaveStatus.invalid;
       }
-      if (_automaticNeedsConsent(_settings, next)) {
-        final config = next.provider!;
-        final callback = authorizeAutomatic;
-        if (callback == null) return AiSettingsSaveStatus.authorizationRequired;
-        if (!await _readHead()) return AiSettingsSaveStatus.storageUnavailable;
-        if (next.route == AiRoute.api &&
-            apiKey == null &&
-            !await _keyAvailable(reference)) {
-          return AiSettingsSaveStatus.vaultUnavailable;
-        }
-        final preview = AiAutomaticPreview._(
-          route: next.route,
-          endpoint: config.completionsEndpoint!,
-          model: config.model,
-          includeOptionalMetadata: next.includeOptionalMetadata,
-          adaptiveEstimatePacing: next.adaptiveEstimatePacing,
-          reserveMicros: next.route == AiRoute.api
-              ? _ledger.maximumCost(
-                  config.budgetRequest(
-                    'preview',
-                    work: AiWorkKind.discretionary,
-                  ),
-                )
-              : null,
-          monthlyCapMicros: next.monthlyCapMicros,
-        );
-        if (next.route == AiRoute.api && preview.reserveMicros == null) {
-          return AiSettingsSaveStatus.invalid;
-        }
-        try {
-          if (!await callback(preview)) {
-            return AiSettingsSaveStatus.authorizationRequired;
-          }
-        } catch (_) {
+      try {
+        if (!await callback(preview)) {
           return AiSettingsSaveStatus.authorizationRequired;
         }
-        if (_disposed || !await _readHead()) {
-          return AiSettingsSaveStatus.storageUnavailable;
-        }
+      } catch (_) {
+        return AiSettingsSaveStatus.authorizationRequired;
       }
-      final previousCap = _ledger.monthlyCapMicros;
-      _ledger.setMonthlyCapMicros(next.monthlyCapMicros);
-      if (!await _commit(next, _ledger)) {
-        _ledger.setMonthlyCapMicros(previousCap);
+      if (_disposed || !await _readHead()) {
         return AiSettingsSaveStatus.storageUnavailable;
       }
-      _settings = next;
-      if (apiKey != null) {
-        try {
-          await _vault.write(reference!, apiKey);
-        } catch (_) {
-          _notify();
-          return AiSettingsSaveStatus.vaultUnavailable;
-        }
+    }
+    if (apiKey != null) {
+      if (!await _readHead() || _disposed) {
+        return AiSettingsSaveStatus.storageUnavailable;
       }
-      _notify();
-      return AiSettingsSaveStatus.saved;
-    });
+      if (_settings.route == AiRoute.api &&
+          _settings.automaticEstimates &&
+          _settings.apiCredentialReference == reference) {
+        // An interrupted key replacement reopens with automatic work paused.
+        final paused = AiRuntimeSettings.fromJson(
+          _settings.toJson()
+            ..['automaticEstimates'] = false
+            ..['adaptiveEstimatePacing'] = false,
+        );
+        if (!await _commit(paused, _ledger) || _disposed) {
+          return AiSettingsSaveStatus.storageUnavailable;
+        }
+        _settings = paused;
+        _notify();
+      }
+      try {
+        await _vault.write(reference!, apiKey);
+      } catch (_) {
+        return AiSettingsSaveStatus.vaultUnavailable;
+      }
+    }
+    if (_disposed) return AiSettingsSaveStatus.storageUnavailable;
+    final previousCap = _ledger.monthlyCapMicros;
+    _ledger.setMonthlyCapMicros(next.monthlyCapMicros);
+    if (!await _commit(next, _ledger)) {
+      _ledger.setMonthlyCapMicros(previousCap);
+      return AiSettingsSaveStatus.storageUnavailable;
+    }
+    _settings = next;
+    _notify();
+    return AiSettingsSaveStatus.saved;
   }
 
   Future<bool> hasApiKey() => _keyAvailable(_settings.apiCredentialReference);
@@ -598,7 +627,7 @@ class AiRuntime extends ChangeNotifier {
         'Reload AI settings to continue.',
       );
     }
-    if (_busy) return status(AiRunStatus.busy);
+    if (_busy || _savingSettings) return status(AiRunStatus.busy);
     if (!_current(source, currentRevision)) return status(AiRunStatus.stale);
     final activeSettings = settings;
     final pace = automatic == null ? null : _automaticPace();

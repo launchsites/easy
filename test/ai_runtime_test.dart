@@ -12,6 +12,168 @@ import 'package:material_ui/material_ui.dart';
 
 void main() {
   test(
+    'a failed replacement key never activates automatic paid estimates',
+    () async {
+      final store = _Store();
+      final keys = <String, String>{};
+      var rejectWrites = false;
+      final vault = AiCallbackCredentialVault(
+        readSecret: (ref) async => keys[ref],
+        writeSecret: (ref, value) async {
+          if (rejectWrites) throw StateError('Synthetic device vault failure.');
+          keys[ref] = value;
+        },
+        deleteSecret: (ref) async => keys.remove(ref),
+      );
+      final runtime = store.runtime(vault: vault);
+      addTearDown(runtime.dispose);
+      expect(
+        await runtime.saveSettings(_paid(), apiKey: _testKey),
+        AiSettingsSaveStatus.saved,
+      );
+      rejectWrites = true;
+      expect(
+        await runtime.saveSettings(
+          _paid(automatic: true),
+          apiKey: 'synthetic-replacement-key',
+          authorizeAutomatic: (_) async => true,
+        ),
+        AiSettingsSaveStatus.vaultUnavailable,
+      );
+      expect(keys.values, [_testKey]);
+      expect(runtime.settings.automaticEstimates, isFalse);
+
+      final reopened = store.runtime(vault: vault);
+      addTearDown(reopened.dispose);
+      await reopened.load();
+      expect(reopened.settings.automaticEstimates, isFalse);
+    },
+  );
+
+  test(
+    'rotating the active paid key pauses automation before the vault write',
+    () async {
+      final store = _Store();
+      final keys = <String, String>{};
+      final writeStarted = Completer<void>();
+      final failWrite = Completer<void>();
+      final vault = AiCallbackCredentialVault(
+        readSecret: (ref) async => keys[ref],
+        writeSecret: (ref, value) async {
+          if (value != _testKey) {
+            writeStarted.complete();
+            await failWrite.future;
+            throw StateError('Synthetic device vault failure.');
+          }
+          keys[ref] = value;
+        },
+        deleteSecret: (ref) async => keys.remove(ref),
+      );
+      final runtime = store.runtime(vault: vault);
+      addTearDown(runtime.dispose);
+      expect(
+        await runtime.saveSettings(
+          _paid(automatic: true),
+          apiKey: _testKey,
+          authorizeAutomatic: (_) async => true,
+        ),
+        AiSettingsSaveStatus.saved,
+      );
+
+      final pending = runtime.saveSettings(
+        _paid(automatic: true),
+        apiKey: 'synthetic-replacement-key',
+      );
+      await writeStarted.future;
+      final reopened = store.runtime(vault: vault);
+      addTearDown(reopened.dispose);
+      try {
+        await reopened.load();
+        expect(reopened.settings.automaticEstimates, isFalse);
+      } finally {
+        failWrite.complete();
+        expect(await pending, AiSettingsSaveStatus.vaultUnavailable);
+      }
+      expect(runtime.settings.automaticEstimates, isFalse);
+      expect(keys.values, [_testKey]);
+    },
+  );
+
+  test(
+    'a stale settings instance leaves the device credential untouched',
+    () async {
+      final store = _Store();
+      final keys = <String, String>{};
+      final vault = AiCallbackCredentialVault(
+        readSecret: (ref) async => keys[ref],
+        writeSecret: (ref, value) async => keys[ref] = value,
+        deleteSecret: (ref) async => keys.remove(ref),
+      );
+      final active = store.runtime(vault: vault);
+      addTearDown(active.dispose);
+      expect(
+        await active.saveSettings(_paid(), apiKey: _testKey),
+        AiSettingsSaveStatus.saved,
+      );
+      final stale = store.runtime(vault: vault);
+      addTearDown(stale.dispose);
+      expect(await stale.load(), isTrue);
+      expect(
+        await active.saveSettings(_paid(model: 'confirmed-model')),
+        AiSettingsSaveStatus.saved,
+      );
+      expect(
+        await stale.saveSettings(
+          _paid(model: 'stale-model'),
+          apiKey: 'synthetic-replacement-key',
+        ),
+        AiSettingsSaveStatus.storageUnavailable,
+      );
+      expect(keys.values, [_testKey]);
+    },
+  );
+
+  test(
+    'a final settings write failure leaves automation paused after rotation',
+    () async {
+      final store = _Store();
+      final keys = <String, String>{};
+      final vault = AiCallbackCredentialVault(
+        readSecret: (ref) async => keys[ref],
+        writeSecret: (ref, value) async {
+          keys[ref] = value;
+          if (value != _testKey) store.rejectWrites = true;
+        },
+        deleteSecret: (ref) async => keys.remove(ref),
+      );
+      final runtime = store.runtime(vault: vault);
+      addTearDown(runtime.dispose);
+      final settings = _paid(automatic: true);
+      expect(
+        await runtime.saveSettings(
+          settings,
+          apiKey: _testKey,
+          authorizeAutomatic: (_) async => true,
+        ),
+        AiSettingsSaveStatus.saved,
+      );
+      expect(
+        await runtime.saveSettings(
+          settings,
+          apiKey: 'synthetic-replacement-key',
+        ),
+        AiSettingsSaveStatus.storageUnavailable,
+      );
+      final reopened = store.runtime(vault: vault);
+      addTearDown(reopened.dispose);
+      expect(await reopened.load(), isTrue);
+      expect(reopened.settings.automaticEstimates, isFalse);
+      expect(await reopened.hasApiKey(), isTrue);
+      expect(keys.values, ['synthetic-replacement-key']);
+    },
+  );
+
+  test(
     'timing history matches the disclosed payload only when configured',
     () async {
       final source = _capture();
@@ -715,6 +877,7 @@ AiCaptureRevision? _candidateRevision(String id) =>
 
 class _Store {
   AiStoredState? state;
+  bool rejectWrites = false;
 
   AiRuntime runtime({
     AiWritableCredentialVault? vault,
@@ -723,7 +886,7 @@ class _Store {
   }) => AiRuntime(
     read: () async => state,
     compareAndSwap: (expected, value) async {
-      if (expected != (state?.revision ?? 0)) return null;
+      if (rejectWrites || expected != (state?.revision ?? 0)) return null;
       state = AiStoredState(revision: expected + 1, value: value);
       return state!.revision;
     },

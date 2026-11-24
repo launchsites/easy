@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 
 import 'calendar_directory.dart';
 import 'event_kit_calendar_adapter.dart';
@@ -22,6 +23,7 @@ class AppleCalendarFeed extends ChangeNotifier {
   var _generation = 0;
   var _disposed = false;
   var _loading = false;
+  var _verifiedAccess = false;
   String? _problem;
 
   List<SourcedCalendarEvent<ExternalCalendarEvent>> get events => _events;
@@ -29,6 +31,7 @@ class AppleCalendarFeed extends ChangeNotifier {
   bool get loading => _loading;
   String? get problem => _problem;
   bool get hasChosenCalendars => _selected.isNotEmpty;
+  bool get hasVerifiedAccess => _verifiedAccess;
 
   bool covers(DateTime day) {
     final start = _start;
@@ -51,9 +54,7 @@ class AppleCalendarFeed extends ChangeNotifier {
       if (_selected.isEmpty && _events.isEmpty && !_loading) return;
       _generation++;
       _selected = const {};
-      _events = const [];
-      _sources = const {};
-      _start = _end = null;
+      _clearSnapshot();
       _problem = null;
       _loading = false;
       _stopWatching();
@@ -62,7 +63,11 @@ class AppleCalendarFeed extends ChangeNotifier {
     }
     if (!_adapter.isAvailable) {
       if (!changed && _problem != null) return;
+      _generation++;
       _selected = Set.unmodifiable(selected);
+      _clearSnapshot();
+      _loading = false;
+      _stopWatching();
       _problem = 'Apple calendars are unavailable on this device.';
       notifyListeners();
       return;
@@ -76,11 +81,7 @@ class AppleCalendarFeed extends ChangeNotifier {
     final generation = ++_generation;
     _selected = Set.unmodifiable(selected);
     final requested = _selected;
-    if (changed) {
-      _events = const [];
-      _sources = const {};
-      _start = _end = null;
-    }
+    if (changed) _clearSnapshot();
     _loading = true;
     _problem = null;
     notifyListeners();
@@ -91,19 +92,18 @@ class AppleCalendarFeed extends ChangeNotifier {
       final access = await _adapter.accessStatus();
       if (!_active(generation)) return;
       if (access != EventKitCalendarAccess.full) {
-        _events = const [];
-        _sources = const {};
-        _start = _end = null;
-        _loading = false;
-        _problem = 'Review Apple Calendar access in Settings.';
-        _stopWatching();
-        notifyListeners();
+        _revokeAccess();
         return;
       }
-      final (sources, events) = await (
-        _adapter.calendars(),
-        _adapter.events(start: from, end: until, calendars: requested),
-      ).wait;
+      late final List<CalendarSource> sources;
+      late final List<SourcedCalendarEvent<ExternalCalendarEvent>> events;
+      // Future.wait preserves the original native permission exception.
+      await Future.wait<void>([
+        _adapter.calendars().then((value) => sources = value),
+        _adapter
+            .events(start: from, end: until, calendars: requested)
+            .then((value) => events = value),
+      ]);
       if (!_active(generation)) return;
       _sources = Map.unmodifiable({
         for (final source in sources)
@@ -125,7 +125,15 @@ class AppleCalendarFeed extends ChangeNotifier {
       _events = List.unmodifiable(unique.values);
       _start = from;
       _end = until;
+      _verifiedAccess = true;
       _watch();
+    } on PlatformException catch (error) {
+      if (!_active(generation)) return;
+      if (error.code == 'calendar_access') {
+        _revokeAccess();
+      } else {
+        _problem = 'Apple calendars could not be refreshed.';
+      }
     } catch (_) {
       if (!_active(generation)) return;
       _problem = 'Apple calendars could not be refreshed.';
@@ -145,6 +153,19 @@ class AppleCalendarFeed extends ChangeNotifier {
   }
 
   bool _active(int generation) => !_disposed && generation == _generation;
+
+  void _clearSnapshot() {
+    _events = const [];
+    _sources = const {};
+    _start = _end = null;
+    _verifiedAccess = false;
+  }
+
+  void _revokeAccess() {
+    _clearSnapshot();
+    _problem = 'Review Apple Calendar access in Settings.';
+    _stopWatching();
+  }
 
   void _watch() {
     _changes ??= _adapter.changes.listen((_) {
