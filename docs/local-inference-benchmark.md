@@ -241,8 +241,13 @@ The duration provider at `4c329d2b80dfae8012646be2607bb32b7b979e05` estimated 12
 | --- | ---: | ---: | ---: | ---: |
 | Qwen2.5 0.5B, one CPU and 1.5 GiB address space | 0/12 · 8/12 | 0/12 · 1/12 | 1.96 s · 3.17 s | 594 MiB |
 | Qwen2.5 1.5B, one CPU and 2.5 GiB address space | 11/12 · 12/12 | 4/12 · 8/12 | 8.26 s · 13.19 s | 1,800 MiB |
+| Qwen3 4B, two CPUs and 6 GiB address space | 7/12 · 7/12 | 4/12 · 6/12 | 23.47 s · 22.29 s | 4,427 MiB |
 
 Qwen2.5 0.5B returned the maximum 1,440 minutes on six tasks with history. The 1.5B model kept eight estimates within tolerance with history, including the repeated run, invoices, piano practice and one short household task. Its old cooking evidence changed a 45-minute estimate to 27 minutes against a 46-minute holdout. Broad category history led to 110 minutes for a six-minute client update and 24 minutes for a 95-minute planning task. The history median alone met tolerance on seven of the 10 tasks with prior records. [0.5B raw estimates](benchmark-results/provider-estimate-qwen05-epyc-20261124.json) · [1.5B raw estimates](benchmark-results/provider-estimate-qwen15-epyc-20261124.json)
+
+Qwen3 4B had five 30-second timeouts in each input variant while sharing the host with the native soak and other jobs. Title-only successes had a median absolute error of 25 minutes, while successes with history had a median error of one minute. Those medians cover accepted estimates. The table's client latency includes timeouts. [4B raw estimates](benchmark-results/provider-estimate-qwen4b-epyc-20261124.json)
+
+An experimental response grammar and prompt about sample age and units gave the 0.5B model 12 accepted responses in each input variant. Each variant produced two estimates within tolerance. The history variant produced seven maximum-duration guesses. The same production response validator ran in both cases. [0.5B guided schema results](benchmark-results/provider-estimate-qwen05-schema-guide-epyc-20261124.json)
 
 The launcher pins inference to the requested CPUs, disables GPU use and prompt caching, verifies the weights digest and starts the real provider client over literal loopback. The runs used a 160-token response ceiling, 2,048-token context and 30-second deadline. No paid requests ran. For the pinned regression, copy the Dart benchmark into an archive of `4c329d2` before compiling. [Dart benchmark](../tool/benchmark/provider_estimate_bench.dart)
 
