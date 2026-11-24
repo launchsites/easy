@@ -14,8 +14,9 @@ extension _WorkspaceOnboarding on _WorkspaceState {
       (_workoutPlans?.isEmpty ?? false);
 
   Future<void> _finishWorkspaceSetup(WorkspaceSetupChoice choice) async {
-    if (!_requiresWorkspaceSetup)
+    if (!_requiresWorkspaceSetup) {
       throw StateError('The workspace has already been set up.');
+    }
     final original = _data;
     final today = _today;
     final samples = choice.content == WorkspaceStartingContent.samples
@@ -52,7 +53,7 @@ extension _WorkspaceOnboarding on _WorkspaceState {
     List<FocusMode> modes,
   ) {
     // The same committed page transition opens all elected modules together.
-    setState(() {
+    _changeWorkspaceView(() {
       _features.value = features;
       _modes = modes;
     });

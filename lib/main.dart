@@ -53,6 +53,7 @@ import 'categories/workspace_categories.dart';
 import 'categories/workspace_categories_page.dart';
 import 'focus/focus_mode.dart';
 import 'focus/focus_modes_page.dart';
+import 'focus/focus_suggestion_action.dart';
 import 'gym_history_page.dart';
 import 'gym_mode_ui.dart';
 import 'gym_session.dart';
@@ -115,6 +116,7 @@ part 'workspace_task_context.dart';
 part 'workspace_apple_updates.dart';
 part 'workspace_activity_actions.dart';
 part 'workspace_onboarding.dart';
+part 'workspace_focus_suggestions.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -285,6 +287,15 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   final _pageStorage = PageStorageBucket();
   final _features = ValueNotifier(FeaturePreferences());
   List<FocusMode> _modes = standardFocusModes();
+  late final _focusSuggestionStore = FocusSuggestionSettingsStore(
+    _legacyPreferences,
+  );
+  FocusSuggestionPreferences _focusSuggestionPreferences =
+      FocusSuggestionPreferences();
+  Timer? _focusSuggestionBoundary;
+  Object? _focusSuggestionSourceRevision;
+  List<FocusSuggestionEvent> _focusEvents = const [];
+  var _focusSuggestionSaving = false;
   CalendarSourcePreferences? _calendarPreferences;
   late final _appleFeed = AppleCalendarFeed(adapter: widget.calendarAdapter);
   final _unsavedAppleCopies = <String, EventKitCopyReceipt>{};
@@ -356,10 +367,11 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _appleFeed.addListener(_appleCalendarChanged);
-    _icsFeed.addListener(_appleCalendarChanged);
-    _internalFeed.addListener(_appleCalendarChanged);
+    _appleFeed.addListener(_calendarViewsChanged);
+    _icsFeed.addListener(_calendarViewsChanged);
+    _internalFeed.addListener(_calendarViewsChanged);
     unawaited(_load());
+    unawaited(_loadFocusSuggestions());
     if (LocalTranscriber.supported) unawaited(_loadVoiceSettings());
   }
 
@@ -372,6 +384,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     _features.dispose();
     _aiViewChanges.dispose();
     _estimateTimer?.cancel();
+    _focusSuggestionBoundary?.cancel();
     _reminderDebounce?.cancel();
     _voiceTranscriber.cancel();
     _heldVoiceOverlay.dispose();
@@ -394,6 +407,11 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     );
     _syncEstimateTimer();
     if (state != AppLifecycleState.resumed) _voiceTranscriber.cancel();
+    if (state != AppLifecycleState.resumed) {
+      _focusSuggestionBoundary?.cancel();
+    } else if (_focusSuggestionPreferences.enabled && !_loading) {
+      setState(() {});
+    }
     if (!_loading && state == AppLifecycleState.resumed) {
       unawaited(_refreshExternalCalendars(force: true));
       if (_reminderWorkspace case final saved?) {
@@ -830,8 +848,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         force: force,
       );
 
-  void _appleCalendarChanged() {
-    if (mounted && !_loading) setState(() {});
+  void _calendarViewsChanged() {
+    if (!_loading) _changeWorkspaceView();
+  }
+
+  void _changeWorkspaceView([VoidCallback? update]) {
+    if (mounted) setState(update ?? () {});
   }
 
   CalendarEvent _fromApple(SourcedCalendarEvent<ExternalCalendarEvent> record) {
@@ -886,6 +908,11 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                     title: 'Focus modes',
                     subtitle: 'Choose what each mode brings into view',
                     onTap: _openFocusSettings,
+                  ),
+                  SettingsItem(
+                    icon: Icons.event_available_outlined,
+                    title: 'Calendar focus suggestions',
+                    onTap: _openFocusSuggestionSettings,
                   ),
                   SettingsItem(
                     icon: Icons.label_outline_rounded,
@@ -4054,7 +4081,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   Widget? _focusedContent(BuildContext context, FocusMode? mode) {
+    final suggestion = _focusSuggestionAction();
     final children = <Widget>[
+      if (suggestion != null)
+        Align(alignment: AlignmentDirectional.centerStart, child: suggestion),
       if (_allows(EasyFeature.workouts) &&
           (mode?.sections.contains(FocusSection.workout) ?? false))
         _gymOverview(context),
