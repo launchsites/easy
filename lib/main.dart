@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'activities/activities.dart';
 import 'ai/ai_device_state.dart';
+import 'ai/ai_linux_credential_vault.dart';
 import 'ai/ai_runtime.dart';
 import 'ai/ai_settings_page.dart';
 import 'ai/task_estimates_page.dart';
@@ -1105,13 +1106,18 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         preferences: _legacyPreferences,
       ));
       if (!mounted) return null;
+      const linuxVault = AiLinuxCredentialVault();
+      final vault = defaultTargetPlatform == TargetPlatform.linux
+          ? await linuxVault.available()
+                ? linuxVault
+                : AiSessionCredentialVault()
+          : const AiSystemCredentialVault();
+      if (!mounted) return null;
       final lifecycle = WidgetsBinding.instance.lifecycleState;
       final runtime = AiRuntime(
         read: state.read,
         compareAndSwap: state.compareAndSwap,
-        vault: defaultTargetPlatform == TargetPlatform.linux
-            ? AiSessionCredentialVault()
-            : const AiSystemCredentialVault(),
+        vault: vault,
         foreground:
             _allows(EasyFeature.ai) &&
             (lifecycle == null || lifecycle == AppLifecycleState.resumed),
