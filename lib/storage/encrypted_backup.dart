@@ -1,10 +1,9 @@
-import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
-import 'package:cryptography/dart.dart';
 
+import 'src/backup_password.dart';
 import 'src/run_crypto_inline.dart'
     if (dart.library.io) 'src/run_crypto_native.dart';
 import 'src/snapshot_codec.dart' show workspaceBackupByteLimit;
@@ -21,19 +20,11 @@ final _saltOffset = _magic.length + 1;
 final _nonceOffset = _saltOffset + _saltBytes;
 final _headerBytes = _nonceOffset + _nonceBytes;
 final _overhead = _headerBytes + _tagBytes;
-const _maxPasswordBytes = 1024;
-
-// Argon2id parameter sets are format-versioned. This is 19 MiB, 2 passes,
-// 1 lane and a 256-bit result, with at most one backup operation at a time.
-const _kdf = DartArgon2id(
-  memory: 19 * 1024,
-  iterations: 2,
-  parallelism: 1,
-  hashLength: 32,
-  maxIsolates: 1,
-);
 
 Future<void>? _cryptoQueue;
+
+int get maximumEncryptedWorkspaceBackupBytes =>
+    workspaceBackupByteLimit + _overhead;
 
 /// Identifies a password-protected backup. Full parsing and authentication are
 /// handled separately. This also recognizes a newer unsupported version.
@@ -50,7 +41,7 @@ Future<Uint8List> encryptWorkspaceBackup(
   Uint8List backup,
   String password,
 ) async {
-  _validatePassword(password);
+  validateBackupPassphrase(password);
   if (backup.isEmpty || backup.length > workspaceBackupByteLimit) {
     throw const FormatException('Invalid workspace backup size.');
   }
@@ -64,10 +55,10 @@ Future<Uint8List> decryptWorkspaceBackup(
   Uint8List backup,
   String password,
 ) async {
-  _validatePassword(password);
+  validateBackupPassphrase(password);
   if (!isEncryptedWorkspaceBackup(backup) ||
       backup.length <= _overhead ||
-      backup.length > workspaceBackupByteLimit + _overhead) {
+      backup.length > maximumEncryptedWorkspaceBackupBytes) {
     throw const FormatException('Invalid encrypted workspace backup.');
   }
   if (backup[_magic.length] != _version) {
@@ -79,7 +70,7 @@ Future<Uint8List> decryptWorkspaceBackup(
 
 extension WorkspaceEncryptedBackups on WorkspaceStore {
   Future<Uint8List> createEncryptedBackup(String password) async {
-    _validatePassword(password);
+    validateBackupPassphrase(password);
     return encryptWorkspaceBackup(await createBackup(), password);
   }
 
@@ -96,16 +87,6 @@ final class WorkspaceBackupAuthenticationException implements Exception {
 
   @override
   String toString() => 'Could not unlock the backup with this password.';
-}
-
-void _validatePassword(String password) {
-  if (password.isEmpty ||
-      password.length > _maxPasswordBytes ||
-      utf8.encode(password).length > _maxPasswordBytes) {
-    throw ArgumentError(
-      'Use a backup password of 1 to $_maxPasswordBytes UTF-8 bytes.',
-    );
-  }
 }
 
 Future<T> _serialCrypto<T>(Future<T> Function() action) {
@@ -130,7 +111,7 @@ Future<Uint8List> _encrypt(Uint8List plaintext, String password) async {
   for (var index = _saltOffset; index < _headerBytes; index++) {
     header[index] = random.nextInt(256);
   }
-  final key = await _deriveKey(
+  final key = await deriveBackupKey(
     password,
     Uint8List.sublistView(header, _saltOffset, _nonceOffset),
   );
@@ -152,7 +133,7 @@ Future<Uint8List> _encrypt(Uint8List plaintext, String password) async {
 }
 
 Future<Uint8List> _decrypt(Uint8List bytes, String password) async {
-  final key = await _deriveKey(
+  final key = await deriveBackupKey(
     password,
     Uint8List.sublistView(bytes, _saltOffset, _nonceOffset),
   );
@@ -173,19 +154,5 @@ Future<Uint8List> _decrypt(Uint8List bytes, String password) async {
     throw const WorkspaceBackupAuthenticationException();
   } finally {
     key.destroy();
-  }
-}
-
-Future<SecretKeyData> _deriveKey(String password, Uint8List salt) async {
-  final material = Uint8List.fromList(utf8.encode(password));
-  final state = _kdf.newState();
-  try {
-    return SecretKeyData(
-      await state.deriveKeyBytes(password: material, nonce: salt),
-      overwriteWhenDestroyed: true,
-    );
-  } finally {
-    material.fillRange(0, material.length, 0);
-    state.tryReleaseMemory();
   }
 }

@@ -4,6 +4,7 @@ Run the focused suites and the scale workload from the repository root.
 
 ```sh
 flutter test test/storage_workspace_test.dart test/storage_history_test.dart test/storage_history_page_test.dart test/storage_encrypted_backup_test.dart test/storage_attachment_test.dart test/sync_journal_test.dart test/workspace_sync_test.dart
+flutter test test/storage_media_backup_test.dart test/storage_backup_page_test.dart
 flutter test tool/benchmark/storage_scale_test.dart --reporter expanded
 EASY_STORAGE_EDITS=10000 taskset -c 4 flutter test tool/benchmark/storage_churn_test.dart --reporter expanded
 bash tool/benchmark/check_storage_crash.sh
@@ -41,3 +42,13 @@ The WAL sample interval was 250 commits. A separate test held a shared WAL reade
 The Linux crash harness used a synthetic workspace and detected its held SQLite write lock before stopping the Flutter test process. The next process opened the last acknowledged version, verified the in-flight mutation had rolled back, retried it with the same operation ID, recovered the named version, and passed the integrity checks.
 
 The focused suites cover concurrent writes and revision conflicts, interrupted recovery and compaction transactions, selective restore, malformed or modified backup files, independent encryption fixtures, duplicate attachment imports, and digest and symlink checks. History restores saved Easy records and settings, with media continuing to use its local storage. Paired bundles use explicit device grants and authenticated import previews. The attachment format suite uses synthetic media containers and small JPEG and PNG files. A separate local smoke run streamed an 847-byte AAC M4A produced by FFmpeg through storage and verified byte-for-byte readback.
+
+## Portable media backups
+
+Encrypted export starts with workspace records. On native devices the export dialog can also include original voice recordings and meal photos referenced by those records. The Open action recognizes both existing record backups and the media format. The restore preview lists the unique original files and waits for confirmation before publishing them. [Backup page](../lib/storage/workspace_backup_page.dart)
+
+The media archive authenticates 64 KiB frames with AES-GCM. An Argon2id passphrase key and a separate derivation context protect each archive. The authenticated manifest binds the logical backup and its exact set of referenced original files by SHA-256, format and length. Matching references share one archived copy. Frame validation starts during input streaming. The file count and byte limits apply to the manifest and the source stream. [Media archive](../lib/storage/media_backup.dart)
+
+The review holds an encrypted archive in a private temporary directory. Format validation creates and removes one temporary original at a time. Confirming restore checks the reviewed revision and publishes verified originals by content ID before the workspace transaction. The transaction records the prior workspace and can be retried with the same operation ID. Interrupted publication can leave verified unreferenced originals for a later retry. [Restore implementation](../lib/storage/src/open_media_backup_native.dart)
+
+Tests verified exact original bytes with a 24 MiB streamed recording, shared references, early rejection of bad passphrases, invalid manifests, truncation, changed tags, altered review data, and partial publication followed by retry. The restore tests also check recovery and SQLite foreign keys. The 320px page test exercises export, preview, cancellation and confirmation without buffering an entire attachment bundle inside the page. [Archive tests](../test/storage_media_backup_test.dart) · [Backup page tests](../test/storage_backup_page_test.dart)

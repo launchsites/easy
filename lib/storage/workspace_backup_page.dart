@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:file_selector/file_selector.dart' show XFile;
 import 'package:material_ui/material_ui.dart';
 
 import '../ui_theme.dart';
+import 'attachment_store.dart';
 import 'encrypted_backup.dart';
+import 'media_backup.dart';
 import 'workspace_history_page.dart';
 import 'workspace_store.dart';
 
@@ -14,12 +18,30 @@ final class BackupExportCancelled implements Exception {
   const BackupExportCancelled();
 }
 
+/// Native file and attachment adapters for portable backups with media.
+final class WorkspaceMediaBackupUiSupport {
+  const WorkspaceMediaBackupUiSupport({
+    required this.loadAttachments,
+    required this.pickBackupFile,
+    required this.saveMediaArchive,
+    this.limits = const WorkspaceMediaBackupLimits(),
+    this.scratchDirectory,
+  });
+
+  final Future<AttachmentStore?> Function() loadAttachments;
+  final Future<XFile?> Function() pickBackupFile;
+  final Future<void> Function(WorkspaceMediaBackupFile) saveMediaArchive;
+  final WorkspaceMediaBackupLimits limits;
+  final String? scratchDirectory;
+}
+
 class WorkspaceBackupPage extends StatefulWidget {
   const WorkspaceBackupPage({
     required this.store,
     required this.pickBackup,
     required this.exportBackup,
     required this.onRestored,
+    this.media,
     super.key,
   });
 
@@ -27,6 +49,7 @@ class WorkspaceBackupPage extends StatefulWidget {
   final Future<Uint8List?> Function() pickBackup;
   final Future<void> Function(Uint8List bytes, String filename) exportBackup;
   final Future<void> Function(WorkspaceRevision) onRestored;
+  final WorkspaceMediaBackupUiSupport? media;
 
   @override
   State<WorkspaceBackupPage> createState() => _WorkspaceBackupPageState();
@@ -49,6 +72,7 @@ enum _Activity {
 
 enum _BackupSource {
   encrypted('Password-protected backup', Icons.lock_outline_rounded),
+  media('Password-protected backup with media', Icons.lock_outline_rounded),
   plain('Checksum-verified backup', Icons.description_outlined),
   recovery('Previous workspace', Icons.history_rounded);
 
@@ -62,7 +86,10 @@ typedef _Selection = ({
   WorkspaceBackupPreview preview,
   int expectedRevision,
   _BackupSource source,
+  WorkspaceMediaBackupPreview? media,
 });
+
+typedef _BackupPassphrase = ({String passphrase, bool includeMedia});
 
 class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
   final _previewKey = GlobalKey();
@@ -70,6 +97,12 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
   _Selection? _selection;
   ({String message, bool error})? _feedback;
   bool _promptOpen = false;
+
+  @override
+  void dispose() {
+    unawaited(_closeMediaPreview(_selection?.media));
+    super.dispose();
+  }
 
   Future<void> _run(_Activity activity, Future<void> Function() action) async {
     if (_activity != null) return;
@@ -86,12 +119,19 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
         'Check the passphrase, then choose the backup again.',
         error: true,
       );
+    } on WorkspaceMediaBackupAuthenticationException {
+      _inform(
+        'Check the passphrase, then choose the backup again.',
+        error: true,
+      );
     } on WorkspaceRevisionConflict {
-      if (mounted) setState(() => _selection = null);
+      await _discardSelection();
       _inform(
         'The workspace changed after this preview. Open the backup again to review it.',
         error: true,
       );
+    } on WorkspaceMediaBackupException catch (error) {
+      _inform(error.message, error: true);
     } on FormatException {
       _inform(
         'The file is damaged or uses an unsupported backup format.',
@@ -117,37 +157,124 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
     }
   }
 
-  Future<String?> _passphrase({required bool export}) =>
-      _prompt((_) => _PassphraseDialog(export: export));
+  Future<_BackupPassphrase?> _passphrase({required bool export}) => _prompt(
+    (_) => _PassphraseDialog(export: export, allowMedia: widget.media != null),
+  );
+
+  Future<AttachmentStore> _attachmentStore(
+    WorkspaceMediaBackupUiSupport support,
+  ) async =>
+      await support.loadAttachments() ??
+      (throw const WorkspaceMediaBackupException(
+        'The attachment store could not be opened.',
+      ));
 
   Future<void> _export() => _run(_Activity.export, () async {
-    final passphrase = await _passphrase(export: true);
-    if (!mounted || passphrase == null) return;
-    final bytes = await widget.store.createEncryptedBackup(passphrase);
+    final chosen = await _passphrase(export: true);
+    if (!mounted || chosen == null) return;
+    if (widget.media case final support? when chosen.includeMedia) {
+      final archive = await createWorkspaceMediaBackup(
+        store: widget.store,
+        attachments: await _attachmentStore(support),
+        passphrase: chosen.passphrase,
+        limits: support.limits,
+        scratchDirectory: support.scratchDirectory,
+      );
+      try {
+        if (!mounted) return;
+        await support.saveMediaArchive(archive);
+      } finally {
+        await archive.close();
+      }
+      _inform('Password-protected backup with media saved.');
+      return;
+    }
+    final bytes = await widget.store.createEncryptedBackup(chosen.passphrase);
     if (!mounted) return;
     await widget.exportBackup(bytes, _backupFilename(DateTime.now()));
     _inform('Password-protected backup saved.');
   });
 
   Future<void> _chooseBackup() => _run(_Activity.preview, () async {
-    final data = await widget.pickBackup();
-    if (!mounted || data == null) return;
-    // Choosing a replacement file invalidates the old preview, even if
-    // the new file or its passphrase turns out to be invalid.
-    setState(() => _selection = null);
+    final support = widget.media;
+    final Uint8List? data;
+    if (support != null) {
+      final file = await support.pickBackupFile();
+      if (!mounted || file == null) return;
+      await _discardSelection();
+      final prefix = BytesBuilder(copy: false);
+      await for (final chunk in file.openRead(0, 8)) {
+        prefix.add(chunk);
+      }
+      if (isWorkspaceMediaBackup(prefix.takeBytes())) {
+        await _previewMedia(file, support);
+        return;
+      }
+      data = await _readLogicalFile(file);
+    } else {
+      data = await widget.pickBackup();
+      if (!mounted || data == null) return;
+      await _discardSelection();
+    }
+    if (!mounted) return;
     final encrypted = isEncryptedWorkspaceBackup(data);
-    final password = encrypted ? await _passphrase(export: false) : null;
+    final password = encrypted
+        ? (await _passphrase(export: false))?.passphrase
+        : null;
     if (!mounted || encrypted && password == null) return;
     final expected = (await widget.store.read()).revision;
     final preview = password != null
         ? await widget.store.previewEncryptedBackup(data, password)
         : await widget.store.previewBackup(data);
-    _showSelection(
+    await _showSelection(
       preview,
       expected,
       encrypted ? _BackupSource.encrypted : _BackupSource.plain,
     );
   });
+
+  Future<Uint8List> _readLogicalFile(XFile file) async {
+    final limit = maximumEncryptedWorkspaceBackupBytes;
+    if (await file.length() > limit) {
+      throw const FormatException('The selected backup is too large.');
+    }
+    final buffer = BytesBuilder(copy: false);
+    await for (final chunk in file.openRead()) {
+      if (chunk.length > limit - buffer.length) {
+        throw const FormatException('The selected backup is too large.');
+      }
+      buffer.add(chunk);
+    }
+    return buffer.takeBytes();
+  }
+
+  Future<void> _previewMedia(
+    XFile file,
+    WorkspaceMediaBackupUiSupport support,
+  ) async {
+    if (!mounted) return;
+    final password = (await _passphrase(export: false))?.passphrase;
+    if (!mounted || password == null) return;
+    final preview = await previewWorkspaceMediaBackup(
+      store: widget.store,
+      source: file.openRead(),
+      passphrase: password,
+      limits: support.limits,
+      scratchDirectory: support.scratchDirectory,
+    );
+    await _showSelection(
+      preview.backup,
+      preview.expectedRevision,
+      _BackupSource.media,
+      media: preview,
+    );
+  }
+
+  Future<void> _discardSelection() async {
+    final old = _selection;
+    if (mounted) setState(() => _selection = null);
+    await _closeMediaPreview(old?.media);
+  }
 
   Future<void> _chooseRecovery() => _run(_Activity.recovery, () async {
     final expected = (await widget.store.read()).revision;
@@ -157,7 +284,7 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
       return;
     }
     final preview = await widget.store.previewBackup(bytes);
-    _showSelection(preview, expected, _BackupSource.recovery);
+    await _showSelection(preview, expected, _BackupSource.recovery);
   });
 
   Future<void> _openHistory(WorkspaceHistoryStore store) =>
@@ -166,26 +293,31 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
           builder: (_) => WorkspaceHistoryPage(
             store: store,
             onRestored: (revision) async {
-              if (mounted) setState(() => _selection = null);
+              await _discardSelection();
               await widget.onRestored(revision);
             },
           ),
         ),
       );
 
-  void _showSelection(
+  Future<void> _showSelection(
     WorkspaceBackupPreview preview,
     int expected,
-    _BackupSource source,
-  ) {
+    _BackupSource source, {
+    WorkspaceMediaBackupPreview? media,
+  }) async {
+    await _discardSelection();
     if (mounted) {
       setState(() {
         _selection = (
           preview: preview,
           expectedRevision: expected,
           source: source,
+          media: media,
         );
       });
+    } else {
+      await _closeMediaPreview(media);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final anchor = _previewKey.currentContext;
         if (anchor == null || !mounted) return;
@@ -206,9 +338,10 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
     final confirm = await _prompt<bool>(
       (context) => AlertDialog(
         title: const Text('Restore this backup?'),
-        content: const Text(
-          'This replaces your workspace records. Easy saves the current records '
-          'as a recovery point first.',
+        content: Text(
+          selected.media == null
+              ? 'This replaces your workspace records. Easy saves the current records as a recovery point first.'
+              : 'This replaces your workspace records and restores the original media in this backup. Easy saves the current records as a recovery point first.',
         ),
         actions: [
           TextButton(
@@ -223,13 +356,22 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
       ),
     );
     if (!mounted || confirm != true) return;
-    final restored = await widget.store.restoreBackup(
-      selected.preview,
-      expectedRevision: selected.expectedRevision,
-    );
-    if (mounted) setState(() => _selection = null);
+    final restored = switch (selected.media) {
+      final preview? => await restoreWorkspaceMediaBackup(
+        store: widget.store,
+        attachments: await _attachmentStore(widget.media!),
+        preview: preview,
+      ),
+      _ => await widget.store.restoreBackup(
+        selected.preview,
+        expectedRevision: selected.expectedRevision,
+      ),
+    };
+    await _discardSelection();
     if (restored.revision == selected.expectedRevision) {
-      _inform('The workspace already matches this backup.');
+      _inform(
+        selected.media == null ? 'The workspace already matches this backup.' : 'Media restored. The workspace records already match this backup.',
+      );
       return;
     }
     try {
@@ -269,8 +411,10 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
                   children: [
                     const Text('Workspace records', style: sectionHeadingStyle),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Backups include your saved records. Media files stay on this device.',
+                    Text(
+                      widget.media == null
+                          ? 'Save and restore your workspace records.'
+                          : 'Save your records with optional voice recordings and meal photos.',
                       style: contentMetadataStyle,
                     ),
                     const SizedBox(height: 14),
@@ -354,9 +498,7 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
                         key: _previewKey,
                         selection: selected,
                         onRestore: enabled ? _confirmRestore : null,
-                        onDismiss: enabled
-                            ? () => setState(() => _selection = null)
-                            : null,
+                        onDismiss: enabled ? _discardSelection : null,
                       ),
                     ],
                   ],
@@ -482,6 +624,8 @@ class _RestorePreview extends StatelessWidget {
               if (counts.foods > 0) ('Saved foods', counts.foods),
               if (counts.activities > 0) ('Activities', counts.activities),
               if (counts.routines > 0) ('Routines', counts.routines),
+              if (selection.media case final media?)
+                ('Original files', media.attachments.length),
               ('Gym sessions', counts.gymSessions),
               ('Workout plans', counts.workoutPlans),
             ]) ...[
@@ -519,9 +663,10 @@ class _RestorePreview extends StatelessWidget {
 }
 
 class _PassphraseDialog extends StatefulWidget {
-  const _PassphraseDialog({required this.export});
+  const _PassphraseDialog({required this.export, required this.allowMedia});
 
   final bool export;
+  final bool allowMedia;
 
   @override
   State<_PassphraseDialog> createState() => _PassphraseDialogState();
@@ -531,6 +676,7 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
   final _passphrase = TextEditingController();
   final _confirm = TextEditingController();
   final _confirmationFocus = FocusNode();
+  var _includeMedia = false;
   String? _error;
 
   void _submit() {
@@ -546,7 +692,8 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
       setState(() => _error = error);
       return;
     }
-    Navigator.of(context).pop(phrase);
+    Navigator.of(context)
+        .pop((passphrase: phrase, includeMedia: _includeMedia));
   }
 
   @override
@@ -598,6 +745,13 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
             decoration: const InputDecoration(labelText: 'Repeat passphrase'),
             onSubmitted: (_) => _submit(),
           ),
+        if (widget.export && widget.allowMedia)
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _includeMedia,
+            title: const Text('Include voice recordings and meal photos'),
+            onChanged: (enabled) => setState(() => _includeMedia = enabled!),
+          ),
         if (_error case final error?) ...[
           const SizedBox(height: 8),
           Semantics(
@@ -621,6 +775,15 @@ class _PassphraseDialogState extends State<_PassphraseDialog> {
       ),
     ],
   );
+}
+
+Future<void> _closeMediaPreview(WorkspaceMediaBackupPreview? preview) async {
+  if (preview == null) return;
+  try {
+    await preview.close();
+  } catch (_) {
+    // The native temporary directory can remove an encrypted file later.
+  }
 }
 
 String _backupFilename(DateTime date) {

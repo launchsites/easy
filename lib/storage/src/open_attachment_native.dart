@@ -33,7 +33,7 @@ Future<AttachmentStore> openDefaultAttachmentStore({
   }
 }
 
-class _FileAttachmentStore implements AttachmentStore {
+class _FileAttachmentStore implements StreamingAttachmentStore {
   _FileAttachmentStore(this._root, this._limits);
 
   final String _root;
@@ -80,6 +80,7 @@ class _FileAttachmentStore implements AttachmentStore {
     required AttachmentKind kind,
     String? declaredMimeType,
     int? expectedLength,
+    String? expectedContentId,
   }) => _submit(
     () => _ingest(
       _root,
@@ -89,6 +90,7 @@ class _FileAttachmentStore implements AttachmentStore {
       declaredMimeType,
       expectedLength,
       runInWorker: true,
+      expectedContentId: expectedContentId,
     ),
   );
 
@@ -97,6 +99,47 @@ class _FileAttachmentStore implements AttachmentStore {
     validateAttachmentId(id);
     return _readInWorker(_root, id, _limits);
   });
+
+  @override
+  Stream<Uint8List> readStream(AttachmentRef expected) async* {
+    if (_closed) {
+      throw const AttachmentStoreException('The attachment store is closed.');
+    }
+    _checkLength(expected.byteLength, _limits.forKind(expected.format.kind));
+    final completion = Completer<void>();
+    _pending.add(completion.future);
+    try {
+      final path = await _attachmentPathInWorker(_root, expected);
+      final digest = _DigestSink();
+      final input = sha256.startChunkedConversion(digest);
+      var count = 0;
+      try {
+        await for (final bytes in File(path).openRead()) {
+          if (bytes.length > expected.byteLength - count) {
+            throw const AttachmentStoreException(
+              'The attachment size changed while reading.',
+            );
+          }
+          count += bytes.length;
+          input.add(bytes);
+          yield bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
+        }
+      } finally {
+        input.close();
+      }
+      if (count != expected.byteLength ||
+          digest.result.toString() != expected.id) {
+        throw const AttachmentStoreException(
+          'The attachment failed its integrity check.',
+        );
+      }
+    } on FileSystemException {
+      throw const AttachmentStoreException('The attachment could not be read.');
+    } finally {
+      _pending.remove(completion.future);
+      completion.complete();
+    }
+  }
 
   @override
   Future<void> close() async {
@@ -136,6 +179,18 @@ Future<StoredAttachment> _readInWorker(
   return StoredAttachment(ref: stored.ref, bytes: stored.bytes!);
 }, debugName: 'easy-attachment-read');
 
+Future<String> _attachmentPathInWorker(String root, AttachmentRef expected) =>
+    Isolate.run(() {
+      final file = _payloadFile(root, expected.id);
+      if (file.lengthSync() != expected.byteLength ||
+          inspectAttachment(file, expected.byteLength) != expected.format) {
+        throw const AttachmentStoreException(
+          'Stored attachment metadata changed.',
+        );
+      }
+      return file.path;
+    }, debugName: 'easy-attachment-stream');
+
 Future<AttachmentRef> _publishInWorker(
   String root,
   AttachmentLimits limits,
@@ -157,10 +212,12 @@ Future<AttachmentRef> _ingest(
   String? declaredMimeType,
   int? expectedLength, {
   required bool runInWorker,
+  String? expectedContentId,
 }) async {
   final limit = limits.forKind(kind);
   _checkMimeLength(declaredMimeType);
   if (expectedLength != null) _checkLength(expectedLength, limit);
+  if (expectedContentId != null) validateAttachmentId(expectedContentId);
   final Directory stage;
   try {
     // The staging directory is private and on the destination filesystem.
@@ -202,6 +259,11 @@ Future<AttachmentRef> _ingest(
       inputDigest.close();
     }
     final id = digest.result.toString();
+    if (expectedContentId != null && id != expectedContentId) {
+      throw const FormatException(
+        'The attachment does not match its content ID.',
+      );
+    }
     final stagedPath = stage.path;
     return runInWorker
         ? await _publishInWorker(
@@ -279,16 +341,7 @@ AttachmentRef _publish(
   AttachmentLimits limits, {
   required bool includeBytes,
 }) {
-  final directory = _digestDirectory(root, id);
-  final file = File.fromUri(directory.uri.resolve(_payloadName));
-  if (FileSystemEntity.typeSync(directory.path, followLinks: false) !=
-          FileSystemEntityType.directory ||
-      FileSystemEntity.typeSync(file.path, followLinks: false) !=
-          FileSystemEntityType.file) {
-    throw const AttachmentStoreException(
-      'The attachment is missing or invalid.',
-    );
-  }
+  final file = _payloadFile(root, id);
   try {
     final handle = file.openSync();
     try {
@@ -330,6 +383,20 @@ AttachmentRef _publish(
   } on FileSystemException {
     throw const AttachmentStoreException('The attachment could not be read.');
   }
+}
+
+File _payloadFile(String root, String id) {
+  final directory = _digestDirectory(root, id);
+  final file = File.fromUri(directory.uri.resolve(_payloadName));
+  if (FileSystemEntity.typeSync(directory.path, followLinks: false) !=
+          FileSystemEntityType.directory ||
+      FileSystemEntity.typeSync(file.path, followLinks: false) !=
+          FileSystemEntityType.file) {
+    throw const AttachmentStoreException(
+      'The attachment is missing or invalid.',
+    );
+  }
+  return file;
 }
 
 Directory _digestDirectory(String root, String id) {

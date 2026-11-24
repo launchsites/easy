@@ -11,6 +11,7 @@ export 'src/attachment_contracts.dart'
         AttachmentRef,
         AttachmentStore,
         AttachmentStoreException,
+        StreamingAttachmentStore,
         StoredAttachment;
 
 /// Opens app-managed local attachment storage. A null result means the

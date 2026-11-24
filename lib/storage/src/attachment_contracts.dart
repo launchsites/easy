@@ -118,12 +118,19 @@ abstract interface class AttachmentStore {
     required AttachmentKind kind,
     String? declaredMimeType,
     int? expectedLength,
+    String? expectedContentId,
   });
 
   /// Reads by content ID and verifies the full payload digest before returning.
   Future<StoredAttachment> read(String id);
 
   Future<void> close();
+}
+
+abstract interface class StreamingAttachmentStore implements AttachmentStore {
+  /// The supplied metadata and digest are checked before successful stream
+  /// completion. A consumer that cancels must discard its partial copy.
+  Stream<Uint8List> readStream(AttachmentRef expected);
 }
 
 final _validId = RegExp(r'^[a-f0-9]{64}$');
