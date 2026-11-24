@@ -1,0 +1,19 @@
+{
+  "revision": "74a9fb889f30457232678769cdfbc9b03164f508",
+  "executable_sha256": "89f00b1bc75c65c42e1e537a22ebd00bab1ac4f1164c3c4949fa8c64ee7b11f1",
+  "aot_sha256": "847af5273c53a8279333e254c6b08f5b6f6ec143f06318473c01261bbe1a62e6",
+  "viewport": [
+    1280,
+    720
+  ],
+  "secret_service_on_launch": false,
+  "elapsed_seconds": 36.03,
+  "checks": {
+    "setup_cancel_preserves_state": true,
+    "wrong_passphrase_rejected": true,
+    "configured_unlock_cancelled": true,
+    "restart_opens_same_vault": true,
+    "native_journal_integrity": "ok",
+    "workspace_unchanged": true
+  }
+}
