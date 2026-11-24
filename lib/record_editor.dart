@@ -16,6 +16,8 @@ class RecordEditor extends StatefulWidget {
     this.note,
     this.initialTaskDate,
     this.initialCategory,
+    this.taskItems = const [],
+    this.initialTaskParentId,
     super.key,
   });
 
@@ -26,6 +28,8 @@ class RecordEditor extends StatefulWidget {
   final NoteItem? note;
   final DateTime? initialTaskDate;
   final String? initialCategory;
+  final List<TaskItem> taskItems;
+  final String? initialTaskParentId;
 
   @override
   State<RecordEditor> createState() => _RecordEditorState();
@@ -37,9 +41,16 @@ class _RecordEditorState extends State<RecordEditor> {
   final _form = GlobalKey<FormState>();
   final _titleFocus = FocusNode();
   final _eventErrorKey = GlobalKey();
+  final _taskErrorKey = GlobalKey();
   late final TextEditingController _title;
   late final TextEditingController _location;
   late final TextEditingController _body;
+  late final TextEditingController _taskNotes;
+  late final TextEditingController _estimate;
+  late final TextEditingController _minimumChunk;
+  late final String _taskId;
+  late List<String> _prerequisiteIds;
+  late bool _allowSplit;
   late RecordKind _kind;
   late String _category;
   late DateTime _startDate;
@@ -48,7 +59,13 @@ class _RecordEditorState extends State<RecordEditor> {
   late TimeOfDay _endTime;
   late bool _allDay;
   DateTime? _dueDate;
+  DateTime? _dueAt;
   String? _eventError;
+  String? _taskParentId;
+  TaskPriority? _priority;
+  DateTime? _earliestStart;
+  String? _taskError;
+  bool _showTaskDetails = false;
 
   bool get _editing =>
       widget.event != null || widget.task != null || widget.note != null;
@@ -65,12 +82,37 @@ class _RecordEditorState extends State<RecordEditor> {
     );
     _location = TextEditingController(text: event?.location);
     _body = TextEditingController(text: note?.body);
+    _estimate = TextEditingController(text: task?.estimatedMinutes?.toString());
+    _minimumChunk = TextEditingController(
+      text: (task?.minimumChunkMinutes ?? defaultTaskChunkMinutes).toString(),
+    );
+    _taskNotes = TextEditingController(text: task?.notes);
+    _taskId = task?.id ?? DateTime.now().microsecondsSinceEpoch.toString();
+    _taskParentId = task == null ? widget.initialTaskParentId : task.parentId;
+    _priority = task?.priority;
+    _earliestStart = task?.earliestStart?.toLocal();
+    _prerequisiteIds = [...?task?.prerequisiteIds];
+    _allowSplit = task?.allowSplit ?? false;
+    _dueAt = task?.dueAt?.toLocal();
+    _showTaskDetails =
+        _taskParentId != null ||
+        _priority != null ||
+        _earliestStart != null ||
+        _dueAt != null ||
+        _allowSplit ||
+        _prerequisiteIds.isNotEmpty ||
+        _estimate.text.isNotEmpty ||
+        _taskNotes.text.isNotEmpty;
     _category =
         event?.category ??
         task?.category ??
         widget.initialCategory ??
         'personal';
-    _dueDate = task == null ? widget.initialTaskDate : task.date;
+    _dueDate = _dueAt == null
+        ? task == null
+              ? widget.initialTaskDate
+              : task.date
+        : DateUtils.dateOnly(_dueAt!);
     _allDay = event?.allDay ?? false;
 
     final now = DateTime.now();
@@ -99,6 +141,9 @@ class _RecordEditorState extends State<RecordEditor> {
     _title.dispose();
     _location.dispose();
     _body.dispose();
+    _estimate.dispose();
+    _taskNotes.dispose();
+    _minimumChunk.dispose();
     super.dispose();
   }
 
@@ -179,7 +224,142 @@ class _RecordEditorState extends State<RecordEditor> {
   Future<void> _changeDueDate() async {
     final date = await _pickDate(_dueDate ?? widget.date, 'Choose a due date');
     if (!mounted || date == null) return;
-    setState(() => _dueDate = date);
+    setState(() {
+      _dueDate = date;
+      if (_dueAt case final exact?) {
+        _dueAt = _combine(date, TimeOfDay.fromDateTime(exact));
+      }
+      _taskError = null;
+    });
+  }
+
+  Future<void> _changeDueTime() async {
+    final due = _dueDate;
+    if (due == null) return;
+    final exact = _dueAt;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: exact == null
+          ? const TimeOfDay(hour: 17, minute: 0)
+          : TimeOfDay.fromDateTime(exact),
+      helpText: 'Choose due time',
+    );
+    if (!mounted || time == null) return;
+    setState(() {
+      _dueAt = _combine(due, time);
+      _taskError = null;
+    });
+  }
+
+  Future<void> _changeEarliestStart() async {
+    final old = _earliestStart;
+    final day = await _pickDate(old ?? widget.date, 'Choose earliest date');
+    if (!mounted || day == null) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: old == null ? TimeOfDay.now() : TimeOfDay.fromDateTime(old),
+      helpText: 'Choose earliest time',
+    );
+    if (!mounted || time == null) return;
+    setState(() {
+      _earliestStart = _combine(day, time);
+      _taskError = null;
+    });
+  }
+
+  Future<void> _changeTaskParent() async {
+    final candidates =
+        TaskHierarchy(widget.taskItems).eligibleParents(_taskId).toList()..sort(
+          (first, second) =>
+              first.title.toLowerCase().compareTo(second.title.toLowerCase()),
+        );
+    final choice = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => _TaskPicker(
+        tasks: candidates,
+        initiallySelected: _taskParentId == null ? const [] : [_taskParentId!],
+        multiple: false,
+      ),
+    );
+    if (!mounted || choice == null) return;
+    setState(() {
+      _taskParentId = choice.firstOrNull;
+      _taskError = null;
+    });
+  }
+
+  Future<void> _changePrerequisites() async {
+    final candidates =
+        TaskDependencyGraph(widget.taskItems)
+            .eligiblePrerequisites(_taskId)
+            .toList()
+          ..sort(
+            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+          );
+    final choice = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => _TaskPicker(
+        tasks: candidates,
+        initiallySelected: _prerequisiteIds,
+        multiple: true,
+      ),
+    );
+    if (!mounted || choice == null) return;
+    setState(() {
+      _prerequisiteIds = choice;
+      _taskError = null;
+    });
+  }
+
+  bool _validateTaskDetails(int? estimatedMinutes, int? minimumChunkMinutes) {
+    final parentIssue = _taskParentId == _taskId
+        ? TaskParentIssue.cycle
+        : widget.taskItems.isEmpty && _taskParentId == widget.task?.parentId
+        ? null
+        : taskParentIssue(widget.taskItems, _taskId, _taskParentId);
+    final due = _dueDate;
+    final start = _earliestStart;
+    final exact = _dueAt;
+    final existingPrerequisites =
+        widget.task?.prerequisiteIds ?? const <String>[];
+    final prerequisiteIssue = _prerequisiteIds.contains(_taskId)
+        ? TaskPrerequisiteIssue.cycle
+        : widget.taskItems.isEmpty &&
+              _prerequisiteIds.every(existingPrerequisites.contains)
+        ? null
+        : taskPrerequisiteIssue(widget.taskItems, _taskId, _prerequisiteIds);
+    final String? error;
+    if (_estimate.text.trim().isNotEmpty &&
+        (estimatedMinutes == null || estimatedMinutes < 1)) {
+      error = 'Enter an estimated duration in whole minutes.';
+    } else if (parentIssue != null) {
+      error = parentIssue.message;
+    } else if (prerequisiteIssue != null) {
+      error = prerequisiteIssue.message;
+    } else if (exact != null && start != null && start.isAfter(exact)) {
+      error = 'Earliest start must be on or before the due time.';
+    } else if (due != null &&
+        start != null &&
+        DateUtils.dateOnly(start).isAfter(DateUtils.dateOnly(due))) {
+      error = 'Earliest start must be on or before the due date.';
+    } else {
+      error = taskSplitIssue(
+        allowSplit: _allowSplit,
+        minimumChunkMinutes: minimumChunkMinutes,
+        estimatedMinutes: estimatedMinutes,
+      );
+    }
+    if (error == null) return true;
+
+    setState(() {
+      _showTaskDetails = true;
+      _taskError = error;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final errorContext = _taskErrorKey.currentContext;
+      if (errorContext != null) Scrollable.ensureVisible(errorContext);
+    });
+    return false;
   }
 
   void _save() {
@@ -192,13 +372,28 @@ class _RecordEditorState extends State<RecordEditor> {
     final newId = now.microsecondsSinceEpoch.toString();
     switch (_kind) {
       case RecordKind.task:
+        final estimate = int.tryParse(_estimate.text.trim());
+        final minimum = int.tryParse(_minimumChunk.text.trim());
+        if (!_validateTaskDetails(estimate, minimum)) return;
+        final notes = _taskNotes.text;
         Navigator.of(context).pop(
           TaskItem(
-            id: widget.task?.id ?? newId,
+            id: _taskId,
             title: title,
             category: _category,
             date: _dueDate,
             done: widget.task?.done ?? false,
+            estimatedMinutes: estimate,
+            priority: _priority,
+            parentId: _taskParentId,
+            notes: notes.trim().isEmpty ? null : notes,
+            earliestStart: _earliestStart,
+            prerequisiteIds: List.unmodifiable(_prerequisiteIds),
+            allowSplit: _allowSplit,
+            minimumChunkMinutes: minimum != null && minimum > 0
+                ? minimum
+                : defaultTaskChunkMinutes,
+            dueAt: _dueAt,
           ),
         );
       case RecordKind.event:
@@ -226,6 +421,7 @@ class _RecordEditorState extends State<RecordEditor> {
             category: _category,
             allDay: _allDay,
             location: location.isEmpty ? null : location,
+            plannedTaskId: widget.event?.plannedTaskId,
           ),
         );
       case RecordKind.note:
@@ -560,12 +756,201 @@ class _RecordEditorState extends State<RecordEditor> {
             if (date != null)
               IconButton(
                 tooltip: 'Remove due date',
-                onPressed: () => setState(() => _dueDate = null),
+                onPressed: () => setState(() {
+                  _dueDate = null;
+                  _dueAt = null;
+                  _taskError = null;
+                }),
                 icon: const Icon(Icons.close_rounded, size: 16, color: muted),
               ),
           ],
         ),
       ]),
+      const SizedBox(height: 6),
+      Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: Semantics(
+          expanded: _showTaskDetails,
+          child: TextButton.icon(
+            iconAlignment: IconAlignment.end,
+            icon: Icon(
+              _showTaskDetails
+                  ? Icons.expand_less_rounded
+                  : Icons.expand_more_rounded,
+            ),
+            onPressed: () =>
+                setState(() => _showTaskDetails = !_showTaskDetails),
+            label: const Text('Task details'),
+          ),
+        ),
+      ),
+      if (_showTaskDetails) ..._taskDetails(),
+      if (_taskError case final error?) ...[
+        const SizedBox(height: 8),
+        Semantics(
+          key: _taskErrorKey,
+          liveRegion: true,
+          child: Text(
+            error,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        ),
+      ],
+    ];
+  }
+
+  List<Widget> _taskDetails() {
+    final start = _earliestStart;
+    final dueAt = _dueAt;
+    final parentId = _taskParentId;
+    final parent = widget.taskItems
+        .where((task) => task.id == parentId)
+        .firstOrNull;
+    final prerequisiteLabel = switch (_prerequisiteIds.length) {
+      0 => 'None',
+      1 =>
+        widget.taskItems
+                .where((task) => task.id == _prerequisiteIds.single)
+                .firstOrNull
+                ?.title ??
+            'Unavailable',
+      _ => '${_prerequisiteIds.length} tasks',
+    };
+    return [
+      _propertyPanel([
+        MenuAnchor(
+          builder: (context, controller, _) => _propertyButton(
+            label: 'Priority',
+            value: _priority?.label ?? 'None',
+            icon: Icons.flag_outlined,
+            onPressed: () =>
+                controller.isOpen ? controller.close() : controller.open(),
+          ),
+          menuChildren: [
+            for (final priority in <TaskPriority?>[
+              null,
+              ...TaskPriority.values,
+            ])
+              MenuItemButton(
+                trailingIcon: priority == _priority
+                    ? const Icon(Icons.check_rounded, size: 16, color: accent)
+                    : null,
+                onPressed: () => setState(() => _priority = priority),
+                child: Text(priority?.label ?? 'None'),
+              ),
+          ],
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _propertyButton(
+                label: 'Earliest start',
+                value: start == null
+                    ? 'None'
+                    : '${_dateLabel(start)} · ${_timeLabel(TimeOfDay.fromDateTime(start))}',
+                icon: Icons.schedule_outlined,
+                onPressed: _changeEarliestStart,
+                showChevron: start == null,
+              ),
+            ),
+            if (start != null)
+              IconButton(
+                tooltip: 'Remove earliest start',
+                onPressed: () => setState(() {
+                  _earliestStart = null;
+                  _taskError = null;
+                }),
+                icon: const Icon(Icons.close_rounded, size: 16, color: muted),
+              ),
+          ],
+        ),
+        if (_dueDate != null)
+          Row(
+            children: [
+              Expanded(
+                child: _propertyButton(
+                  label: 'Due time',
+                  value: dueAt == null
+                      ? 'None'
+                      : _timeLabel(TimeOfDay.fromDateTime(dueAt)),
+                  icon: Icons.access_time_rounded,
+                  onPressed: _changeDueTime,
+                  showChevron: dueAt == null,
+                ),
+              ),
+              if (dueAt != null)
+                IconButton(
+                  tooltip: 'Remove due time',
+                  onPressed: () => setState(() {
+                    _dueAt = null;
+                    _taskError = null;
+                  }),
+                  icon: const Icon(Icons.close_rounded, size: 16, color: muted),
+                ),
+            ],
+          ),
+        if (parentId != null || widget.taskItems.isNotEmpty)
+          _propertyButton(
+            label: 'Parent task',
+            value: parentId == null ? 'None' : parent?.title ?? 'Unavailable',
+            icon: Icons.account_tree_outlined,
+            onPressed: _changeTaskParent,
+          ),
+        if (_prerequisiteIds.isNotEmpty ||
+            widget.taskItems.any((task) => task.id != _taskId))
+          _propertyButton(
+            label: 'Prerequisites',
+            value: prerequisiteLabel,
+            icon: Icons.checklist_rounded,
+            onPressed: _changePrerequisites,
+          ),
+        SwitchListTile.adaptive(
+          title: const Text(
+            'Split across blocks',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 13),
+          value: _allowSplit,
+          onChanged: (value) => setState(() {
+            _allowSplit = value;
+            _taskError = null;
+          }),
+        ),
+      ]),
+      const SizedBox(height: 12),
+      TextFormField(
+        key: const ValueKey('task-estimate'),
+        controller: _estimate,
+        decoration: _decoration('Estimated minutes'),
+        keyboardType: TextInputType.number,
+        textInputAction: TextInputAction.next,
+        onChanged: (_) {
+          if (_taskError != null) setState(() => _taskError = null);
+        },
+      ),
+      if (_allowSplit) ...[
+        const SizedBox(height: 12),
+        TextFormField(
+          key: const ValueKey('task-minimum-chunk'),
+          controller: _minimumChunk,
+          decoration: _decoration('Minimum block (minutes)'),
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.next,
+          onChanged: (_) {
+            if (_taskError != null) setState(() => _taskError = null);
+          },
+        ),
+      ],
+      const SizedBox(height: 12),
+      TextFormField(
+        key: const ValueKey('task-notes'),
+        controller: _taskNotes,
+        decoration: _decoration('Task notes'),
+        minLines: 2,
+        maxLines: 8,
+        keyboardType: TextInputType.multiline,
+        textCapitalization: TextCapitalization.sentences,
+      ),
     ];
   }
 
@@ -732,6 +1117,149 @@ class _RecordEditorState extends State<RecordEditor> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskPicker extends StatefulWidget {
+  const _TaskPicker({
+    required this.tasks,
+    required this.initiallySelected,
+    required this.multiple,
+  });
+
+  final List<TaskItem> tasks;
+  final List<String> initiallySelected;
+  final bool multiple;
+
+  @override
+  State<_TaskPicker> createState() => _TaskPickerState();
+}
+
+class _TaskPickerState extends State<_TaskPicker> {
+  late final _selected = widget.initiallySelected.toSet();
+  String _query = '';
+
+  void _choose(List<String> ids) => Navigator.pop(context, ids);
+
+  void _toggle(String id, bool? checked) => setState(() {
+    if (checked == true) {
+      _selected.add(id);
+    } else {
+      _selected.remove(id);
+    }
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.tasks
+        .where((task) => task.title.toLowerCase().contains(_query))
+        .toList();
+    final unavailable = widget.multiple
+        ? _selected.difference({
+            for (final task in widget.tasks) task.id,
+          }).toList()
+        : const <String>[];
+    final extraRows = widget.multiple ? unavailable.length : 1;
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 380),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.multiple
+                          ? 'Choose prerequisites'
+                          : 'Choose parent task',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: widget.multiple
+                        ? 'Close prerequisite picker'
+                        : 'Close parent picker',
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                itemCount: 1 + extraRows + filtered.length,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.search_rounded),
+                          hintText: 'Find a task',
+                        ),
+                        onChanged: (text) =>
+                            setState(() => _query = text.trim().toLowerCase()),
+                      ),
+                    );
+                  }
+                  if (!widget.multiple && index == 1) {
+                    return ListTile(
+                      title: const Text('No parent'),
+                      selected: _selected.isEmpty,
+                      onTap: () => _choose(const []),
+                    );
+                  }
+                  if (widget.multiple && index <= unavailable.length) {
+                    final id = unavailable[index - 1];
+                    return CheckboxListTile(
+                      title: const Text('Unavailable prerequisite'),
+                      value: true,
+                      onChanged: (checked) => _toggle(id, checked),
+                    );
+                  }
+                  final task = filtered[index - 1 - extraRows];
+                  if (widget.multiple) {
+                    return CheckboxListTile(
+                      key: ValueKey(task.id),
+                      title: Text(task.title),
+                      subtitle: Text(
+                        task.done ? 'Completed' : spaceName(task.category),
+                      ),
+                      value: _selected.contains(task.id),
+                      onChanged: (checked) => _toggle(task.id, checked),
+                    );
+                  }
+                  return ListTile(
+                    title: Text(task.title),
+                    subtitle: Text(spaceName(task.category)),
+                    selected: _selected.contains(task.id),
+                    onTap: () => _choose([task.id]),
+                  );
+                },
+              ),
+            ),
+            if (widget.multiple)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton(
+                    onPressed: () => _choose(_selected.toList()),
+                    child: const Text('Apply prerequisites'),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

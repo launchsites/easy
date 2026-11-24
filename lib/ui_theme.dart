@@ -11,6 +11,11 @@ const raisedPaper = Color(0xfffffefa);
 const softAccent = Color(0xffe7eee4);
 const shellSurface = Color(0xff222923);
 
+const contentSurfaceRadius = BorderRadius.all(Radius.circular(16));
+const contentControlShape = RoundedRectangleBorder(
+  borderRadius: BorderRadius.all(Radius.circular(11)),
+);
+
 ThemeData easyTheme() {
   final colors = ColorScheme.fromSeed(
     seedColor: accent,
@@ -35,6 +40,21 @@ ThemeData easyTheme() {
     hoverColor: const Color(0x0b426651),
     focusColor: const Color(0x16426651),
     splashColor: const Color(0x17426651),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(64, 44),
+        shape: contentControlShape,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(64, 44),
+        shape: contentControlShape,
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(shape: contentControlShape),
+    ),
     dividerTheme: const DividerThemeData(color: line, thickness: 1, space: 1),
     checkboxTheme: CheckboxThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
@@ -67,8 +87,14 @@ ThemeData easyTheme() {
       ),
     ),
   );
+  final text = theme.textTheme.apply(bodyColor: ink, displayColor: ink);
   return theme.copyWith(
-    textTheme: theme.textTheme.apply(bodyColor: ink, displayColor: ink),
+    textTheme: text.copyWith(
+      labelLarge: text.labelLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0,
+      ),
+    ),
   );
 }
 
@@ -86,4 +112,18 @@ const sectionHeadingStyle = TextStyle(
   fontWeight: FontWeight.w700,
   letterSpacing: -.52,
   height: 1.2,
+);
+
+const contentTitleStyle = TextStyle(
+  color: ink,
+  fontSize: 15,
+  fontWeight: FontWeight.w600,
+  height: 1.33,
+  letterSpacing: -.20,
+);
+
+const contentMetadataStyle = TextStyle(
+  color: muted,
+  fontSize: 13,
+  height: 1.35,
 );

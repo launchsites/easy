@@ -7,6 +7,7 @@ import 'package:easy/mobile_home.dart';
 import 'package:easy/orbit_navigation.dart';
 import 'package:easy/quick_capture.dart';
 import 'package:easy/record_editor.dart';
+import 'package:easy/storage/workspace_store.dart';
 import 'package:easy/workout_plan.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,7 +28,9 @@ void main() {
     tester,
   ) async {
     _setViewport(tester, const Size(390, 844));
-    await tester.pumpWidget(const EasyApp());
+    await tester.pumpWidget(
+      const EasyApp(openStore: openPreferenceWorkspaceStore),
+    );
     await tester.pumpAndSettle();
     expect(find.byType(MobileHome), findsOneWidget);
     expect(find.text('Note to self'), findsOneWidget);
@@ -59,18 +62,83 @@ void main() {
 
     // Create a fresh workspace state backed by the same local store.
     await tester.pumpWidget(const SizedBox());
-    await tester.pumpWidget(const EasyApp());
+    await tester.pumpWidget(
+      const EasyApp(openStore: openPreferenceWorkspaceStore),
+    );
     await tester.pumpAndSettle();
     await _openMobileDestination(tester, 'Tasks');
     expect(find.byType(TasksPage), findsOneWidget);
     expect(task, findsOneWidget);
   });
 
+  testWidgets('Capture can send a task to Work while Gym stays focused', (
+    tester,
+  ) async {
+    _setViewport(tester, const Size(390, 844));
+    await tester.pumpWidget(
+      const EasyApp(openStore: openPreferenceWorkspaceStore),
+    );
+    await tester.pumpAndSettle();
+    await _pickMode(tester, 'Gym');
+    await tester.tap(find.byTooltip('Add item'));
+    await tester.pumpAndSettle();
+    final input = find.descendant(
+      of: find.byType(QuickCapture),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(input, 'Prepare project handoff');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Choose category'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(MenuItemButton, 'Work'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Add task'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(GymWorkoutOverview), findsOneWidget);
+    expect(find.text('Prepare project handoff'), findsNothing);
+    await _pickMode(tester, 'Work');
+    expect(find.text('Prepare project handoff'), findsOneWidget);
+  });
+
+  testWidgets('Reviewed text adds cross-focus items as one saved batch', (
+    tester,
+  ) async {
+    _setViewport(tester, const Size(390, 844));
+    await tester.pumpWidget(
+      const EasyApp(openStore: openPreferenceWorkspaceStore),
+    );
+    await tester.pumpAndSettle();
+    await _pickMode(tester, 'Gym');
+    await tester.tap(find.byTooltip('Add item'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Open capture review'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextField),
+      'Work: task: Write handoff; Health: note: Packed lunch ready',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Review'));
+    await tester.pumpAndSettle();
+    expect(find.text('Write handoff'), findsOneWidget);
+    expect(find.text('Packed lunch ready'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Add 2 items'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(GymWorkoutOverview), findsOneWidget);
+    await _pickMode(tester, 'Work');
+    expect(find.text('Write handoff'), findsOneWidget);
+    await _pickMode(tester, 'Health');
+    expect(find.text('Packed lunch ready'), findsOneWidget);
+  });
+
   testWidgets(
     'Gym shows the workout while No mode restores the daily overview',
     (tester) async {
       _setViewport(tester, const Size(390, 844));
-      await tester.pumpWidget(const EasyApp());
+      await tester.pumpWidget(
+        const EasyApp(openStore: openPreferenceWorkspaceStore),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Get the outline out first'), findsOneWidget);
       expect(find.text('Upcoming today'), findsOneWidget);
@@ -128,7 +196,9 @@ void main() {
     await SharedPreferencesAsync().setStringList('easy.workout-plans.v1', [
       plan.encode(),
     ]);
-    await tester.pumpWidget(const EasyApp());
+    await tester.pumpWidget(
+      const EasyApp(openStore: openPreferenceWorkspaceStore),
+    );
     await tester.pumpAndSettle();
     await _pickMode(tester, 'Gym');
     expect(find.text('Two-day rotation'), findsOneWidget);
@@ -170,7 +240,9 @@ void main() {
           '{"id":"legacy","title":"Old note","body":"Still here",'
           '"updated":"2026-01-01T00:00:00.000"}]}',
     );
-    await tester.pumpWidget(const EasyApp());
+    await tester.pumpWidget(
+      const EasyApp(openStore: openPreferenceWorkspaceStore),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Old note'), findsNothing);
 
@@ -180,7 +252,9 @@ void main() {
     expect(find.text('Leave time to refine the draft'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
-    await tester.pumpWidget(const EasyApp());
+    await tester.pumpWidget(
+      const EasyApp(openStore: openPreferenceWorkspaceStore),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Leave time to refine the draft'), findsOneWidget);
 
@@ -193,7 +267,9 @@ void main() {
     tester,
   ) async {
     _setViewport(tester, const Size(390, 844));
-    await tester.pumpWidget(const EasyApp());
+    await tester.pumpWidget(
+      const EasyApp(openStore: openPreferenceWorkspaceStore),
+    );
     await tester.pumpAndSettle();
     await _pickMode(tester, 'Gym');
     await tester.tap(find.text('Freestyle'));
@@ -205,7 +281,9 @@ void main() {
     expect(find.text('Stretch'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
-    await tester.pumpWidget(const EasyApp());
+    await tester.pumpWidget(
+      const EasyApp(openStore: openPreferenceWorkspaceStore),
+    );
     await tester.pumpAndSettle();
     await _pickMode(tester, 'Gym');
     await tester.tap(find.text('Resume'));
@@ -217,7 +295,9 @@ void main() {
     tester,
   ) async {
     _setViewport(tester, const Size(1440, 900));
-    await tester.pumpWidget(const EasyApp());
+    await tester.pumpWidget(
+      const EasyApp(openStore: openPreferenceWorkspaceStore),
+    );
     await tester.pumpAndSettle();
     expect(find.byTooltip('Navigate'), findsNothing);
 

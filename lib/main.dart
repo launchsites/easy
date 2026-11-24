@@ -1,10 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show compute, listEquals;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'calendar_page.dart';
+import 'capture/capture_archive.dart';
+import 'capture/capture_interpreter.dart';
+import 'capture/capture_review_sheet.dart';
 import 'gym_mode_ui.dart';
 import 'gym_session.dart';
 import 'list_pages.dart';
@@ -12,6 +16,9 @@ import 'mobile_home.dart';
 import 'orbit_navigation.dart';
 import 'quick_capture.dart';
 import 'record_editor.dart';
+import 'scheduling/plan_day_sheet.dart';
+import 'scheduling/planner.dart';
+import 'storage/workspace_store.dart';
 import 'today_page.dart';
 import 'workout_plan.dart';
 import 'workout_plans_page.dart';
@@ -21,8 +28,15 @@ const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
 void main() => runApp(const EasyApp());
 
+typedef WorkspaceStoreOpener = Future<WorkspaceStore> Function({
+  required SharedPreferencesAsync preferences,
+  required Future<WorkspaceSnapshot> Function() readLegacy,
+});
+
 class EasyApp extends StatelessWidget {
-  const EasyApp({super.key});
+  const EasyApp({super.key, this.openStore = openWorkspaceStore});
+
+  final WorkspaceStoreOpener openStore;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +44,7 @@ class EasyApp extends StatelessWidget {
       title: appName,
       debugShowCheckedModeBanner: false,
       theme: easyTheme(),
-      home: const _Workspace(),
+      home: _Workspace(openStore: openStore),
     );
   }
 }
@@ -52,16 +66,23 @@ const _gymStorageKey = 'easy.gym-sessions.v1';
 const _workoutPlansKey = 'easy.workout-plans.v1';
 
 class _Workspace extends StatefulWidget {
-  const _Workspace();
+  const _Workspace({required this.openStore});
+
+  final WorkspaceStoreOpener openStore;
 
   @override
   State<_Workspace> createState() => _WorkspaceState();
 }
 
 class _WorkspaceState extends State<_Workspace> {
-  final _storage = SharedPreferencesAsync();
+  final _legacyPreferences = SharedPreferencesAsync();
+  WorkspaceStore? _store;
+  int? _persistedRevision;
+  var _openingStore = false;
+  var _reviewSaving = false;
   Future<void> _pendingSave = Future.value();
   late WorkspaceData _data;
+  int _contentRevision = 0;
   List<GymSession>? _gymSessions;
   List<WorkoutPlan>? _workoutPlans;
   var _calendarDate = dateOnly(DateTime.now());
@@ -79,19 +100,44 @@ class _WorkspaceState extends State<_Workspace> {
     unawaited(_load());
   }
 
+  @override
+  void dispose() {
+    final store = _store;
+    if (store != null) {
+      unawaited(_pendingSave.then((_) => store.close()));
+    }
+    super.dispose();
+  }
+
   Future<void> _load() async {
-    final gymSessions = _readGymSessions();
-    final workoutPlans = _readWorkoutPlans();
+    if (_openingStore) return;
+    _openingStore = true;
     try {
-      final raw = await _storage.getString(_storageKey);
-      final data = raw == null
-          ? WorkspaceData.samples(_today)
-          : WorkspaceData.decode(raw);
-      if (raw == null) await _storage.setString(_storageKey, data.encode());
-      final sessions = await gymSessions;
-      final plans = await workoutPlans;
+      final store =
+          _store ??
+          await widget.openStore(
+            preferences: _legacyPreferences,
+            readLegacy: _readLegacy,
+          );
+      if (!mounted) {
+        if (_store == null) await store.close();
+        return;
+      }
+      _store = store;
+      final revision = await store.read();
+      final snapshot = revision.snapshot;
+      final data = WorkspaceData.decode(snapshot.workspaceJson);
+      final sessions = _decodeRecords(
+        snapshot.gymSessionJson,
+        GymSession.decode,
+      );
+      final plans = _decodeRecords(
+        snapshot.workoutPlanJson,
+        WorkoutPlan.decode,
+      );
       if (!mounted) return;
       setState(() {
+        _persistedRevision = revision.revision;
         _data = data;
         _gymSessions = sessions;
         _workoutPlans = plans;
@@ -100,35 +146,34 @@ class _WorkspaceState extends State<_Workspace> {
       });
     } catch (_) {
       if (mounted) setState(() => _loadFailed = true);
+    } finally {
+      _openingStore = false;
     }
   }
 
-  Future<List<GymSession>?> _readGymSessions() async {
-    try {
-      final saved = await _storage.getStringList(_gymStorageKey) ?? [];
-      return saved.map(GymSession.decode).toList();
-    } catch (_) {
-      return null;
-    }
+  Future<WorkspaceSnapshot> _readLegacy() async {
+    final (workspace, gym, plans) = await (
+      _legacyPreferences.getString(_storageKey),
+      _legacyPreferences.getStringList(_gymStorageKey),
+      _legacyPreferences.getStringList(_workoutPlansKey),
+    ).wait;
+    return WorkspaceSnapshot(
+      workspaceJson: workspace ?? WorkspaceData.samples(_today).encode(),
+      gymSessionJson: gym ?? [],
+      workoutPlanJson: plans ?? [_sampleWorkoutPlan(_today).encode()],
+    );
   }
 
-  Future<List<WorkoutPlan>?> _readWorkoutPlans() async {
+  List<T>? _decodeRecords<T>(List<String> saved, T Function(String) decode) {
     try {
-      final saved = await _storage.getStringList(_workoutPlansKey);
-      if (saved != null) return saved.map(WorkoutPlan.decode).toList();
-      final plans = [_sampleWorkoutPlan(_today)];
-      await _storage.setStringList(
-        _workoutPlansKey,
-        plans.map((plan) => plan.encode()).toList(),
-      );
-      return plans;
+      return saved.map(decode).toList();
     } catch (_) {
       return null;
     }
   }
 
   Future<void> _openWorkoutPlans() async {
-    final plans = _workoutPlans ?? await _readWorkoutPlans();
+    final plans = _workoutPlans;
     if (!mounted) return;
     if (plans == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -156,24 +201,84 @@ class _WorkspaceState extends State<_Workspace> {
   void _persistWorkoutPlans() {
     final snapshot = _workoutPlans!.map((plan) => plan.encode()).toList();
     _queueSave(
-      () => _storage.setStringList(_workoutPlansKey, snapshot),
+      () => _saveMutation(WorkspaceMutation.workoutPlans(snapshot)),
       _persistWorkoutPlans,
     );
   }
 
   void _update(WorkspaceData data) {
-    setState(() => _data = data);
+    setState(() => _assignData(data));
     final snapshot = data.encode();
     _queueSave(
-      () => _storage.setString(_storageKey, snapshot),
+      () => _saveMutation(WorkspaceMutation.workspace(snapshot)),
       () => _update(_data),
     );
+  }
+
+  void _assignData(WorkspaceData data) {
+    if (!identical(data.tasks, _data.tasks) ||
+        !identical(data.events, _data.events) ||
+        !identical(data.notes, _data.notes)) {
+      _contentRevision++;
+    }
+    _data = data;
+    if (_inspected case final TaskItem selected) {
+      _inspected = data.tasks
+          .where((task) => task.id == selected.id)
+          .firstOrNull;
+    }
+  }
+
+  Future<void> _saveMutation(
+    WorkspaceMutation mutation, {
+    String? operationId,
+  }) async {
+    final saved = await _store!.save(
+      mutation,
+      expectedRevision: _persistedRevision,
+      operationId: operationId,
+    );
+    _persistedRevision = saved.revision;
+  }
+
+  Future<void> _commitReviewedData(
+    WorkspaceData previous,
+    WorkspaceData updated, {
+    String? operationId,
+  }) {
+    if (_reviewSaving) {
+      return Future.error(StateError('A reviewed change is being saved.'));
+    }
+    setState(() => _reviewSaving = true);
+    final operation = _pendingSave.then((_) async {
+      try {
+        if (!mounted || !identical(_data, previous)) {
+          throw StateError('The workspace changed after review.');
+        }
+        await _saveMutation(
+          WorkspaceMutation.workspace(updated.encode()),
+          operationId: operationId,
+        );
+        if (mounted) setState(() => _assignData(updated));
+      } finally {
+        if (mounted) setState(() => _reviewSaving = false);
+      }
+    });
+    _pendingSave = operation.then<void>((_) {}, onError: (Object _) {});
+    return operation;
   }
 
   void _queueSave(Future<void> Function() write, VoidCallback retry) {
     _pendingSave = _pendingSave.then((_) async {
       try {
         await write();
+      } on WorkspaceRevisionConflict {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This workspace changed in another window.'),
+          ),
+        );
       } catch (_) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -187,7 +292,7 @@ class _WorkspaceState extends State<_Workspace> {
   }
 
   Future<void> _openGymSession({WorkoutPlan? plan}) async {
-    final sessions = _gymSessions ?? await _readGymSessions();
+    final sessions = _gymSessions;
     if (!mounted) return;
     if (sessions == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -291,7 +396,7 @@ class _WorkspaceState extends State<_Workspace> {
   void _persistGymSessions() {
     final snapshot = _gymSessions!.map((session) => session.encode()).toList();
     _queueSave(
-      () => _storage.setStringList(_gymStorageKey, snapshot),
+      () => _saveMutation(WorkspaceMutation.gymSessions(snapshot)),
       _persistGymSessions,
     );
   }
@@ -333,15 +438,7 @@ class _WorkspaceState extends State<_Workspace> {
   void _setTaskDone(String id, bool done) {
     final task = _data.tasks.where((task) => task.id == id).firstOrNull;
     if (task == null || task.done == done) return;
-    _saveRecord(
-      TaskItem(
-        id: task.id,
-        title: task.title,
-        category: task.category,
-        date: task.date,
-        done: done,
-      ),
-    );
+    _saveRecord(task.withDone(done));
   }
 
   List<T> _upsert<T>(List<T> records, T updated, String Function(T) id) => [
@@ -351,20 +448,56 @@ class _WorkspaceState extends State<_Workspace> {
   ];
 
   void _saveRecord(Object record) {
+    if (record is TaskItem) {
+      final previous = _data.tasks
+          .where((task) => task.id == record.id)
+          .firstOrNull;
+      if (previous?.parentId != record.parentId) {
+        final issue = taskParentIssue(_data.tasks, record.id, record.parentId);
+        if (issue != null) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(issue.message)));
+          return;
+        }
+      }
+      if (!listEquals(
+        previous?.prerequisiteIds ?? const [],
+        record.prerequisiteIds,
+      )) {
+        final issue = taskPrerequisiteIssue(
+          _data.tasks,
+          record.id,
+          record.prerequisiteIds,
+        );
+        if (issue != null) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(issue.message)));
+          return;
+        }
+      }
+      if (previous?.allowSplit != record.allowSplit ||
+          previous?.estimatedMinutes != record.estimatedMinutes ||
+          previous?.minimumChunkMinutes != record.minimumChunkMinutes) {
+        final issue = taskSplitIssue(
+          allowSplit: record.allowSplit,
+          minimumChunkMinutes: record.minimumChunkMinutes,
+          estimatedMinutes: record.estimatedMinutes,
+        );
+        if (issue != null) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(issue)));
+          return;
+        }
+      }
+    }
     final data = switch (record) {
-      CalendarEvent event => WorkspaceData(
+      CalendarEvent event => _data.copyWith(
         events: _upsert(_data.events, event, (value) => value.id),
-        tasks: _data.tasks,
-        notes: _data.notes,
       ),
-      TaskItem task => WorkspaceData(
-        events: _data.events,
+      TaskItem task => _data.copyWith(
         tasks: _upsert(_data.tasks, task, (value) => value.id),
-        notes: _data.notes,
       ),
-      NoteItem note => WorkspaceData(
-        events: _data.events,
-        tasks: _data.tasks,
+      NoteItem note => _data.copyWith(
         notes: _upsert(_data.notes, note, (value) => value.id),
       ),
       _ => _data,
@@ -396,11 +529,25 @@ class _WorkspaceState extends State<_Workspace> {
     if (confirmed != true || !mounted) return;
     if (_inspected == record) _inspected = null;
     final id = _recordId(record);
+    final detached = {
+      if (record is TaskItem)
+        for (final child in _data.tasks)
+          if (child.parentId == id) child.id: child.withParent(null),
+    };
     _update(
-      WorkspaceData(
-        events: _data.events.where((record) => record.id != id).toList(),
-        tasks: _data.tasks.where((record) => record.id != id).toList(),
-        notes: _data.notes.where((record) => record.id != id).toList(),
+      _data.copyWith(
+        events: record is CalendarEvent
+            ? _data.events.where((item) => item.id != id).toList()
+            : _data.events,
+        tasks: record is TaskItem
+            ? [
+                for (final task in _data.tasks)
+                  if (task.id != id) detached[task.id] ?? task,
+              ]
+            : _data.tasks,
+        notes: record is NoteItem
+            ? _data.notes.where((item) => item.id != id).toList()
+            : _data.notes,
       ),
     );
     ScaffoldMessenger.of(context).showSnackBar(
@@ -408,10 +555,34 @@ class _WorkspaceState extends State<_Workspace> {
         content: Text('${spaceName(_recordKind(record).name)} deleted'),
         action: SnackBarAction(
           label: 'Undo',
-          onPressed: () => _saveRecord(record),
+          onPressed: () {
+            if (record is TaskItem) {
+              _restoreTask(record, detached);
+            } else {
+              _saveRecord(record);
+            }
+          },
         ),
       ),
     );
+  }
+
+  void _restoreTask(TaskItem saved, Map<String, TaskItem> detached) {
+    if (_data.tasks.any((task) => task.id == saved.id)) return;
+    final restored =
+        taskParentIssue(_data.tasks, saved.id, saved.parentId) == null
+        ? saved
+        : saved.withParent(null);
+    final candidates = [..._data.tasks, restored];
+    final tasks = [
+      for (final task in candidates)
+        if (identical(detached[task.id], task) &&
+            taskParentIssue(candidates, task.id, restored.id) == null)
+          task.withParent(restored.id)
+        else
+          task,
+    ];
+    _update(_data.copyWith(tasks: tasks));
   }
 
   NoteItem? _homeNote() {
@@ -446,6 +617,7 @@ class _WorkspaceState extends State<_Workspace> {
   }
 
   Future<void> _capture({RecordKind? kind, bool noteToSelf = false}) async {
+    if (_reviewSaving) return;
     final destination = _destination;
     final result = await _showEditor(
       QuickCapture(
@@ -460,13 +632,300 @@ class _WorkspaceState extends State<_Workspace> {
         initialTaskDate: _today,
         initialCategory: _space,
         noteToSelf: noteToSelf,
+        allowReview: !noteToSelf,
       ),
     );
     if (result == null || !mounted) return;
+    if (result case final CaptureReviewRequest request) {
+      await _openCaptureReview(request.text);
+      return;
+    }
     _saveRecord(result);
     if (result is CalendarEvent && destination == _Destination.calendar) {
       _changeDate(result.start);
     }
+  }
+
+  Future<void> _planDay() async {
+    if (_reviewSaving) return;
+    final prior = _data;
+    final result = await _showEditor(
+      PlanDaySheet(day: _today, events: prior.events, tasks: prior.tasks),
+    );
+    if (!mounted || result is! PlanSelection || result.tasks.isEmpty) return;
+    final beforeAcceptance = _data;
+    final current = await compute(_reviewSchedule, (
+      window: result.window,
+      reservationStart: result.reservationStart,
+      events: beforeAcceptance.events,
+      tasks: beforeAcceptance.tasks,
+    ));
+    if (!mounted) return;
+    final available = {
+      for (final entry in current.scheduled) entry.task.id: entry,
+    };
+    final selectedIds = result.tasks.map((item) => item.task.id).toSet();
+    final completedIds = {
+      for (final task in beforeAcceptance.tasks)
+        if (task.done) task.id,
+    };
+    final now = DateTime.now();
+    if (!identical(beforeAcceptance, _data) ||
+        selectedIds.length != result.tasks.length ||
+        result.tasks.any((entry) {
+          final checked = available[entry.task.id];
+          return checked == null ||
+              !_samePlanBlocks(entry.blocks, checked.blocks) ||
+              entry.blocks.any((block) => block.start.isBefore(now)) ||
+              checked.task.prerequisites.any(
+                (id) => !completedIds.contains(id) && !selectedIds.contains(id),
+              );
+        })) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The available time changed. Preview the day again.'),
+        ),
+      );
+      return;
+    }
+
+    final operationId = 'schedule-${now.microsecondsSinceEpoch}';
+    var index = 0;
+    final events = [
+      ...beforeAcceptance.events,
+      for (final entry in result.tasks)
+        for (final block in available[entry.task.id]!.blocks)
+          CalendarEvent(
+            id: '$operationId-${index++}',
+            title: available[entry.task.id]!.task.title,
+            start: block.start,
+            end: block.end,
+            category: available[entry.task.id]!.task.category,
+            plannedTaskId: entry.task.id,
+          ),
+    ];
+    try {
+      await _commitReviewedData(
+        beforeAcceptance,
+        beforeAcceptance.copyWith(events: events),
+        operationId: operationId,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The plan could not be saved. Preview it again.'),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    _changeDate(result.window.start);
+    _navigate(_Destination.calendar);
+  }
+
+  Future<void> _openCaptureReview(String text) async {
+    final sheet = CaptureReviewSheet(
+      initialText: text,
+      drafts: _data.captures,
+      onReview: _reviewCaptureText,
+      onApply: _applyCaptureReview,
+    );
+    if (MediaQuery.sizeOf(context).width < 720) {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        isDismissible: false,
+        enableDrag: false,
+        backgroundColor: paper,
+        builder: (_) => sheet,
+      );
+    } else {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => Dialog(backgroundColor: paper, child: sheet),
+      );
+    }
+  }
+
+  CaptureInput _captureInput(CaptureArchiveEntry source) => CaptureInput(
+    id: source.id,
+    revision: source.revision,
+    text: source.text,
+    context: CaptureContext(
+      anchor: source.capturedAt,
+      revision: _contentRevision,
+      focusCategory: _space,
+      selectedRecordId: _inspected == null ? null : _recordId(_inspected!),
+      categories: {
+        for (final category in spaceColors.keys) category: spaceName(category),
+      },
+      records: [
+        for (final task in _data.tasks)
+          CaptureRecordRef(
+            id: task.id,
+            kind: CaptureIntentKind.task,
+            title: task.title,
+            revision: _contentRevision,
+            category: task.category,
+            completed: task.done,
+          ),
+      ],
+    ),
+  );
+
+  Future<CaptureReview> _reviewCaptureText({
+    String? draftId,
+    required String text,
+  }) async {
+    if (text.trim().isEmpty || text.length > 12000) {
+      throw ArgumentError('Capture text is outside the supported range.');
+    }
+    final previous = _data;
+    final old = previous.captures
+        .where((entry) => entry.id == draftId)
+        .firstOrNull;
+    if (old?.applied == true) {
+      throw StateError('This capture is already applied.');
+    }
+    final now = DateTime.now();
+    final source = old == null
+        ? CaptureArchiveEntry(
+            id: 'capture-${now.microsecondsSinceEpoch}',
+            text: text,
+            capturedAt: now,
+          )
+        : old.text == text
+        ? old
+        : old.revised(text);
+    if (!identical(source, old)) {
+      await _commitReviewedData(
+        previous,
+        previous.copyWith(
+          captures: _upsert(previous.captures, source, (entry) => entry.id),
+        ),
+        operationId: '${source.id}-draft-${source.revision}',
+      );
+    }
+    return interpretCapture(_captureInput(source));
+  }
+
+  Future<String?> _applyCaptureReview(
+    CaptureReview review,
+    List<CaptureProposal> selected,
+  ) async {
+    final previous = _data;
+    final source = previous.captures
+        .where((entry) => entry.id == review.input.id)
+        .firstOrNull;
+    if (source == null ||
+        source.applied ||
+        !review.isCurrentFor(_captureInput(source))) {
+      return 'This capture changed. Review it again before adding items.';
+    }
+    if (selected.isEmpty ||
+        selected.toSet().length != selected.length ||
+        selected.any(
+          (entry) => !entry.isReady || !review.proposals.contains(entry),
+        )) {
+      return 'Choose the ready items you want to add.';
+    }
+
+    final tasks = [...previous.tasks];
+    final events = [...previous.events];
+    final notes = [...previous.notes];
+    for (final proposal in selected) {
+      final draft = proposal.draft;
+      final id = '${source.id}-${source.revision}-${proposal.span.start}';
+      if (tasks.any((record) => record.id == id) ||
+          events.any((record) => record.id == id) ||
+          notes.any((record) => record.id == id)) {
+        return 'An item from this capture was already added.';
+      }
+      switch (draft) {
+        case CaptureTaskDraft():
+          tasks.add(
+            TaskItem(
+              id: id,
+              title: draft.title,
+              category: draft.category ?? 'personal',
+              date: draft.dueDate ?? dateOnly(source.capturedAt),
+            ),
+          );
+        case CaptureEventDraft():
+          final start = draft.start;
+          final end = draft.end;
+          if (start == null || end == null || !end.isAfter(start)) {
+            return 'Enter the start and end time for this event.';
+          }
+          events.add(
+            CalendarEvent(
+              id: id,
+              title: draft.title,
+              category: draft.category ?? 'personal',
+              start: start,
+              end: end,
+              allDay: draft.allDay,
+              location: draft.location,
+            ),
+          );
+        case CaptureNoteDraft():
+          notes.add(
+            NoteItem(
+              id: id,
+              title: draft.title,
+              body: draft.body,
+              updated: source.capturedAt,
+              category: draft.category,
+              noteToSelf: draft.noteToSelf,
+            ),
+          );
+        case CaptureWorkoutDraft():
+          notes.add(
+            NoteItem(
+              id: id,
+              title: draft.title,
+              body: draft.details,
+              updated: source.capturedAt,
+              category: draft.category ?? 'gym',
+            ),
+          );
+        case CaptureMealDraft():
+          notes.add(
+            NoteItem(
+              id: id,
+              title: draft.title,
+              body: draft.description,
+              updated: source.capturedAt,
+              category: draft.category ?? 'health',
+            ),
+          );
+        case CaptureCompleteTaskDraft():
+          final index = tasks.indexWhere((task) => task.id == draft.targetId);
+          if (index < 0 || tasks[index].done) {
+            return 'Review the task’s current state.';
+          }
+          tasks[index] = tasks[index].withDone(true);
+      }
+    }
+
+    await _commitReviewedData(
+      previous,
+      previous.copyWith(
+        tasks: tasks,
+        events: events,
+        notes: notes,
+        captures: _upsert(
+          previous.captures,
+          source.markApplied(),
+          (entry) => entry.id,
+        ),
+      ),
+      operationId: '${source.id}-apply-${source.revision}',
+    );
+    return null;
   }
 
   Future<void> _editRecord(Object existing) async {
@@ -476,6 +935,7 @@ class _WorkspaceState extends State<_Workspace> {
         kind: _recordKind(existing),
         event: existing is CalendarEvent ? existing : null,
         task: existing is TaskItem ? existing : null,
+        taskItems: _data.tasks,
         note: existing is NoteItem ? existing : null,
       ),
     );
@@ -518,6 +978,7 @@ class _WorkspaceState extends State<_Workspace> {
   }
 
   Future<void> _search() async {
+    if (_reviewSaving) return;
     final result = await showDialog<Object>(
       context: context,
       builder: (_) => _SearchDialog(
@@ -577,6 +1038,9 @@ class _WorkspaceState extends State<_Workspace> {
               .where((item) => item.category?.toLowerCase() == space)
               .toList();
     final todayNote = mobile ? _homeNote() : null;
+    final canPlan = _data.tasks.any(
+      (task) => !task.done && (task.estimatedMinutes ?? 0) > 0,
+    );
     final page = PageStorage(
       bucket: _pageStorage,
       child: IndexedStack(
@@ -594,6 +1058,7 @@ class _WorkspaceState extends State<_Workspace> {
               ),
               note: todayNote,
               focusedContent: space == 'gym' ? _gymOverview(context) : null,
+              onPlanDay: canPlan && space != 'gym' ? _planDay : null,
               events: events,
               tasks: tasks,
               onNoteTap: () => _openHomeNote(todayNote),
@@ -608,6 +1073,7 @@ class _WorkspaceState extends State<_Workspace> {
           else
             TodayPage(
               date: _today,
+              onPlanDay: canPlan ? _planDay : null,
               events: events,
               tasks: tasks,
               onEventTap: _openRecord,
@@ -637,108 +1103,141 @@ class _WorkspaceState extends State<_Workspace> {
       bindings: shortcuts,
       child: Focus(
         autofocus: true,
-        child: MobileModeFrame(
-          mode: space,
-          child: Scaffold(
-            backgroundColor: mobile ? paper : shell,
-            body: SafeArea(
-              bottom: !mobile,
-              child: mobile
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Column(
-                          children: [
-                            if (_destination != _Destination.today &&
-                                (_destination != _Destination.calendar ||
-                                    space != null))
-                              _MobileHeader(
-                                space: space,
-                                displayBrand:
-                                    _destination != _Destination.calendar,
-                                onSpaceChanged: _changeSpace,
-                                onSearch: _search,
-                              ),
-                            Expanded(child: page),
-                          ],
-                        ),
-                        Positioned(
-                          right: 20,
-                          bottom: MediaQuery.paddingOf(context).bottom + 20,
-                          child: FloatingActionButton(
-                            heroTag: 'capture',
-                            tooltip: 'Add item',
-                            onPressed: _capture,
-                            backgroundColor: accent,
-                            foregroundColor: Colors.white,
-                            shape: const CircleBorder(),
-                            elevation: 3,
-                            highlightElevation: 1,
-                            hoverElevation: 5,
-                            child: const Icon(Icons.add_rounded, size: 27),
-                          ),
-                        ),
-                        Positioned.fill(
-                          child: OrbitNavigation(
-                            destinations: [
-                              for (final destination in _Destination.values)
-                                OrbitDestination(
-                                  destination.label,
-                                  destination.icon,
-                                ),
-                            ],
-                            selectedIndex: _destination.index,
-                            onSelected: (index) =>
-                                _navigate(_Destination.values[index]),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      children: [
-                        _DesktopHeader(onSearch: _search, onCapture: _capture),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 0, 14, 14),
-                            child: Row(
-                              children: [
-                                _Sidebar(
-                                  destination: _destination,
-                                  compact: compact,
+        child: AbsorbPointer(
+          absorbing: _reviewSaving,
+          child: MobileModeFrame(
+            mode: space,
+            child: Scaffold(
+              backgroundColor: mobile ? paper : shell,
+              body: SafeArea(
+                bottom: !mobile,
+                child: mobile
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Column(
+                            children: [
+                              if (_destination != _Destination.today &&
+                                  (_destination != _Destination.calendar ||
+                                      space != null))
+                                _MobileHeader(
                                   space: space,
-                                  onNavigate: _navigate,
+                                  displayBrand:
+                                      _destination != _Destination.calendar,
                                   onSpaceChanged: _changeSpace,
+                                  onSearch: _search,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(child: _Surface(child: page)),
-                                if (_inspected != null && width >= 1000) ...[
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: width >= 1250 ? 294 : 264,
-                                    child: _Surface(
-                                      child: _RecordDetails(
-                                        record: _inspected!,
-                                        onClose: () =>
-                                            setState(() => _inspected = null),
-                                        onEdit: () => _editRecord(_inspected!),
-                                        onDelete: () =>
-                                            _deleteRecord(_inspected!),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                              Expanded(child: page),
+                            ],
+                          ),
+                          Positioned(
+                            right: 20,
+                            bottom: MediaQuery.paddingOf(context).bottom + 20,
+                            child: FloatingActionButton(
+                              heroTag: 'capture',
+                              tooltip: 'Add item',
+                              onPressed: _capture,
+                              backgroundColor: accent,
+                              foregroundColor: Colors.white,
+                              shape: const CircleBorder(),
+                              elevation: 3,
+                              highlightElevation: 1,
+                              hoverElevation: 5,
+                              child: const Icon(Icons.add_rounded, size: 27),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                          Positioned.fill(
+                            child: OrbitNavigation(
+                              destinations: [
+                                for (final destination in _Destination.values)
+                                  OrbitDestination(
+                                    destination.label,
+                                    destination.icon,
+                                  ),
+                              ],
+                              selectedIndex: _destination.index,
+                              onSelected: (index) =>
+                                  _navigate(_Destination.values[index]),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        children: [
+                          _DesktopHeader(
+                            onSearch: _search,
+                            onCapture: _capture,
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 0, 14, 14),
+                              child: Row(
+                                children: [
+                                  _Sidebar(
+                                    destination: _destination,
+                                    compact: compact,
+                                    space: space,
+                                    onNavigate: _navigate,
+                                    onSpaceChanged: _changeSpace,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: _Surface(child: page)),
+                                  if (_inspected != null && width >= 1000) ...[
+                                    const SizedBox(width: 12),
+                                    SizedBox(
+                                      width: width >= 1250 ? 294 : 264,
+                                      child: _Surface(
+                                        child: _RecordDetails(
+                                          record: _inspected!,
+                                          onClose: () =>
+                                              setState(() => _inspected = null),
+                                          onEdit: () =>
+                                              _editRecord(_inspected!),
+                                          onDelete: () =>
+                                              _deleteRecord(_inspected!),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+ScheduleProposal _reviewSchedule(
+  ({
+    TimeSpan window,
+    DateTime? reservationStart,
+    List<CalendarEvent> events,
+    List<TaskItem> tasks,
+  })
+  input,
+) => planWorkspaceDay(
+  window: input.window,
+  reservationStart: input.reservationStart,
+  events: input.events,
+  tasks: input.tasks,
+);
+
+bool _samePlanBlocks(List<TimeSpan> first, List<TimeSpan> second) {
+  if (first.length != second.length) return false;
+  for (var index = 0; index < first.length; index++) {
+    if (!first[index].start.isAtSameMomentAs(second[index].start) ||
+        !first[index].end.isAtSameMomentAs(second[index].end)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 WorkoutPlan _sampleWorkoutPlan(DateTime today) => WorkoutPlan(

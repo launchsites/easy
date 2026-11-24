@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
 
 import 'calendar_page.dart';
+import 'capture/capture_archive.dart';
 import 'list_pages.dart';
 import 'ui_theme.dart';
 
@@ -38,11 +39,25 @@ class WorkspaceData {
     required this.events,
     required this.tasks,
     required this.notes,
+    this.captures = const [],
   });
 
   final List<CalendarEvent> events;
   final List<TaskItem> tasks;
   final List<NoteItem> notes;
+  final List<CaptureArchiveEntry> captures;
+
+  WorkspaceData copyWith({
+    List<CalendarEvent>? events,
+    List<TaskItem>? tasks,
+    List<NoteItem>? notes,
+    List<CaptureArchiveEntry>? captures,
+  }) => WorkspaceData(
+    events: events ?? this.events,
+    tasks: tasks ?? this.tasks,
+    notes: notes ?? this.notes,
+    captures: captures ?? this.captures,
+  );
 
   factory WorkspaceData.samples(DateTime today) {
     DateTime at(int hour, [int minute = 0, int days = 0]) =>
@@ -110,6 +125,8 @@ class WorkspaceData {
           category: 'work',
           date: today,
           done: false,
+          estimatedMinutes: 45,
+          priority: TaskPriority.high,
         ),
         TaskItem(
           id: 'sample-chapters',
@@ -117,6 +134,7 @@ class WorkspaceData {
           category: 'study',
           date: today,
           done: false,
+          estimatedMinutes: 35,
         ),
         TaskItem(
           id: 'sample-set-log',
@@ -205,6 +223,7 @@ class WorkspaceData {
             category: event['category'] as String,
             allDay: event['allDay'] as bool,
             location: event['location'] as String?,
+            plannedTaskId: event['plannedTaskId'] as String?,
           ),
       ],
       tasks: [
@@ -217,6 +236,22 @@ class WorkspaceData {
                 ? null
                 : DateTime.parse(task['date'] as String),
             done: task['done'] as bool,
+            estimatedMinutes: task['estimatedMinutes'] as int?,
+            priority: TaskPriority.values
+                .where((value) => value.name == task['priority'])
+                .firstOrNull,
+            parentId: task['parentId'] as String?,
+            notes: task['notes'] as String?,
+            earliestStart: DateTime.tryParse(
+              task['earliestStart'] as String? ?? '',
+            ),
+            dueAt: DateTime.tryParse(task['dueAt'] as String? ?? ''),
+            prerequisiteIds: List.unmodifiable(
+              (task['prerequisiteIds'] as List?)?.cast<String>() ??
+                  const <String>[],
+            ),
+            allowSplit: task['allowSplit'] as bool? ?? false,
+            minimumChunkMinutes: task['minimumChunkMinutes'] as int? ?? 15,
           ),
       ],
       notes: [
@@ -230,10 +265,16 @@ class WorkspaceData {
             noteToSelf: note['noteToSelf'] as bool? ?? false,
           ),
       ],
+      captures: [
+        for (final capture in (data['captures'] as List<dynamic>? ?? const []))
+          CaptureArchiveEntry.fromJson(capture as Map<String, dynamic>),
+      ],
     );
   }
 
   String encode() => jsonEncode({
+    if (captures.isNotEmpty)
+      'captures': captures.map((entry) => entry.toJson()).toList(),
     'events': [
       for (final event in events)
         {
@@ -244,6 +285,7 @@ class WorkspaceData {
           'category': event.category,
           'allDay': event.allDay,
           'location': event.location,
+          if (event.plannedTaskId != null) 'plannedTaskId': event.plannedTaskId,
         },
     ],
     'tasks': [
@@ -254,6 +296,20 @@ class WorkspaceData {
           'category': task.category,
           'date': task.date?.toIso8601String(),
           'done': task.done,
+          if (task.estimatedMinutes != null)
+            'estimatedMinutes': task.estimatedMinutes,
+          if (task.priority != null) 'priority': task.priority!.name,
+          if (task.parentId != null) 'parentId': task.parentId,
+          if (task.notes != null) 'notes': task.notes,
+          if (task.earliestStart != null)
+            'earliestStart': task.earliestStart!.toIso8601String(),
+          if (task.dueAt != null)
+            'dueAt': task.dueAt!.toUtc().toIso8601String(),
+          if (task.prerequisiteIds.isNotEmpty)
+            'prerequisiteIds': task.prerequisiteIds,
+          if (task.allowSplit) 'allowSplit': true,
+          if (task.minimumChunkMinutes != 15)
+            'minimumChunkMinutes': task.minimumChunkMinutes,
         },
     ],
     'notes': [

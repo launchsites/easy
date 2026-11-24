@@ -1,26 +1,13 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'task_model.dart';
 import 'ui_theme.dart';
 import 'workspace_data.dart' show spaceColor, spaceName;
 
+export 'task_model.dart';
+
 const _softSurface = Color(0xFFF1F0E9);
 const _overdueInk = Color(0xFF954A3D);
-
-class TaskItem {
-  const TaskItem({
-    required this.id,
-    required this.title,
-    required this.category,
-    this.date,
-    this.done = false,
-  });
-
-  final String id;
-  final String title;
-  final String category;
-  final DateTime? date;
-  final bool done;
-}
 
 class NoteItem {
   const NoteItem({
@@ -80,39 +67,55 @@ class TasksPage extends StatefulWidget {
 
 class _TasksPageState extends State<TasksPage> {
   _TaskFilter _filter = _TaskFilter.all;
+  final _collapsed = <String>{};
 
-  Map<_TaskGroup, List<TaskItem>> _groupedTasks() {
-    final today = DateUtils.dateOnly(DateTime.now());
+  Map<_TaskGroup, List<_TaskListRow>> _groupedTasks(DateTime today) {
     final groups = <_TaskGroup, List<TaskItem>>{
       for (final group in _TaskGroup.values) group: [],
     };
-    for (final task in widget.tasks) {
-      if (_filter == _TaskFilter.open && task.done ||
-          _filter == _TaskFilter.completed && !task.done) {
-        continue;
+    final visible = {
+      for (final task in widget.tasks)
+        if (_filter == _TaskFilter.all ||
+            (task.done
+                ? _filter == _TaskFilter.completed
+                : _filter == _TaskFilter.open))
+          task.id: task,
+    };
+    final hierarchy = TaskHierarchy(visible.values);
+    final children = <String, List<TaskItem>>{};
+    for (final task in visible.values) {
+      if (hierarchy.visibleParentOf(task) case final parent?) {
+        (children[parent] ??= []).add(task);
+      } else {
+        groups[_groupFor(task, today)]!.add(task);
       }
-      final date = task.date == null
-          ? null
-          : DateUtils.dateOnly(task.date!.toLocal());
-      final group = switch ((task.done, date)) {
-        (true, _) => _TaskGroup.completed,
-        (false, null) => _TaskGroup.inbox,
-        (false, final date?) when date.isBefore(today) => _TaskGroup.overdue,
-        (false, final date?) when date == today => _TaskGroup.today,
-        _ => _TaskGroup.upcoming,
-      };
-      groups[group]!.add(task);
     }
     for (final group in [_TaskGroup.overdue, _TaskGroup.upcoming]) {
-      groups[group]!.sort((a, b) => a.date!.compareTo(b.date!));
+      groups[group]!.sort(
+        (a, b) => (a.dueAt ?? a.date!).compareTo(b.dueAt ?? b.date!),
+      );
     }
-    groups.removeWhere((_, entries) => entries.isEmpty);
-    return groups;
+
+    Iterable<_TaskListRow> rows(TaskItem task, int depth) sync* {
+      final subtasks = children[task.id] ?? const <TaskItem>[];
+      yield (task: task, depth: depth, childCount: subtasks.length);
+      if (_collapsed.contains(task.id)) return;
+      for (final child in subtasks) {
+        yield* rows(child, depth + 1);
+      }
+    }
+
+    return {
+      for (final group in groups.entries)
+        if (group.value.isNotEmpty)
+          group.key: [for (final task in group.value) ...rows(task, 0)],
+    };
   }
 
   @override
   Widget build(BuildContext context) {
-    final groups = _groupedTasks();
+    final today = DateUtils.dateOnly(DateTime.now());
+    final groups = _groupedTasks(today);
     final labels = Theme.of(context).textTheme.labelLarge;
     return _ListPageLayout(
       title: 'Tasks',
@@ -174,11 +177,26 @@ class _TasksPageState extends State<TasksPage> {
           SliverList.builder(
             itemCount: tasks.length,
             itemBuilder: (context, index) {
-              final task = tasks[index];
+              final rowData = tasks[index];
+              final task = rowData.task;
+              final expanded = !_collapsed.contains(task.id);
               final row = _TaskRow(
                 key: ValueKey(task.id),
                 task: task,
-                group: group,
+                group: _groupFor(task, today),
+                depth: rowData.depth,
+                indentation: wide
+                    ? rowData.depth * 16.0
+                    : rowData.depth.clamp(0, 4) * 12.0,
+                childCount: rowData.childCount,
+                expanded: expanded,
+                onDisclosure: () => setState(() {
+                  if (expanded) {
+                    _collapsed.add(task.id);
+                  } else {
+                    _collapsed.remove(task.id);
+                  }
+                }),
                 onToggle: () => widget.onToggle(task),
                 onTap: () => widget.onTaskTap(task),
               );
@@ -209,6 +227,20 @@ class _TasksPageState extends State<TasksPage> {
       ],
     );
   }
+}
+
+typedef _TaskListRow = ({TaskItem task, int depth, int childCount});
+
+_TaskGroup _groupFor(TaskItem task, DateTime today) {
+  final date = (task.dueAt ?? task.date)?.toLocal();
+  return switch ((task.done, date)) {
+    (true, _) => _TaskGroup.completed,
+    (false, null) => _TaskGroup.inbox,
+    (false, final date?) when date.isBefore(today) => _TaskGroup.overdue,
+    (false, final date?) when DateUtils.isSameDay(date, today) =>
+      _TaskGroup.today,
+    _ => _TaskGroup.upcoming,
+  };
 }
 
 class _GroupLabel extends StatelessWidget {
@@ -254,6 +286,11 @@ class _TaskRow extends StatelessWidget {
   const _TaskRow({
     required this.task,
     required this.group,
+    required this.depth,
+    required this.indentation,
+    required this.childCount,
+    required this.expanded,
+    required this.onDisclosure,
     required this.onToggle,
     required this.onTap,
     super.key,
@@ -261,23 +298,50 @@ class _TaskRow extends StatelessWidget {
 
   final TaskItem task;
   final _TaskGroup group;
+  final int depth;
+  final double indentation;
+  final int childCount;
+  final bool expanded;
+  final VoidCallback onDisclosure;
   final VoidCallback onToggle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final localizations = MaterialLocalizations.of(context);
-    final date = group == _TaskGroup.today ? null : task.date?.toLocal();
+    final dueAt = task.dueAt?.toLocal();
+    final date = depth == 0 && group == _TaskGroup.today
+        ? null
+        : dueAt ?? task.date?.toLocal();
+    final dueTime = dueAt == null
+        ? null
+        : localizations.formatTimeOfDay(
+            TimeOfDay.fromDateTime(dueAt),
+            alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+          );
+    final dueLabel = [
+      if (date != null)
+        (date.year == DateTime.now().year
+            ? localizations.formatMediumDate(date)
+            : localizations.formatShortDate(date)),
+      if (dueTime != null) (date == null ? 'Due $dueTime' : dueTime),
+    ].join(' · ');
     final category = task.category.trim();
+    final estimate = task.estimatedMinutes;
+    final priority = task.priority;
+    final showEstimate = estimate != null && estimate > 0;
+    final showSubtasks = childCount > 0 && !expanded;
+    const metadata = TextStyle(color: muted, fontSize: 12, height: 1.25);
     return Row(
       children: [
+        if (indentation > 0) SizedBox(width: indentation),
         Tooltip(
           message: task.done
               ? 'Reopen ${task.title}'
               : 'Complete ${task.title}',
           child: Checkbox(
             value: task.done,
-            semanticLabel: task.title,
+            semanticLabel: depth > 0 ? 'Subtask: ${task.title}' : task.title,
             onChanged: (_) => onToggle(),
             activeColor: accent,
             checkColor: Colors.white,
@@ -317,7 +381,11 @@ class _TaskRow extends StatelessWidget {
                               : null,
                         ),
                       ),
-                      if (date != null || category.isNotEmpty) ...[
+                      if (dueLabel.isNotEmpty ||
+                          category.isNotEmpty ||
+                          showEstimate ||
+                          priority != null ||
+                          showSubtasks) ...[
                         const SizedBox(height: 4),
                         Wrap(
                           spacing: 13,
@@ -325,18 +393,28 @@ class _TaskRow extends StatelessWidget {
                           children: [
                             if (category.isNotEmpty)
                               _CategoryLabel(name: category),
-                            if (date != null)
+                            if (dueLabel.isNotEmpty)
                               Text(
-                                date.year == DateTime.now().year
-                                    ? localizations.formatMediumDate(date)
-                                    : localizations.formatShortDate(date),
-                                style: TextStyle(
-                                  color: group == _TaskGroup.overdue
-                                      ? _overdueInk
-                                      : muted,
-                                  fontSize: 12,
-                                  height: 1.25,
-                                ),
+                                dueLabel,
+                                style: group == _TaskGroup.overdue
+                                    ? metadata.copyWith(color: _overdueInk)
+                                    : metadata,
+                              ),
+                            if (showEstimate)
+                              Text(
+                                '$estimate min',
+                                semanticsLabel: 'Estimated $estimate minutes',
+                                style: metadata,
+                              ),
+                            if (priority != null)
+                              Text(
+                                '${priority.label} priority',
+                                style: metadata,
+                              ),
+                            if (showSubtasks)
+                              Text(
+                                '$childCount ${childCount == 1 ? 'subtask' : 'subtasks'}',
+                                style: metadata,
                               ),
                           ],
                         ),
@@ -348,6 +426,20 @@ class _TaskRow extends StatelessWidget {
             ),
           ),
         ),
+        if (childCount > 0)
+          Semantics(
+            expanded: expanded,
+            child: IconButton(
+              tooltip: '${expanded ? 'Collapse' : 'Expand'} ${task.title}',
+              onPressed: onDisclosure,
+              icon: Icon(
+                expanded
+                    ? Icons.expand_more_rounded
+                    : Icons.chevron_right_rounded,
+                color: muted,
+              ),
+            ),
+          ),
       ],
     );
   }

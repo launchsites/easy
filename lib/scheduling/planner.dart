@@ -181,8 +181,7 @@ ScheduleProposal proposeSchedule({
   final categoryWindows = <String, List<TimeSpan>>{};
   final windows = availability.toList();
   var occupied = _merge([
-    for (final commitment in commitments)
-      if (_blockedSpan(commitment, horizon) case final span?) span,
+    for (final commitment in commitments) ?_blockedSpan(commitment, horizon),
   ]);
   final scheduled = <ScheduledTask>[];
   final unscheduled = <UnscheduledTask>[];
@@ -196,8 +195,7 @@ ScheduleProposal proposeSchedule({
       task.category,
       () => _merge([
         for (final window in windows)
-          if (window.allows(task.category))
-            if (window.span.intersection(horizon) case final span?) span,
+          if (window.allows(task.category)) ?window.span.intersection(horizon),
       ]),
     );
     final outcome = _place(task, horizon, knownWindows, occupied, finishedAt);
@@ -253,8 +251,9 @@ PlanningDecision _place(
     return UnscheduledTask(task, PlannerProblem.needsDetails);
   }
   final minutes = task.remainingMinutes;
-  if (minutes == null)
+  if (minutes == null) {
     return UnscheduledTask(task, PlannerProblem.needsDuration);
+  }
   final due = task.deadline;
   if (due != null && !due.isAfter(horizon.start)) {
     return UnscheduledTask(task, PlannerProblem.deadlinePassed);
@@ -281,13 +280,13 @@ PlanningDecision _place(
 
   final usable = TimeSpan(release, deadline);
   final candidates = _subtract([
-    for (final span in availability)
-      if (span.intersection(usable) case final clipped?) clipped,
+    for (final span in availability) ?span.intersection(usable),
   ], occupied);
 
   final chunks = _takeBlocks(task, minutes, candidates);
-  if (chunks.isEmpty)
+  if (chunks.isEmpty) {
     return UnscheduledTask(task, PlannerProblem.noFeasibleTime);
+  }
   return ScheduledTask(
     task: task,
     blocks: chunks,

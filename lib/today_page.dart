@@ -12,6 +12,7 @@ class TodayPage extends StatelessWidget {
     required this.onEventTap,
     required this.onTaskTap,
     required this.onTaskToggle,
+    this.onPlanDay,
     super.key,
   });
 
@@ -21,6 +22,7 @@ class TodayPage extends StatelessWidget {
   final ValueChanged<CalendarEvent> onEventTap;
   final ValueChanged<TaskItem> onTaskTap;
   final ValueChanged<TaskItem> onTaskToggle;
+  final VoidCallback? onPlanDay;
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +88,16 @@ class TodayPage extends StatelessWidget {
                     ),
                   ),
                 SizedBox(height: mobile ? 23 : 33),
-                const _SectionHeading('Tasks'),
+                Row(
+                  children: [
+                    const Expanded(child: _SectionHeading('Tasks')),
+                    if (onPlanDay != null)
+                      TextButton(
+                        onPressed: onPlanDay,
+                        child: const Text('Plan day'),
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 10),
                 if (dayTasks.isEmpty)
                   const _EmptyMessage('No tasks due today.'),

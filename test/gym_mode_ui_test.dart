@@ -130,4 +130,56 @@ void main() {
     await tester.tap(find.text('Resume'));
     expect(resumes, 1);
   });
+
+  testWidgets('gym plan and actions remain reachable with narrow large text', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var started = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: easyTheme(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(1.8),
+            disableAnimations: true,
+          ),
+          child: child!,
+        ),
+        home: Scaffold(
+          body: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              GymWorkoutOverview(
+                workoutName: 'Upper-body strength and conditioning',
+                scheduleLabel: 'Thursday, November 26 · 5:30 PM',
+                exercises: const [
+                  (
+                    name: 'Incline dumbbell bench press',
+                    detail: '4 sets × 10 reps',
+                  ),
+                  (name: 'Cardiovascular cooldown', detail: '0.75 km · 6 min'),
+                ],
+                active: false,
+                canStart: true,
+                onWorkout: () => started = true,
+                onPlans: () {},
+                onFreestyle: () {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final start = find.text('Start');
+    await tester.ensureVisible(start);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(start);
+    expect(started, isTrue);
+  });
 }

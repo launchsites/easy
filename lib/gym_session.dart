@@ -593,15 +593,15 @@ class _GymSessionPageState extends State<GymSessionPage> {
     return Material(
       color: raisedPaper,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: contentSurfaceRadius,
         side: const BorderSide(color: line),
       ),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         leading: Icon(icon, color: accent),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(detail, style: const TextStyle(color: muted)),
+        title: Text(title, style: contentTitleStyle),
+        subtitle: Text(detail, style: contentMetadataStyle),
         trailing: const Icon(Icons.chevron_right_rounded, color: muted),
         onTap: () => _begin(planned),
       ),
@@ -703,7 +703,12 @@ class _GymSessionPageState extends State<GymSessionPage> {
     if (!_active) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: Text(display, style: const TextStyle(color: muted)),
+        child: Text(
+          display,
+          style: contentMetadataStyle.copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
       );
     }
     final target = index == null
@@ -713,13 +718,17 @@ class _GymSessionPageState extends State<GymSessionPage> {
       message: 'Edit ${metric.label.toLowerCase()} for $target',
       child: TextButton(
         style: TextButton.styleFrom(
-          minimumSize: const Size.square(48),
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+          minimumSize: const Size(45, 39),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           foregroundColor: ink,
-          backgroundColor: raisedPaper,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: const BorderSide(color: line),
+          backgroundColor: paper,
+          side: const BorderSide(color: line),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+          ),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontFeatures: [FontFeature.tabularFigures()],
           ),
         ),
         onPressed: () => _editMetric((
@@ -747,7 +756,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
             GymProgress.done => 'Done',
             GymProgress.skipped => 'Skipped',
           },
-          style: TextStyle(
+          style: contentMetadataStyle.copyWith(
             color: switch (progress) {
               GymProgress.pending => muted,
               GymProgress.done => doneColor,
@@ -777,11 +786,18 @@ class _GymSessionPageState extends State<GymSessionPage> {
             onPressed: () =>
                 _update(_session!._withProgress(exerciseId, setId, action)),
             style: IconButton.styleFrom(
-              minimumSize: const Size.square(48),
-              foregroundColor: progress == action ? Colors.white : color,
-              backgroundColor: progress == action ? color : null,
+              minimumSize: const Size.square(44),
+              foregroundColor: progress == action || action == GymProgress.done
+                  ? color
+                  : muted,
+              backgroundColor: progress != action
+                  ? null
+                  : action == GymProgress.done
+                  ? softAccent
+                  : const Color(0xfff4e4df),
+              shape: contentControlShape,
             ),
-            icon: Icon(icon, size: 21),
+            icon: Icon(icon, size: 19),
           ),
       ],
     );
@@ -795,12 +811,12 @@ class _GymSessionPageState extends State<GymSessionPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final valuesRow = Wrap(
-          spacing: 4,
-          runSpacing: 4,
+          spacing: 5,
+          runSpacing: 3,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: values,
         );
-        if (constraints.maxWidth < 232 ||
+        if (constraints.maxWidth < 246 ||
             MediaQuery.textScalerOf(context).scale(14) > 20) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -829,70 +845,104 @@ class _GymSessionPageState extends State<GymSessionPage> {
   Widget _structuredExercise(WorkoutExercise exercise) {
     final cardio = exercise.kind == WorkoutExerciseKind.cardio;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  exercise.name,
-                  style: const TextStyle(
-                    color: ink,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              if (_active)
-                PopupMenuButton<String>(
-                  tooltip: 'Options for ${exercise.name}',
-                  icon: const Icon(Icons.more_horiz_rounded, color: muted),
-                  onSelected: (_) => _removeExercise(exercise),
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(
-                      value: 'remove',
-                      child: Text('Remove exercise'),
+      padding: const EdgeInsets.only(bottom: 13),
+      child: Material(
+        color: raisedPaper,
+        surfaceTintColor: Colors.transparent,
+        elevation: .5,
+        shadowColor: const Color(0x24373b2f),
+        shape: const RoundedRectangleBorder(
+          borderRadius: contentSurfaceRadius,
+          side: BorderSide(color: line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(14, 3, 5, 3),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          exercise.name,
+                          style: contentTitleStyle.copyWith(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     ),
+                    if (_active)
+                      PopupMenuButton<String>(
+                        tooltip: 'Options for ${exercise.name}',
+                        icon: const Icon(
+                          Icons.more_horiz_rounded,
+                          color: muted,
+                          size: 20,
+                        ),
+                        onSelected: (_) => _removeExercise(exercise),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'remove',
+                            child: Text('Remove exercise'),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsetsDirectional.only(start: 11, top: 3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (cardio)
-                  _metricLine(
-                    values: [
-                      _metric(exercise, _Metric.distance, exercise.distanceKm),
-                      _metric(
-                        exercise,
-                        _Metric.incline,
-                        exercise.inclinePercent,
-                      ),
-                      _metric(exercise, _Metric.minutes, exercise.minutes),
-                    ],
-                    progress: _progressControls(exercise.name, exercise.id),
-                  )
-                else ...[
-                  for (var index = 0; index < exercise.sets.length; index++)
-                    _setLine(exercise, index),
-                  if (_active)
-                    TextButton.icon(
-                      onPressed: () => _addSet(exercise),
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Add set'),
-                    ),
-                ],
-              ],
+              ),
             ),
-          ),
-          const SizedBox(height: 7),
-          const Divider(height: 1),
-        ],
+            const Divider(indent: 13, endIndent: 13),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 6, 7),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (cardio)
+                    _metricLine(
+                      values: [
+                        _metric(
+                          exercise,
+                          _Metric.distance,
+                          exercise.distanceKm,
+                        ),
+                        _metric(
+                          exercise,
+                          _Metric.incline,
+                          exercise.inclinePercent,
+                        ),
+                        _metric(exercise, _Metric.minutes, exercise.minutes),
+                      ],
+                      progress: _progressControls(exercise.name, exercise.id),
+                    )
+                  else ...[
+                    for (final (index, _) in exercise.sets.indexed) ...[
+                      if (index > 0) const Divider(indent: 3, endIndent: 7),
+                      _setLine(exercise, index),
+                    ],
+                    if (_active)
+                      TextButton.icon(
+                        onPressed: () => _addSet(exercise),
+                        icon: const Icon(Icons.add_rounded, size: 17),
+                        label: const Text('Add set'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsetsDirectional.only(
+                            start: 4,
+                            end: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -907,7 +957,14 @@ class _GymSessionPageState extends State<GymSessionPage> {
             icon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('$number', style: const TextStyle(color: muted)),
+                Text(
+                  'Set $number',
+                  style: contentMetadataStyle.copyWith(
+                    color: ink,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(width: 3),
                 const Icon(Icons.more_horiz_rounded, size: 13, color: muted),
               ],
@@ -919,10 +976,10 @@ class _GymSessionPageState extends State<GymSessionPage> {
           )
         : Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Text('$number', style: const TextStyle(color: muted)),
+            child: Text('Set $number', style: contentMetadataStyle),
           );
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: _metricLine(
         leading: setLabel,
         values: [
@@ -946,14 +1003,11 @@ class _GymSessionPageState extends State<GymSessionPage> {
 
   Widget _entryRow(GymLogEntry entry, {required bool editable}) {
     return ListTile(
-      contentPadding: const EdgeInsets.only(left: 0, right: 1),
-      title: Text(
-        entry.title,
-        style: const TextStyle(color: ink, fontWeight: FontWeight.w600),
-      ),
+      contentPadding: const EdgeInsetsDirectional.only(start: 13, end: 7),
+      title: Text(entry.title, style: contentTitleStyle),
       subtitle: entry.actual == null
           ? null
-          : Text(entry.actual!, style: const TextStyle(color: muted)),
+          : Text(entry.actual!, style: contentMetadataStyle),
       trailing: editable
           ? IconButton(
               tooltip: 'Edit ${entry.title}',
@@ -968,16 +1022,24 @@ class _GymSessionPageState extends State<GymSessionPage> {
     if (session.entries.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 7),
-        child: Text('No entries yet.', style: TextStyle(color: muted)),
+        child: Text('No entries yet.', style: contentMetadataStyle),
       );
     }
-    return Column(
-      children: [
-        for (final entry in session.entries) ...[
-          _entryRow(entry, editable: editable),
-          const Divider(height: 1),
+    return Material(
+      color: raisedPaper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: contentSurfaceRadius,
+        side: BorderSide(color: line),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (final (index, entry) in session.entries.indexed) ...[
+            if (index > 0) const Divider(indent: 13, endIndent: 13),
+            _entryRow(entry, editable: editable),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -986,9 +1048,10 @@ class _GymSessionPageState extends State<GymSessionPage> {
     final exercise =
         _editingExercise?.title ??
         (_editingEntry?.exerciseId == null ? null : _editingEntry?.title);
-    final radius = BorderRadius.circular(13);
+    const radius = BorderRadius.all(Radius.circular(12));
     return DecoratedBox(
       decoration: const BoxDecoration(
+        color: paper,
         border: Border(top: BorderSide(color: line)),
       ),
       child: Padding(
@@ -1006,10 +1069,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
                           (exercise == null
                               ? 'Edit entry'
                               : 'Actual · $exercise'),
-                      style: const TextStyle(
-                        color: ink,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: contentTitleStyle,
                     ),
                   ),
                   IconButton(
@@ -1042,6 +1102,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
               onChanged: (_) {
                 if (_error != null) setState(() => _error = null);
               },
+              style: contentTitleStyle.copyWith(fontWeight: FontWeight.w500),
               decoration: InputDecoration(
                 hintText: metric == null
                     ? _editing
@@ -1051,6 +1112,7 @@ class _GymSessionPageState extends State<GymSessionPage> {
                           : 'Add an exercise or note'
                     : metric.metric.unit,
                 errorText: _error,
+                hintStyle: contentMetadataStyle.copyWith(fontSize: 14),
                 filled: true,
                 fillColor: raisedPaper,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1099,20 +1161,31 @@ class _GymSessionPageState extends State<GymSessionPage> {
               .where((exercise) => !logged.contains(exercise.id))
               .toList()
         : const <_Exercise>[];
-    final side = MediaQuery.sizeOf(context).width < 600 ? 20.0 : 30.0;
+    final width = MediaQuery.sizeOf(context).width;
+    final side = width < 360 ? 16.0 : (width < 600 ? 20.0 : 30.0);
     return Scaffold(
       appBar: AppBar(
         title: Text(
           session?.structured == true ? session!.workoutTitle : 'Gym session',
         ),
+        titleTextStyle: contentTitleStyle.copyWith(
+          fontSize: 19,
+          fontWeight: FontWeight.w700,
+        ),
+        titleSpacing: 2,
         backgroundColor: paper,
         surfaceTintColor: Colors.transparent,
         actions: [
           if (_active)
             Padding(
-              padding: const EdgeInsetsDirectional.only(end: 7),
+              padding: EdgeInsetsDirectional.only(end: side - 6),
               child: TextButton(
                 onPressed: _finish,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(58, 44),
+                  backgroundColor: softAccent,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
                 child: const Text('Finish'),
               ),
             ),
@@ -1127,7 +1200,9 @@ class _GymSessionPageState extends State<GymSessionPage> {
               children: [
                 Expanded(
                   child: ListView(
-                    padding: EdgeInsets.fromLTRB(side, 18, side, 22),
+                    padding: EdgeInsets.fromLTRB(side, 12, side, 22),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     children: [
                       if (session != null) ...[
                         if (session.finished) ...[_heading('Session complete')],

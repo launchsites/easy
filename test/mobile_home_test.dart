@@ -2,6 +2,7 @@ import 'package:easy/calendar_page.dart';
 import 'package:easy/list_pages.dart';
 import 'package:easy/mobile_home.dart';
 import 'package:easy/ui_theme.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -225,16 +226,87 @@ void main() {
     await tester.tap(find.text('+2 more'));
     expect(openedCalendar, isTrue);
   });
+
+  testWidgets('compact home supports large text and keyboard note editing', (
+    tester,
+  ) async {
+    var openedNote = false;
+    await _show(
+      tester,
+      MobileHome(
+        date: DateTime(2030, 1, 10),
+        mode: null,
+        modeControl: TextButton(onPressed: () {}, child: const Text('Mode')),
+        note: null,
+        events: const [],
+        tasks: const [],
+        onNoteTap: () => openedNote = true,
+        onCalendarTap: () {},
+        onEventTap: (_) {},
+        onTaskTap: (_) {},
+        onTaskToggle: (_) {},
+      ),
+      size: const Size(320, 568),
+      textScale: 1.8,
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(tester.getRect(find.text('Mode')).right, lessThan(320));
+    expect(tester.getRect(find.text('Write a note')).left, greaterThan(0));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    expect(openedNote, isTrue);
+  });
+
+  testWidgets('wide home keeps content within a readable centered column', (
+    tester,
+  ) async {
+    await _show(
+      tester,
+      MobileHome(
+        date: DateTime(2030, 1, 10),
+        mode: 'study',
+        modeControl: const Text('Mode'),
+        note: null,
+        events: const [],
+        tasks: const [],
+        onNoteTap: () {},
+        onCalendarTap: () {},
+        onEventTap: (_) {},
+        onTaskTap: (_) {},
+        onTaskToggle: (_) {},
+      ),
+      size: const Size(900, 680),
+    );
+
+    expect(tester.getTopLeft(find.text('Study')).dx, closeTo(140, 1));
+    expect(tester.getTopRight(find.text('Mode')).dx, closeTo(760, 1));
+    expect(tester.takeException(), isNull);
+  });
 }
 
-Future<void> _show(WidgetTester tester, MobileHome home) async {
+Future<void> _show(
+  WidgetTester tester,
+  MobileHome home, {
+  Size size = const Size(390, 844),
+  double textScale = 1,
+}) async {
   tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(390, 844);
+  tester.view.physicalSize = size;
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
   await tester.pumpWidget(
     MaterialApp(
       theme: easyTheme(),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: Scaffold(body: home),
     ),
   );

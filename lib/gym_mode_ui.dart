@@ -72,6 +72,8 @@ class GymWorkoutOverview extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = workoutName?.trim() ?? '';
     final date = scheduleLabel?.trim() ?? '';
+    final preview = exercises.take(5).toList();
+    final compact = MediaQuery.sizeOf(context).width < 360;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -84,112 +86,207 @@ class GymWorkoutOverview extends StatelessWidget {
                 child: const Text('Workout', style: sectionHeadingStyle),
               ),
             ),
-            TextButton(
+            TextButton.icon(
               onPressed: onPlans,
-              child: const Text('Plans', semanticsLabel: 'Workout plans'),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsetsDirectional.only(start: 12, end: 2),
+              ),
+              iconAlignment: IconAlignment.end,
+              icon: const Icon(Icons.chevron_right_rounded, size: 17),
+              label: const Text('Plans', semanticsLabel: 'Workout plans'),
             ),
           ],
         ),
-        if (name.isNotEmpty || active)
-          Text(
-            name.isNotEmpty ? name : 'Workout in progress',
-            style: const TextStyle(
-              color: ink,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -.22,
-              height: 1.25,
-            ),
-          )
-        else
-          const Text(
-            'No workouts planned.',
-            style: TextStyle(color: muted, fontSize: 14),
+        const SizedBox(height: 4),
+        Material(
+          color: raisedPaper,
+          surfaceTintColor: Colors.transparent,
+          elevation: .6,
+          shadowColor: const Color(0x24373b2f),
+          clipBehavior: Clip.antiAlias,
+          shape: const RoundedRectangleBorder(
+            side: BorderSide(color: line),
+            borderRadius: contentSurfaceRadius,
           ),
-        if (date.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(date, style: const TextStyle(color: muted, fontSize: 13)),
-        ],
-        if (exercises.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          DecoratedBox(
-            decoration: const BoxDecoration(
-              border: BorderDirectional(start: BorderSide(color: line)),
-            ),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.only(start: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final exercise in exercises.take(5))
-                    _ExerciseLine(name: exercise.name, detail: exercise.detail),
-                ],
-              ),
-            ),
-          ),
-        ],
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            if (active || canStart)
-              FilledButton(
-                onPressed: onWorkout,
-                child: Text(
-                  active ? 'Resume' : 'Start',
-                  semanticsLabel: active ? 'Resume workout' : 'Start workout',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (name.isNotEmpty || active)
+                _WorkoutPlanHeading(
+                  name: name.isNotEmpty ? name : 'Workout in progress',
+                  date: date,
+                  active: active,
+                  compact: compact,
+                )
+              else
+                const Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(17, 17, 17, 0),
+                  child: Text(
+                    'No workouts planned.',
+                    style: contentMetadataStyle,
+                  ),
+                ),
+              if (preview.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(20, 4, 17, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final (index, exercise) in preview.indexed) ...[
+                        _ExerciseLine(
+                          name: exercise.name,
+                          detail: exercise.detail,
+                          compact: compact,
+                        ),
+                        if (index < preview.length - 1) const Divider(),
+                      ],
+                    ],
+                  ),
+                ),
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(
+                  16,
+                  compact ? 6 : 10,
+                  16,
+                  compact ? 10 : 13,
+                ),
+                child: Wrap(
+                  spacing: 7,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (active || canStart)
+                      FilledButton.icon(
+                        onPressed: onWorkout,
+                        icon: const Icon(Icons.play_arrow_rounded, size: 19),
+                        label: Text(
+                          active ? 'Resume' : 'Start',
+                          semanticsLabel: active
+                              ? 'Resume workout'
+                              : 'Start workout',
+                        ),
+                      ),
+                    if (!active)
+                      TextButton(
+                        onPressed: onFreestyle,
+                        child: const Text(
+                          'Freestyle',
+                          semanticsLabel: 'Start a freestyle workout',
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            if (!active)
-              TextButton(
-                onPressed: onFreestyle,
-                child: const Text(
-                  'Freestyle',
-                  semanticsLabel: 'Start a freestyle workout',
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ],
     );
   }
 }
 
+class _WorkoutPlanHeading extends StatelessWidget {
+  const _WorkoutPlanHeading({
+    required this.name,
+    required this.date,
+    required this.active,
+    required this.compact,
+  });
+
+  final String name;
+  final String date;
+  final bool active;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: shellSurface,
+      child: Padding(
+        padding: EdgeInsetsDirectional.fromSTEB(
+          17,
+          compact ? 11 : 14,
+          17,
+          compact ? 12 : 16,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (date.isNotEmpty) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(
+                      active
+                          ? Icons.timer_outlined
+                          : Icons.calendar_today_outlined,
+                      size: 14,
+                      color: sidebarText,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      date,
+                      style: contentMetadataStyle.copyWith(color: sidebarText),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
+            Text(
+              name,
+              style: TextStyle(
+                color: paper,
+                fontSize: compact ? 22 : 25,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -.66,
+                height: 1.12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ExerciseLine extends StatelessWidget {
-  const _ExerciseLine({required this.name, required this.detail});
+  const _ExerciseLine({
+    required this.name,
+    required this.detail,
+    required this.compact,
+  });
 
   final String name;
   final String detail;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.symmetric(vertical: compact ? 7 : 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            flex: 3,
             child: Text(
               name,
-              style: const TextStyle(
-                color: ink,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                height: 1.3,
-              ),
+              style: contentTitleStyle.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
           if (detail.isNotEmpty) ...[
             const SizedBox(width: 12),
             Expanded(
-              flex: 2,
               child: Text(
                 detail,
                 textAlign: TextAlign.end,
-                style: const TextStyle(color: muted, fontSize: 13, height: 1.4),
+                style: compact
+                    ? contentMetadataStyle.copyWith(fontSize: 12)
+                    : contentMetadataStyle,
               ),
             ),
           ],

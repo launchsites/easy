@@ -2,11 +2,13 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'calendar_page.dart';
+import 'capture/capture_review_sheet.dart' show CaptureReviewRequest;
 import 'capture_text.dart';
 import 'list_pages.dart';
 import 'record_editor.dart' show RecordKind;
 import 'ui_theme.dart'
     show accent, ink, line, muted, paper, raisedPaper, softAccent;
+import 'workspace_data.dart' show spaceColor, spaceColors, spaceName;
 
 class QuickCapture extends StatefulWidget {
   const QuickCapture({
@@ -15,6 +17,7 @@ class QuickCapture extends StatefulWidget {
     this.initialCategory,
     this.initialTaskDate,
     this.noteToSelf = false,
+    this.allowReview = false,
     super.key,
   });
 
@@ -23,6 +26,7 @@ class QuickCapture extends StatefulWidget {
   final String? initialCategory;
   final DateTime? initialTaskDate;
   final bool noteToSelf;
+  final bool allowReview;
 
   @override
   State<QuickCapture> createState() => _QuickCaptureState();
@@ -40,6 +44,8 @@ class _QuickCaptureState extends State<QuickCapture> {
   String? _error;
   String _eventText = '';
   bool _finished = false;
+  String? _selectedCategory;
+  bool _categoryChosen = false;
 
   @override
   void dispose() {
@@ -48,7 +54,9 @@ class _QuickCaptureState extends State<QuickCapture> {
     super.dispose();
   }
 
-  String get _category => widget.initialCategory ?? 'personal';
+  String? get _noteCategory =>
+      _categoryChosen ? _selectedCategory : widget.initialCategory;
+  String get _category => _noteCategory ?? 'personal';
 
   EventCaptureText _parseEvent(String input) =>
       parseEventCapture(input, date: widget.date, now: _openedAt);
@@ -146,7 +154,7 @@ class _QuickCaptureState extends State<QuickCapture> {
             title: breakAt < 0 ? input : input.substring(0, breakAt).trim(),
             body: breakAt < 0 ? '' : input.substring(breakAt + 1).trim(),
             updated: now,
-            category: widget.initialCategory,
+            category: _noteCategory,
             noteToSelf: widget.noteToSelf,
           ),
         );
@@ -308,6 +316,54 @@ class _QuickCaptureState extends State<QuickCapture> {
           ),
       ],
     );
+  }
+
+  Widget _categoryChoice() {
+    final current = _kind == RecordKind.note ? _noteCategory : _category;
+    return MenuAnchor(
+      builder: (context, controller, child) => Tooltip(
+        message: 'Choose category',
+        child: TextButton.icon(
+          onPressed: () =>
+              controller.isOpen ? controller.close() : controller.open(),
+          icon: const Icon(Icons.expand_more_rounded, size: 16),
+          iconAlignment: IconAlignment.end,
+          label: Text(current == null ? 'General' : spaceName(current)),
+          style: TextButton.styleFrom(
+            foregroundColor: current == null ? muted : spaceColor(current),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+          ),
+        ),
+      ),
+      menuChildren: [
+        if (_kind == RecordKind.note)
+          MenuItemButton(
+            onPressed: () => _chooseCategory(null),
+            child: const Text('General'),
+          ),
+        for (final category in spaceColors.keys)
+          MenuItemButton(
+            onPressed: () => _chooseCategory(category),
+            leadingIcon: Icon(
+              Icons.circle,
+              color: spaceColor(category),
+              size: 8,
+            ),
+            trailingIcon: current == category
+                ? const Icon(Icons.check_rounded, size: 17)
+                : null,
+            child: Text(spaceName(category)),
+          ),
+      ],
+    );
+  }
+
+  void _chooseCategory(String? category) {
+    setState(() {
+      _categoryChosen = true;
+      _selectedCategory = category;
+    });
+    _focus.requestFocus();
   }
 
   Widget _bar(String action) {
@@ -486,12 +542,22 @@ class _QuickCaptureState extends State<QuickCapture> {
                                   )
                                 : _kindSelector(),
                           ),
+                          if (widget.allowReview && _step == _CaptureStep.text)
+                            IconButton(
+                              tooltip: 'Open capture review',
+                              onPressed: () =>
+                                  _finish(CaptureReviewRequest(_text.text)),
+                              icon: const Icon(
+                                Icons.playlist_add_rounded,
+                                color: muted,
+                              ),
+                            ),
                           close,
                         ],
                       ),
                       const SizedBox(height: 9),
                       _bar(action),
-                      if (showTitle || summary.isNotEmpty) ...[
+                      if (input.isNotEmpty || event != null) ...[
                         const SizedBox(height: 9),
                         if (showTitle)
                           Text(
@@ -503,8 +569,18 @@ class _QuickCaptureState extends State<QuickCapture> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                        if (summary.isNotEmpty)
-                          Text(summary, style: const TextStyle(color: muted)),
+                        Wrap(
+                          spacing: 9,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (summary.isNotEmpty)
+                              Text(
+                                summary,
+                                style: const TextStyle(color: muted),
+                              ),
+                            _categoryChoice(),
+                          ],
+                        ),
                       ],
                       if (_error case final error?) ...[
                         const SizedBox(height: 8),

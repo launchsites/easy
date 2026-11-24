@@ -87,20 +87,20 @@ class _WorkoutPlansPageState extends State<WorkoutPlansPage> {
               style: TextStyle(color: muted),
             ),
           ),
-        for (final plan in _plans) ...[
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.fitness_center_outlined, color: accent),
-            trailing: const Icon(Icons.chevron_right_rounded, color: muted),
-            title: Text(plan.name, style: _rowTitle),
-            subtitle: Text(
-              _scheduleLabel(context, plan.schedule),
-              style: const TextStyle(color: muted),
-            ),
-            onTap: () => _edit(plan),
+        if (_plans.isNotEmpty)
+          _PlanCard(
+            children: [
+              for (final (index, plan) in _plans.indexed) ...[
+                if (index > 0) const Divider(indent: 13, endIndent: 13),
+                _PlanRow(
+                  title: plan.name,
+                  detail: _scheduleLabel(context, plan.schedule),
+                  icon: Icons.fitness_center_outlined,
+                  onTap: () => _edit(plan),
+                ),
+              ],
+            ],
           ),
-          const Divider(),
-        ],
       ],
     );
   }
@@ -128,8 +128,6 @@ const _exerciseKinds = {
   WorkoutExerciseKind.cardio: 'Cardio',
   WorkoutExerciseKind.strength: 'Strength',
 };
-
-const _rowTitle = TextStyle(color: ink, fontWeight: FontWeight.w600);
 
 String _scheduleLabel(BuildContext context, WorkoutSchedule schedule) {
   final date = MaterialLocalizations.of(context)
@@ -276,101 +274,100 @@ class _WorkoutPlanEditorState extends State<_WorkoutPlanEditor> {
           ),
           const SizedBox(height: 23),
           const _Heading('Schedule'),
-          _Choices(
-            options: _scheduleKinds,
-            selected: _kind,
-            onSelected: (kind) {
-              if (_kind == kind) return;
-              setState(() {
-                _kind = kind;
-                if (kind == WorkoutScheduleKind.weekdays &&
-                    _selectedDays.isEmpty) {
-                  _selectedDays.add(_start.weekday);
-                }
-                _noWeekdays = false;
-                _dirty = true;
-              });
-            },
-          ),
-          const SizedBox(height: 5),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(
-              Icons.calendar_today_outlined,
-              color: accent,
-              size: 20,
-            ),
-            title: Text(
-              _kind == WorkoutScheduleKind.once ? 'Date' : 'Start date',
-              style: _rowTitle,
-            ),
-            subtitle: Text(date, style: const TextStyle(color: muted)),
-            trailing: const Icon(Icons.chevron_right_rounded, color: muted),
-            onTap: _pickDate,
-          ),
-          if (_kind == WorkoutScheduleKind.weekdays) ...[
-            Wrap(
-              spacing: 7,
-              runSpacing: 4,
-              children: [
-                for (var index = 0; index < _weekdays.length; index++)
-                  FilterChip(
-                    label: Text(
-                      _weekdays[index],
-                      semanticsLabel: _weekdayLabels[index],
-                    ),
-                    selected: _selectedDays.contains(index + 1),
-                    showCheckmark: false,
-                    onSelected: (selected) => setState(() {
-                      if (selected) {
-                        _selectedDays.add(index + 1);
-                      } else {
-                        _selectedDays.remove(index + 1);
+          _PlanCard(
+            children: [
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 12, 5),
+                child: _Choices(
+                  options: _scheduleKinds,
+                  selected: _kind,
+                  onSelected: (kind) {
+                    if (_kind == kind) return;
+                    setState(() {
+                      _kind = kind;
+                      if (kind == WorkoutScheduleKind.weekdays &&
+                          _selectedDays.isEmpty) {
+                        _selectedDays.add(_start.weekday);
                       }
                       _noWeekdays = false;
                       _dirty = true;
-                    }),
-                  ),
-              ],
-            ),
-            if (_noWeekdays)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  'Choose one or more weekdays.',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    });
+                  },
                 ),
               ),
-          ],
-          if (_kind == WorkoutScheduleKind.interval) ...[
-            const SizedBox(height: 7),
-            _NumberField(
-              label: 'Repeat every (days)',
-              value: _interval,
-              integer: true,
-              minimum: 1,
-              isRequired: true,
-              onChanged: (interval) {
-                _interval = interval;
-                _markDirty();
-              },
-            ),
-          ],
-          const SizedBox(height: 24),
-          const _Heading('Exercises'),
-          for (final exercise in _exercises) ...[
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(exercise.name, style: _rowTitle),
-              subtitle: Text(
-                _exerciseLabel(exercise),
-                style: const TextStyle(color: muted),
+              const Divider(indent: 12, endIndent: 12),
+              _PlanRow(
+                title: _kind == WorkoutScheduleKind.once
+                    ? 'Date'
+                    : 'Start date',
+                detail: date,
+                icon: Icons.calendar_today_outlined,
+                onTap: _pickDate,
               ),
-              trailing: const Icon(Icons.chevron_right_rounded, color: muted),
-              onTap: () => _editExercise(exercise),
+              if (_kind == WorkoutScheduleKind.weekdays)
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(12, 0, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _WeekdayChoices(
+                        selectedDays: _selectedDays,
+                        onChanged: (day, selected) => setState(() {
+                          if (selected) {
+                            _selectedDays.add(day);
+                          } else {
+                            _selectedDays.remove(day);
+                          }
+                          _noWeekdays = false;
+                          _dirty = true;
+                        }),
+                      ),
+                      if (_noWeekdays)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Choose one or more weekdays.',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              if (_kind == WorkoutScheduleKind.interval)
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 13),
+                  child: _NumberField(
+                    label: 'Repeat every (days)',
+                    value: _interval,
+                    integer: true,
+                    minimum: 1,
+                    isRequired: true,
+                    onChanged: (interval) {
+                      _interval = interval;
+                      _markDirty();
+                    },
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 25),
+          const _Heading('Exercises'),
+          if (_exercises.isNotEmpty)
+            _PlanCard(
+              children: [
+                for (final (index, exercise) in _exercises.indexed) ...[
+                  if (index > 0) const Divider(indent: 13, endIndent: 13),
+                  _PlanRow(
+                    title: exercise.name,
+                    detail: _exerciseLabel(exercise),
+                    onTap: () => _editExercise(exercise),
+                  ),
+                ],
+              ],
             ),
-            const Divider(),
-          ],
+          const SizedBox(height: 5),
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: TextButton.icon(
@@ -618,47 +615,63 @@ class _StrengthSetFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final number = index + 1;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final weight = _NumberField(
+      label: 'Weight (kg)',
+      value: draft.weight,
+      onChanged: (value) {
+        draft.weight = value;
+        onChange();
+      },
+    );
+    final reps = _NumberField(
+      label: 'Reps',
+      value: draft.reps,
+      integer: true,
+      isRequired: true,
+      onChanged: (value) {
+        draft.reps = value;
+        onChange();
+      },
+    );
+    return _PlanCard(
       children: [
-        Row(
-          children: [
-            Expanded(child: Text('Set $number', style: _rowTitle)),
-            IconButton(
-              tooltip: 'Remove set $number',
-              icon: const Icon(Icons.close_rounded, size: 19, color: muted),
-              onPressed: onRemove,
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(13, 1, 3, 0),
+          child: Row(
+            children: [
+              Expanded(child: Text('Set $number', style: contentTitleStyle)),
+              IconButton(
+                tooltip: 'Remove set $number',
+                icon: const Icon(Icons.close_rounded, size: 18, color: muted),
+                onPressed: onRemove,
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 6),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _NumberField(
-                label: 'Weight (kg)',
-                value: draft.weight,
-                onChanged: (value) {
-                  draft.weight = value;
-                  onChange();
-                },
-              ),
-            ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: _NumberField(
-                label: 'Reps',
-                value: draft.reps,
-                integer: true,
-                isRequired: true,
-                onChanged: (value) {
-                  draft.reps = value;
-                  onChange();
-                },
-              ),
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 3, 12, 12),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final stack =
+                  constraints.maxWidth < 210 ||
+                  MediaQuery.textScalerOf(context).scale(14) > 19;
+              if (stack) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: 8,
+                  children: [weight, reps],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: weight),
+                  const SizedBox(width: 9),
+                  Expanded(child: reps),
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
@@ -726,15 +739,22 @@ bool _validateForm(GlobalKey<FormState> form) {
 }
 
 InputDecoration _field(String label) {
-  final radius = BorderRadius.circular(9);
+  const radius = BorderRadius.all(Radius.circular(10));
   return InputDecoration(
     labelText: label,
+    labelStyle: const TextStyle(color: muted),
+    floatingLabelBehavior: FloatingLabelBehavior.always,
     filled: true,
     fillColor: raisedPaper,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
     border: OutlineInputBorder(borderRadius: radius),
     enabledBorder: OutlineInputBorder(
       borderRadius: radius,
       borderSide: const BorderSide(color: line),
+    ),
+    focusedBorder: const OutlineInputBorder(
+      borderRadius: radius,
+      borderSide: BorderSide(color: accent, width: 1.5),
     ),
   );
 }
@@ -759,6 +779,113 @@ Future<bool> _confirm(BuildContext context, String title, String action) async {
       false;
 }
 
+class _PlanCard extends StatelessWidget {
+  const _PlanCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: raisedPaper,
+    surfaceTintColor: Colors.transparent,
+    clipBehavior: Clip.antiAlias,
+    shape: const RoundedRectangleBorder(
+      borderRadius: contentSurfaceRadius,
+      side: BorderSide(color: line),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    ),
+  );
+}
+
+class _PlanRow extends StatelessWidget {
+  const _PlanRow({
+    required this.title,
+    required this.detail,
+    required this.onTap,
+    this.icon,
+  });
+
+  final String title;
+  final String detail;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    contentPadding: const EdgeInsetsDirectional.fromSTEB(13, 3, 10, 3),
+    horizontalTitleGap: 11,
+    leading: icon == null
+        ? null
+        : Container(
+            width: 34,
+            height: 34,
+            decoration: const BoxDecoration(
+              color: softAccent,
+              borderRadius: BorderRadius.all(Radius.circular(9)),
+            ),
+            child: Icon(icon, color: accent, size: 17),
+          ),
+    title: Text(title, style: contentTitleStyle),
+    subtitle: Text(detail, style: contentMetadataStyle),
+    trailing: const Icon(Icons.chevron_right_rounded, color: muted, size: 18),
+    onTap: onTap,
+  );
+}
+
+class _WeekdayChoices extends StatelessWidget {
+  const _WeekdayChoices({required this.selectedDays, required this.onChanged});
+
+  final Set<int> selectedDays;
+  final void Function(int day, bool selected) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = [
+      for (final (index, label) in _weekdays.indexed)
+        _dayChip(index + 1, label),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 286) return _row(chips);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 3,
+          children: [
+            _row(chips.take(4).toList()),
+            _row(chips.skip(4).toList()),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _row(List<Widget> chips) =>
+      Wrap(spacing: 4, runSpacing: 3, children: chips);
+
+  Widget _dayChip(int day, String label) {
+    final selected = selectedDays.contains(day);
+    return FilterChip(
+      label: Text(label, semanticsLabel: _weekdayLabels[day - 1]),
+      labelStyle: contentMetadataStyle.copyWith(
+        color: selected ? accent : ink,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+        fontSize: 12,
+      ),
+      selected: selected,
+      selectedColor: softAccent,
+      showCheckmark: false,
+      shape: contentControlShape,
+      side: BorderSide(color: selected ? accent.withValues(alpha: .28) : line),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      onSelected: (selected) => onChanged(day, selected),
+    );
+  }
+}
+
 class _Choices<T> extends StatelessWidget {
   const _Choices({
     required this.options,
@@ -779,6 +906,19 @@ class _Choices<T> extends StatelessWidget {
         ChoiceChip(
           label: Text(option.value),
           selected: option.key == selected,
+          selectedColor: softAccent,
+          shape: contentControlShape,
+          side: BorderSide(
+            color: option.key == selected
+                ? accent.withValues(alpha: .28)
+                : line,
+          ),
+          labelStyle: contentMetadataStyle.copyWith(
+            color: option.key == selected ? accent : ink,
+            fontWeight: FontWeight.w600,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
           showCheckmark: false,
           onSelected: (_) => onSelected(option.key),
         ),
@@ -793,7 +933,7 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.only(bottom: 10),
     child: Semantics(
       header: true,
       child: Text(label, style: sectionHeadingStyle),
@@ -816,8 +956,9 @@ class _PlanPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final inset = MediaQuery.sizeOf(context).width < 600 ? 20.0 : 36.0;
-    final padding = EdgeInsets.fromLTRB(inset, 15, inset, 20);
+    final width = MediaQuery.sizeOf(context).width;
+    final inset = width < 360 ? 16.0 : (width < 600 ? 20.0 : 36.0);
+    final padding = EdgeInsets.fromLTRB(inset, 15, inset, 24);
     final scrolling = form == null
         ? ListView(padding: padding, children: children)
         : Form(
@@ -834,6 +975,11 @@ class _PlanPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
+        titleTextStyle: contentTitleStyle.copyWith(
+          fontSize: 19,
+          fontWeight: FontWeight.w700,
+        ),
+        titleSpacing: 2,
         backgroundColor: paper,
         surfaceTintColor: Colors.transparent,
       ),
@@ -850,7 +996,10 @@ class _PlanPage extends StatelessWidget {
                   padding: EdgeInsets.fromLTRB(inset, 8, inset, 12),
                   child: Align(
                     alignment: AlignmentDirectional.centerEnd,
-                    child: action,
+                    child: SizedBox(
+                      width: width < 600 ? double.infinity : null,
+                      child: action,
+                    ),
                   ),
                 ),
               ],

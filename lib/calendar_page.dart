@@ -16,6 +16,7 @@ class CalendarEvent {
     required this.category,
     this.allDay = false,
     this.location,
+    this.plannedTaskId,
   });
 
   final String id;
@@ -25,6 +26,7 @@ class CalendarEvent {
   final String category;
   final bool allDay;
   final String? location;
+  final String? plannedTaskId;
 }
 
 class CalendarPage extends StatefulWidget {
