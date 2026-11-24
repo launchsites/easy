@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:easy/ai/ai_budget.dart';
@@ -316,6 +317,195 @@ void main() {
     },
   );
 
+  test(
+    'automatic estimates require scoped consent before durable activation',
+    () async {
+      final store = _Store();
+      final runtime = store.runtime();
+      addTearDown(runtime.dispose);
+      expect(
+        await runtime.saveSettings(_automaticLocal()),
+        AiSettingsSaveStatus.authorizationRequired,
+      );
+      expect(store.state, isNull);
+      expect(runtime.settings.automaticEstimates, false);
+      expect(
+        await runtime.saveSettings(
+          _automaticLocal(),
+          authorizeAutomatic: (preview) async {
+            expect(preview.route, AiRoute.local);
+            expect(preview.endpoint.host, '127.0.0.1');
+            expect(preview.includeOptionalMetadata, false);
+            expect(preview.reserveMicros, isNull);
+            return true;
+          },
+        ),
+        AiSettingsSaveStatus.saved,
+      );
+      expect(runtime.settings.automaticEstimates, true);
+      final confirmed = store.state!.value;
+      expect(
+        await runtime.saveSettings(_automaticLocal(metadata: true)),
+        AiSettingsSaveStatus.authorizationRequired,
+      );
+      expect(store.state!.value, confirmed);
+    },
+  );
+
+  test('automatic work is metadata-scoped, deduped, and restored as pending review', () async {
+    final store = _Store();
+    var now = _clock();
+    var sends = 0;
+    final runtime = store.runtime(
+      clock: () => now,
+      send: (request) async {
+        sends++;
+        final payload = _userPayload(request);
+        expect(payload.keys.toSet(), {
+          'captureId',
+          'sourceRevision',
+          'contextRevision',
+          'title',
+          'sampleDurationsMinutes',
+        });
+        expect(payload['captureId'], isNot(contains('private-workspace-id')));
+        expect(payload['sourceRevision'], 0);
+        expect(payload['contextRevision'], 0);
+        expect(payload['sampleDurationsMinutes'], [20, 40]);
+        return _estimateAnswer(payload);
+      },
+    );
+    addTearDown(runtime.dispose);
+    await runtime.saveSettings(
+      _automaticLocal(metadata: true),
+      authorizeAutomatic: (_) async => true,
+    );
+    final a = _candidate('private-workspace-id');
+    final b = _candidate('private-workspace-id-2');
+    runtime.setForeground(false);
+    expect(
+      (await runtime.runAutomaticEstimate(
+        candidate: a,
+        currentRevision: _candidateRevision,
+      )).status,
+      AiRunStatus.blocked,
+    );
+    runtime.setForeground(true);
+    final first = await runtime.runAutomaticEstimate(
+      candidate: a,
+      currentRevision: _candidateRevision,
+    );
+    expect(first.status, AiRunStatus.ready);
+    expect(first.value!.requiresReview, true);
+    expect(first.value!.durationMinutes, 35);
+    expect(
+      (await runtime.runAutomaticEstimate(
+        candidate: b,
+        currentRevision: _candidateRevision,
+      )).status,
+      AiRunStatus.blocked,
+    );
+    now = now.add(const Duration(hours: 1));
+    expect(
+      (await runtime.runAutomaticEstimate(
+        candidate: a,
+        currentRevision: _candidateRevision,
+      )).status,
+      AiRunStatus.blocked,
+    );
+    expect(
+      (await runtime.runAutomaticEstimate(
+        candidate: b,
+        currentRevision: _candidateRevision,
+      )).status,
+      AiRunStatus.ready,
+    );
+    expect(sends, 2);
+    expect(store.state!.value, isNot(contains(a.title)));
+    expect(store.state!.value, isNot(contains('sampleDurationsMinutes')));
+
+    final restored = store.runtime(clock: () => now);
+    addTearDown(restored.dispose);
+    expect(await restored.load(), true);
+    expect(restored.pendingEstimates, hasLength(2));
+    expect(restored.currentPendingEstimates((_) => null), isEmpty);
+    expect(restored.currentPendingEstimates(_candidateRevision), hasLength(2));
+    expect(
+      await restored.discardPendingEstimate(restored.pendingEstimates.first),
+      true,
+    );
+    expect(restored.pendingEstimates, hasLength(1));
+  });
+
+  test('a paid forecast at the cap stops automatic work', () async {
+    final store = _Store();
+    final source = _capture();
+    var calls = 0;
+    final runtime = store.runtime(
+      clock: () => DateTime.utc(2026, 11),
+      send: (_) async {
+        calls++;
+        return _answer(source, usage: true, inputTokens: 40000);
+      },
+    );
+    addTearDown(runtime.dispose);
+    expect(
+      await runtime.saveSettings(
+        _paid(automatic: true),
+        apiKey: _testKey,
+        authorizeAutomatic: (_) async => true,
+      ),
+      AiSettingsSaveStatus.saved,
+    );
+    final manual = await runtime.runCapture(
+      input: source,
+      currentRevision: _revision,
+      authorize: (_) async => true,
+    );
+    expect(manual.status, AiRunStatus.ready);
+    expect(
+      runtime.budget.projectedMicros,
+      greaterThan(runtime.budget.monthlyCapMicros),
+    );
+    final automatic = await runtime.runAutomaticEstimate(
+      candidate: _candidate('private-workspace-id'),
+      currentRevision: _candidateRevision,
+    );
+    expect(automatic.status, AiRunStatus.blocked);
+    expect(runtime.pendingEstimates, isEmpty);
+    expect(calls, 1);
+  });
+
+  test(
+    'backgrounding cancels an automatic request without publishing output',
+    () async {
+      final store = _Store();
+      final reached = Completer<http.AbortableRequest>();
+      final reply = Completer<http.StreamedResponse>();
+      final runtime = store.runtime(
+        send: (request) {
+          reached.complete(request as http.AbortableRequest);
+          return reply.future;
+        },
+      );
+      addTearDown(runtime.dispose);
+      await runtime.saveSettings(
+        _automaticLocal(),
+        authorizeAutomatic: (_) async => true,
+      );
+      final running = runtime.runAutomaticEstimate(
+        candidate: _candidate('private-workspace-id'),
+        currentRevision: _candidateRevision,
+      );
+      final req = await reached.future;
+      runtime.setForeground(false);
+      await req.abortTrigger!;
+      expect((await running).status, AiRunStatus.declined);
+      reply.complete(_estimateAnswer(_userPayload(req)));
+      expect(runtime.pendingEstimates, isEmpty);
+    },
+  );
+
   testWidgets('settings fit a 320px phone and save the local preference', (
     tester,
   ) async {
@@ -353,6 +543,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(runtime.settings.route, AiRoute.local);
     expect(runtime.settings.confirmLocal, false);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    final estimates = find.widgetWithText(SwitchListTile, 'Suggest durations');
+    await tester.scrollUntilVisible(estimates, 120, scrollable: outerScroll);
+    await tester.tap(estimates);
+    await tester.pumpAndSettle();
+    final automatic = find.widgetWithText(SwitchListTile, 'Use spare capacity');
+    await tester.scrollUntilVisible(automatic, 120, scrollable: outerScroll);
+    await tester.tap(automatic);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(save, 120, scrollable: outerScroll);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(find.text('Enable automatic estimates?'), findsOneWidget);
+    expect(find.text('Task title and temporary request ID'), findsOneWidget);
+    expect(runtime.settings.automaticEstimates, false);
+    await tester.tap(find.widgetWithText(FilledButton, 'Enable'));
+    await tester.pumpAndSettle();
+    expect(runtime.settings.automaticEstimates, true);
     expect(tester.takeException(), isNull);
   });
 }
@@ -379,6 +589,7 @@ AiRuntimeSettings _paid({
   String endpoint = 'https://fixture.example.test/v1',
   String model = 'text-fixture',
   int cap = 1000000,
+  bool automatic = false,
 }) => AiRuntimeSettings(
   route: AiRoute.api,
   apiBaseUrl: endpoint,
@@ -386,7 +597,30 @@ AiRuntimeSettings _paid({
   monthlyCapMicros: cap,
   inputMicrosPerMillion: 1000000,
   outputMicrosPerMillion: 2000000,
+  allowEstimates: automatic,
+  automaticEstimates: automatic,
 );
+
+AiRuntimeSettings _automaticLocal({bool metadata = false}) => AiRuntimeSettings(
+  route: AiRoute.local,
+  localModel: 'test-local',
+  allowEstimates: true,
+  automaticEstimates: true,
+  includeOptionalMetadata: metadata,
+);
+
+AiEnrichmentCandidate _candidate(String id) => AiEnrichmentCandidate(
+  taskId: id,
+  title: 'Draft reviewed estimate',
+  sourceRevision: 8,
+  contextRevision: 9,
+  sampleDurationsMinutes: [20, 40],
+);
+
+AiCaptureRevision? _candidateRevision(String id) =>
+    id.startsWith('private-workspace-id')
+    ? (sourceRevision: 8, contextRevision: 9)
+    : null;
 
 class _Store {
   AiStoredState? state;
@@ -394,6 +628,7 @@ class _Store {
   AiRuntime runtime({
     AiWritableCredentialVault? vault,
     Future<http.StreamedResponse> Function(http.BaseRequest)? send,
+    DateTime Function()? clock,
   }) => AiRuntime(
     read: () async => state,
     compareAndSwap: (expected, value) async {
@@ -403,7 +638,7 @@ class _Store {
     },
     vault: vault,
     transport: _FakeClient(send),
-    clock: _clock,
+    clock: clock ?? _clock,
   );
 }
 
@@ -419,7 +654,11 @@ class _FakeClient extends http.BaseClient {
   }
 }
 
-http.StreamedResponse _answer(CaptureInput source, {bool usage = false}) {
+http.StreamedResponse _answer(
+  CaptureInput source, {
+  bool usage = false,
+  int inputTokens = 2,
+}) {
   final content = jsonEncode({
     'version': 1,
     'captureId': source.id,
@@ -442,10 +681,41 @@ http.StreamedResponse _answer(CaptureInput source, {bool usage = false}) {
               'message': {'content': content},
             },
           ],
-          if (usage) 'usage': {'prompt_tokens': 2, 'completion_tokens': 1},
+          if (usage)
+            'usage': {'prompt_tokens': inputTokens, 'completion_tokens': 1},
         }),
       ),
     ),
     200,
   );
 }
+
+Map<String, dynamic> _userPayload(http.BaseRequest request) {
+  final json =
+      jsonDecode((request as http.Request).body) as Map<String, dynamic>;
+  final userMessage = (json['messages'] as List)[1] as Map<String, dynamic>;
+  return jsonDecode(userMessage['content'] as String) as Map<String, dynamic>;
+}
+
+http.StreamedResponse _estimateAnswer(Map<String, dynamic> payload) =>
+    http.StreamedResponse(
+      Stream.value(
+        utf8.encode(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': jsonEncode({
+                    'captureId': payload['captureId'],
+                    'sourceRevision': payload['sourceRevision'],
+                    'contextRevision': payload['contextRevision'],
+                    'minutes': 35,
+                  }),
+                },
+              },
+            ],
+          }),
+        ),
+      ),
+      200,
+    );

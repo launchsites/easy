@@ -50,6 +50,50 @@ Future<bool> showAiTransmissionDialog(
       false;
 }
 
+Future<bool> showAiAutomaticDialog(
+  BuildContext context,
+  AiAutomaticPreview preview,
+) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        title: const Text('Enable automatic estimates?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SelectableText(preview.endpoint.toString()),
+            Text(preview.model, style: const TextStyle(color: muted)),
+            const SizedBox(height: 12),
+            const Text('One request per hour while Easy is active.'),
+            const Text('Fields sent', style: sectionHeadingStyle),
+            const Text('Task title and temporary request ID'),
+            if (preview.includeOptionalMetadata)
+              const Text('Selected prior durations in minutes'),
+            if (preview.reserveMicros case final reserve?) ...[
+              const SizedBox(height: 10),
+              Text('Reserve ${formatPoundsMicros(reserve)} per request'),
+              Text(
+                'Monthly limit ${formatPoundsMicros(preview.monthlyCapMicros)}',
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    ) ??
+    false;
+
 class AiSettingsPage extends StatefulWidget {
   const AiSettingsPage({required this.runtime, super.key});
 
@@ -77,6 +121,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _metadata = false;
   bool _confirmLocal = true;
   bool _estimates = false;
+  bool _automatic = false;
   bool _completionTokens = true;
   String? _error;
 
@@ -124,6 +169,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       _metadata = settings.includeOptionalMetadata;
       _confirmLocal = settings.confirmLocal;
       _estimates = settings.allowEstimates;
+      _automatic = settings.automaticEstimates;
       _completionTokens = settings.apiUsesCompletionTokenLimit;
       _apiUrl.text = settings.apiBaseUrl;
       _apiModel.text = settings.apiModel;
@@ -144,6 +190,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   void _selectRoute(AiRoute route) {
     setState(() {
       if (route != AiRoute.api) _apiKey.clear();
+      if (route == AiRoute.offline) _automatic = false;
       _route = route;
       _error = null;
     });
@@ -194,6 +241,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       includeOptionalMetadata: _metadata,
       confirmLocal: _confirmLocal,
       allowEstimates: _estimates,
+      automaticEstimates: _automatic,
       apiUsesCompletionTokenLimit: _completionTokens,
     );
     setState(() {
@@ -201,7 +249,12 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       _error = null;
     });
     final key = paid && _apiKey.text.isNotEmpty ? _apiKey.text : null;
-    final status = await _runtime.saveSettings(next, apiKey: key);
+    final status = await _runtime.saveSettings(
+      next,
+      apiKey: key,
+      authorizeAutomatic: (preview) async =>
+          mounted && await showAiAutomaticDialog(context, preview),
+    );
     if (!mounted) return;
     _apiKey.clear();
     final hasKey = await _runtime.hasApiKey();
@@ -218,6 +271,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           'Reload AI settings before saving.',
         AiSettingsSaveStatus.vaultUnavailable =>
           'The selected vault could not save this key.',
+        AiSettingsSaveStatus.authorizationRequired =>
+          'Review the automatic estimate details to enable it.',
       };
     });
     if (status == AiSettingsSaveStatus.saved) {
@@ -455,8 +510,19 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           contentPadding: EdgeInsets.zero,
           value: _estimates,
           title: const Text('Suggest durations'),
-          onChanged: (value) => setState(() => _estimates = value),
+          onChanged: (value) => setState(() {
+            _estimates = value;
+            if (!value) _automatic = false;
+          }),
         ),
+        if (_estimates && (api || local))
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _automatic,
+            title: const Text('Use spare capacity'),
+            subtitle: const Text('Prepare duration suggestions for review'),
+            onChanged: (value) => setState(() => _automatic = value),
+          ),
         if (_error case final error?)
           Semantics(
             liveRegion: true,
@@ -472,8 +538,18 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         Align(
           alignment: AlignmentDirectional.centerEnd,
           child: FilledButton(
-            onPressed: _saving || _runtime.busy ? null : _save,
-            child: Text(_saving ? 'Saving…' : 'Save settings'),
+            onPressed: _saving
+                ? null
+                : _runtime.busy
+                ? _runtime.cancelCurrent
+                : _save,
+            child: Text(
+              _saving
+                  ? 'Saving…'
+                  : _runtime.busy
+                  ? 'Stop request'
+                  : 'Save settings',
+            ),
           ),
         ),
       ],

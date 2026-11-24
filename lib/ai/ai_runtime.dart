@@ -5,11 +5,13 @@ import 'package:http/http.dart' as http;
 
 import '../capture/capture_interpreter.dart';
 import 'ai_budget.dart';
+import 'ai_enrichment.dart';
 import 'ai_runtime_settings.dart';
 import 'inference_jobs.dart';
 import 'provider/ai_provider.dart';
 
 export 'ai_runtime_settings.dart';
+export 'ai_enrichment.dart' show AiEnrichmentCandidate, AiPendingEstimate;
 export 'inference_jobs.dart' show AiCaptureRevision, AiRevisionLookup;
 export 'provider/ai_provider.dart' show AiEstimateInput;
 
@@ -26,6 +28,9 @@ typedef AiRuntimeCompareAndSwap = Future<int?> Function(
   String value,
 );
 typedef AiAuthorize = Future<bool> Function(AiTransmissionPreview preview);
+typedef AiAuthorizeAutomatic = Future<bool> Function(
+  AiAutomaticPreview preview,
+);
 
 enum AiSettingsSaveStatus {
   saved,
@@ -33,6 +38,7 @@ enum AiSettingsSaveStatus {
   busy,
   storageUnavailable,
   vaultUnavailable,
+  authorizationRequired,
 }
 
 enum AiRunStatus {
@@ -59,6 +65,24 @@ class AiTransmissionPreview {
   final String model;
   final Map<String, Object?> fields;
   final int? reserveMicros;
+}
+
+class AiAutomaticPreview {
+  const AiAutomaticPreview._({
+    required this.route,
+    required this.endpoint,
+    required this.model,
+    required this.includeOptionalMetadata,
+    required this.reserveMicros,
+    required this.monthlyCapMicros,
+  });
+
+  final AiRoute route;
+  final Uri endpoint;
+  final String model;
+  final bool includeOptionalMetadata;
+  final int? reserveMicros;
+  final int monthlyCapMicros;
 }
 
 class AiRuntimeOutcome<T> {
@@ -105,6 +129,7 @@ class AiRuntime extends ChangeNotifier {
   final bool _ownsTransport;
   final DateTime Function() _clock;
   AiRuntimeSettings _settings = const AiRuntimeSettings();
+  AiEnrichmentState _enrichment = AiEnrichmentState();
   late AiBudgetLedger _ledger = _emptyLedger();
   late AiProviderClient _provider = _providerFor(_ledger);
   Future<void> _writes = Future.value();
@@ -112,6 +137,7 @@ class AiRuntime extends ChangeNotifier {
   bool _loaded = false;
   bool _storageReady = false;
   bool _busy = false;
+  bool _automaticInFlight = false;
   bool _disposed = false;
   bool _cancelRequested = false;
   int _revision = 0;
@@ -125,6 +151,14 @@ class AiRuntime extends ChangeNotifier {
   bool get busy => _busy;
   bool get storageReady => _storageReady;
   bool get persistentVault => _vault.persistent;
+  List<AiPendingEstimate> get pendingEstimates => _enrichment.pending;
+
+  List<AiPendingEstimate> currentPendingEstimates(AiRevisionLookup current) =>
+      List.unmodifiable(
+        _enrichment.pending.where(
+          (estimate) => estimate.isCurrent((id) => _lookup(current, id)),
+        ),
+      );
 
   Future<bool> load({bool refresh = false}) => _writeLane(() async {
     if (_disposed || (_busy && refresh)) return false;
@@ -133,6 +167,7 @@ class AiRuntime extends ChangeNotifier {
       final stored = await _read().timeout(const Duration(seconds: 5));
       var next = const AiRuntimeSettings();
       var ledger = _emptyLedger();
+      var enrichment = AiEnrichmentState();
       if (stored != null) {
         if (stored.revision < 1) {
           throw const FormatException('Invalid state revision.');
@@ -148,6 +183,11 @@ class AiRuntime extends ChangeNotifier {
           jsonEncode(parsed['budget']),
           clock: _clock,
         );
+        if (parsed['enrichment'] case final Map<String, dynamic> data) {
+          enrichment = AiEnrichmentState.fromJson(data);
+        } else if (parsed['enrichment'] != null) {
+          throw const FormatException('Invalid enrichment state.');
+        }
         if (!next.valid ||
             ledger.currency != 'GBP' ||
             ledger.monthlyCapMicros != next.monthlyCapMicros) {
@@ -156,6 +196,7 @@ class AiRuntime extends ChangeNotifier {
       }
       _settings = next;
       _ledger = ledger;
+      _enrichment = enrichment;
       _provider = _providerFor(ledger);
       _revision = stored?.revision ?? 0;
       _durableValue = stored?.value;
@@ -182,6 +223,7 @@ class AiRuntime extends ChangeNotifier {
   Future<AiSettingsSaveStatus> saveSettings(
     AiRuntimeSettings next, {
     String? apiKey,
+    AiAuthorizeAutomatic? authorizeAutomatic,
   }) async {
     await load();
     return _writeLane(() async {
@@ -193,6 +235,45 @@ class AiRuntime extends ChangeNotifier {
       if (!next.valid ||
           (apiKey != null && (reference == null || !validAiKey(apiKey)))) {
         return AiSettingsSaveStatus.invalid;
+      }
+      if (_automaticNeedsConsent(_settings, next)) {
+        final config = next.provider!;
+        final callback = authorizeAutomatic;
+        if (callback == null) return AiSettingsSaveStatus.authorizationRequired;
+        if (!await _readHead()) return AiSettingsSaveStatus.storageUnavailable;
+        if (next.route == AiRoute.api &&
+            apiKey == null &&
+            !await _keyAvailable(reference)) {
+          return AiSettingsSaveStatus.vaultUnavailable;
+        }
+        final preview = AiAutomaticPreview._(
+          route: next.route,
+          endpoint: config.completionsEndpoint!,
+          model: config.model,
+          includeOptionalMetadata: next.includeOptionalMetadata,
+          reserveMicros: next.route == AiRoute.api
+              ? _ledger.maximumCost(
+                  config.budgetRequest(
+                    'preview',
+                    work: AiWorkKind.discretionary,
+                  ),
+                )
+              : null,
+          monthlyCapMicros: next.monthlyCapMicros,
+        );
+        if (next.route == AiRoute.api && preview.reserveMicros == null) {
+          return AiSettingsSaveStatus.invalid;
+        }
+        try {
+          if (!await callback(preview)) {
+            return AiSettingsSaveStatus.authorizationRequired;
+          }
+        } catch (_) {
+          return AiSettingsSaveStatus.authorizationRequired;
+        }
+        if (_disposed || !await _readHead()) {
+          return AiSettingsSaveStatus.storageUnavailable;
+        }
       }
       final previousCap = _ledger.monthlyCapMicros;
       _ledger.setMonthlyCapMicros(next.monthlyCapMicros);
@@ -231,6 +312,7 @@ class AiRuntime extends ChangeNotifier {
   void setForeground(bool foreground) {
     _foreground = foreground;
     _queue?.setForeground(foreground);
+    if (!foreground && _automaticInFlight) cancelCurrent();
     if (!foreground && _busy && _queue == null) _cancelRequested = true;
   }
 
@@ -308,10 +390,80 @@ class AiRuntime extends ChangeNotifier {
     ),
   );
 
+  Future<AiRuntimeOutcome<AiPendingEstimate>> runAutomaticEstimate({
+    required AiEnrichmentCandidate candidate,
+    required AiRevisionLookup currentRevision,
+  }) async {
+    if (!candidate.valid ||
+        _lookup(currentRevision, candidate.taskId) != candidate.revision) {
+      return const AiRuntimeOutcome._(
+        status: AiRunStatus.stale,
+        source: AiRoute.offline,
+      );
+    }
+    final anchor = _clock();
+    final source = CaptureInput(
+      id: 'estimate-${anchor.microsecondsSinceEpoch}-${_serial++}',
+      revision: 0,
+      text: candidate.title,
+      context: CaptureContext(anchor: anchor),
+    );
+    final input = AiEstimateInput(
+      title: candidate.title,
+      sampleDurationsMinutes: candidate.sampleDurationsMinutes,
+    );
+    AiCaptureRevision? live(String id) =>
+        id == source.id &&
+            _lookup(currentRevision, candidate.taskId) == candidate.revision
+        ? (sourceRevision: 0, contextRevision: 0)
+        : null;
+    return _run(
+      source: source,
+      currentRevision: live,
+      work: AiWorkKind.discretionary,
+      automatic: candidate,
+      fallback: () => null,
+      payload: (settings) => aiEstimatePayload(
+        _estimateInput(input, settings),
+        captureId: source.id,
+        sourceRevision: 0,
+        contextRevision: 0,
+      ),
+      routeBlock: (_) => null,
+      execute: (config, claim, settings) => _provider.estimate(
+        config: config,
+        claim: claim,
+        input: _estimateInput(input, settings),
+        currentRevision: live,
+      ),
+      convert: (estimate) => AiPendingEstimate(
+        taskId: candidate.taskId,
+        sourceRevision: candidate.sourceRevision,
+        contextRevision: candidate.contextRevision,
+        durationMinutes: estimate.duration.inMinutes,
+        route: settings.route,
+        createdAt: _clock(),
+      ),
+      persistReview: (estimate) => _writeLane(() async {
+        if (!_foreground || _cancelRequested || !_current(source, live)) {
+          return false;
+        }
+        return _writeEnrichment(_enrichment.withEstimate(estimate));
+      }),
+    );
+  }
+
+  Future<bool> discardPendingEstimate(AiPendingEstimate estimate) =>
+      _writeLane(() async {
+        final next = _enrichment.withoutEstimate(estimate);
+        if (next.pending.length == _enrichment.pending.length) return false;
+        return _writeEnrichment(next);
+      });
+
   Future<AiRuntimeOutcome<T>> _run<T extends Object, P extends Object>({
     required CaptureInput source,
     required AiRevisionLookup currentRevision,
-    required AiAuthorize authorize,
+    AiAuthorize? authorize,
     required AiWorkKind work,
     required T? Function() fallback,
     required Map<String, Object?> Function(AiRuntimeSettings settings) payload,
@@ -323,6 +475,8 @@ class AiRuntime extends ChangeNotifier {
     )
     execute,
     required T Function(P result) convert,
+    AiEnrichmentCandidate? automatic,
+    Future<bool> Function(T result)? persistReview,
   }) async {
     final ready = await load();
     AiRuntimeOutcome<T> status(AiRunStatus state, [String? message]) =>
@@ -354,6 +508,15 @@ class AiRuntime extends ChangeNotifier {
     if (_busy) return status(AiRunStatus.busy);
     if (!_current(source, currentRevision)) return status(AiRunStatus.stale);
     final activeSettings = settings;
+    if (automatic != null &&
+        (!activeSettings.automaticEstimates ||
+            !_foreground ||
+            !_enrichment.permits(
+              automatic,
+              AiEnrichmentState.hourOf(_clock()),
+            ))) {
+      return status(AiRunStatus.blocked);
+    }
     final discretionary = work == AiWorkKind.discretionary;
     if (discretionary && !activeSettings.allowEstimates) {
       return status(AiRunStatus.blocked);
@@ -362,6 +525,7 @@ class AiRuntime extends ChangeNotifier {
     if (!_foreground) return status(AiRunStatus.blocked);
 
     _busy = true;
+    _automaticInFlight = automatic != null;
     _cancelRequested = false;
     _notify();
     try {
@@ -389,7 +553,12 @@ class AiRuntime extends ChangeNotifier {
         final available = discretionary
             ? budget.discretionaryMicros
             : budget.remainingMicros;
-        if (maximum == null || maximum > available) {
+        final forecastAtCap =
+            automatic != null &&
+            maximum != null &&
+            maximum > 0 &&
+            budget.projectedMicros >= budget.monthlyCapMicros;
+        if (maximum == null || maximum > available || forecastAtCap) {
           return localReview(
             'The current allowance cannot cover this request.',
           );
@@ -402,18 +571,20 @@ class AiRuntime extends ChangeNotifier {
       }
       if (!_current(source, currentRevision)) return status(AiRunStatus.stale);
       if (_cancelRequested || !_foreground) return status(AiRunStatus.declined);
-      if (paid || activeSettings.confirmLocal) {
+      if (automatic == null && (paid || activeSettings.confirmLocal)) {
         var allowed = false;
         try {
-          allowed = await authorize(
-            AiTransmissionPreview._(
-              route: activeSettings.route,
-              endpoint: endpoint,
-              model: config.model,
-              fields: fields,
-              reserveMicros: maximum,
-            ),
-          );
+          allowed =
+              await authorize?.call(
+                AiTransmissionPreview._(
+                  route: activeSettings.route,
+                  endpoint: endpoint,
+                  model: config.model,
+                  fields: fields,
+                  reserveMicros: maximum,
+                ),
+              ) ??
+              false;
         } catch (_) {
           return status(AiRunStatus.declined);
         }
@@ -444,6 +615,32 @@ class AiRuntime extends ChangeNotifier {
       if (claim == null) {
         return localReview('The current allowance cannot cover this request.');
       }
+      if (automatic != null) {
+        final remembered = await _writeLane(() async {
+          final hour = AiEnrichmentState.hourOf(_clock());
+          if (!_foreground ||
+              _cancelRequested ||
+              !_current(source, currentRevision) ||
+              !_enrichment.permits(automatic, hour)) {
+            return false;
+          }
+          return _writeEnrichment(_enrichment.withAttempt(automatic, hour));
+        });
+        if (!remembered) {
+          queue.cancel(id);
+          _ledger.abandon(id, dispatched: false);
+          return status(
+            _storageReady
+                ? AiRunStatus.blocked
+                : AiRunStatus.storageUnavailable,
+          );
+        }
+        if (!_foreground || _cancelRequested) {
+          queue.cancel(id);
+        } else if (!_current(source, currentRevision)) {
+          queue.invalidateStale((id) => _lookup(currentRevision, id));
+        }
+      }
 
       final reply = await execute(config, claim, activeSettings);
       if (reply.succeeded &&
@@ -452,10 +649,16 @@ class AiRuntime extends ChangeNotifier {
             currentRevision: (id) => _lookup(currentRevision, id),
             result: null,
           )) {
+        final value = convert(reply.value!);
+        if (persistReview != null && !await persistReview(value)) {
+          return status(
+            _storageReady ? AiRunStatus.stale : AiRunStatus.storageUnavailable,
+          );
+        }
         return AiRuntimeOutcome._(
           status: AiRunStatus.ready,
           source: activeSettings.route,
-          value: convert(reply.value!),
+          value: value,
         );
       }
       queue.fail(claim, currentRevision: (id) => _lookup(currentRevision, id));
@@ -474,11 +677,14 @@ class AiRuntime extends ChangeNotifier {
       _queue = null;
       _runningId = null;
       _busy = false;
+      _automaticInFlight = false;
       _notify();
     }
   }
 
-  Future<bool> _verifyHead() => _writeLane(() async {
+  Future<bool> _verifyHead() => _writeLane(_readHead);
+
+  Future<bool> _readHead() async {
     if (!_storageReady) return false;
     try {
       final recorded = await _read().timeout(const Duration(seconds: 5));
@@ -495,16 +701,18 @@ class AiRuntime extends ChangeNotifier {
       _notify();
       return false;
     }
-  });
+  }
 
   Future<bool> _commit(
     AiRuntimeSettings settings,
-    AiBudgetLedger ledger,
-  ) async {
+    AiBudgetLedger ledger, {
+    AiEnrichmentState? enrichment,
+  }) async {
     final data = jsonEncode({
       'version': 1,
       'settings': settings.toJson(),
       'budget': jsonDecode(ledger.encode()),
+      'enrichment': (enrichment ?? _enrichment).toJson(),
     });
     if (data == _durableValue) return true;
     try {
@@ -521,6 +729,14 @@ class AiRuntime extends ChangeNotifier {
     }
     _notify();
     return false;
+  }
+
+  Future<bool> _writeEnrichment(AiEnrichmentState next) async {
+    if (!_storageReady || _disposed) return false;
+    if (!await _commit(_settings, _ledger, enrichment: next)) return false;
+    _enrichment = next;
+    _notify();
+    return true;
   }
 
   Future<T> _writeLane<T>(Future<T> Function() action) {
@@ -621,6 +837,25 @@ bool _current(CaptureInput input, AiRevisionLookup lookup) {
             sourceRevision: input.revision,
             contextRevision: input.context.revision,
           );
+}
+
+bool _automaticNeedsConsent(AiRuntimeSettings before, AiRuntimeSettings after) {
+  if (!after.automaticEstimates) return false;
+  final prior = before.provider;
+  final next = after.provider;
+  return !before.automaticEstimates ||
+      before.route != after.route ||
+      prior?.completionsEndpoint != next?.completionsEndpoint ||
+      prior?.model != next?.model ||
+      prior?.tokenLimitField != next?.tokenLimitField ||
+      (!before.includeOptionalMetadata && after.includeOptionalMetadata) ||
+      after.monthlyCapMicros > before.monthlyCapMicros ||
+      after.maxInputTokens > before.maxInputTokens ||
+      after.maxOutputTokens > before.maxOutputTokens ||
+      (after.inputMicrosPerMillion ?? 0) >
+          (before.inputMicrosPerMillion ?? 0) ||
+      (after.outputMicrosPerMillion ?? 0) >
+          (before.outputMicrosPerMillion ?? 0);
 }
 
 AiCaptureRevision? _lookup(AiRevisionLookup lookup, String id) {

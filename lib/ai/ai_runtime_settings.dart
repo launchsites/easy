@@ -75,6 +75,7 @@ class AiRuntimeSettings {
     this.includeOptionalMetadata = false,
     this.confirmLocal = true,
     this.allowEstimates = false,
+    this.automaticEstimates = false,
     this.apiUsesCompletionTokenLimit = true,
   });
 
@@ -91,6 +92,7 @@ class AiRuntimeSettings {
   final bool includeOptionalMetadata;
   final bool confirmLocal;
   final bool allowEstimates;
+  final bool automaticEstimates;
   final bool apiUsesCompletionTokenLimit;
 
   bool get valid =>
@@ -104,6 +106,7 @@ class AiRuntimeSettings {
       _nonnegative(maxOutputTokens) &&
       (apiBaseUrl.trim().isEmpty || _apiAddress != null) &&
       (localBaseUrl.trim().isEmpty || _localAddress != null) &&
+      (!automaticEstimates || (allowEstimates && route != AiRoute.offline)) &&
       (route == AiRoute.offline || provider != null);
 
   AiProviderConfig? get provider => switch (route) {
@@ -202,6 +205,7 @@ class AiRuntimeSettings {
     'includeOptionalMetadata': includeOptionalMetadata,
     'confirmLocal': confirmLocal,
     'allowEstimates': allowEstimates,
+    'automaticEstimates': automaticEstimates,
     'apiUsesCompletionTokenLimit': apiUsesCompletionTokenLimit,
   };
 
@@ -220,6 +224,7 @@ class AiRuntimeSettings {
         includeOptionalMetadata: values['includeOptionalMetadata'] as bool,
         confirmLocal: values['confirmLocal'] as bool,
         allowEstimates: values['allowEstimates'] as bool,
+        automaticEstimates: values['automaticEstimates'] as bool? ?? false,
         apiUsesCompletionTokenLimit:
             values['apiUsesCompletionTokenLimit'] as bool,
       );
