@@ -826,7 +826,12 @@ class _NoteRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    _details(context, updated, snippet),
+                    _details(
+                      context,
+                      updated,
+                      snippet,
+                      fullPreview: snippet == preview ? null : preview,
+                    ),
                   ],
                 ),
               ),
@@ -837,7 +842,12 @@ class _NoteRow extends StatelessWidget {
     );
   }
 
-  Widget _details(BuildContext context, String updated, String snippet) {
+  Widget _details(
+    BuildContext context,
+    String updated,
+    String snippet, {
+    required String? fullPreview,
+  }) {
     final date = Text(
       updated,
       maxLines: 1,
@@ -847,6 +857,7 @@ class _NoteRow extends StatelessWidget {
     if (snippet.isEmpty) return date;
     final preview = Text(
       snippet,
+      semanticsLabel: fullPreview,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: _metadataStyle,

@@ -60,27 +60,21 @@ void main() {
         ),
         NoteItem(id: 'first', title: 'Parcel log', body: body, updated: date),
       ];
+      NoteItem? opened;
       await tester.pumpWidget(
         MaterialApp(
           theme: easyTheme(),
           home: Scaffold(
-            body: NotesPage(notes: notes, onNoteTap: (_) {}),
+            body: NotesPage(notes: notes, onNoteTap: (note) => opened = note),
           ),
         ),
       );
-      final metadata = tester.widget<Text>(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is Text &&
-              (widget.textSpan?.toPlainText().contains('delivery receipt') ??
-                  false),
-        ),
-      );
-      final renderedText = metadata.textSpan!.toPlainText(
-        includeSemanticsLabels: false,
-      );
-      expect(renderedText.endsWith('$prefix…'), isTrue);
-      expect(metadata.textSpan!.toPlainText().endsWith(body), isTrue);
+      final row = find.byKey(const ValueKey('first'));
+      final preview = find.descendant(of: row, matching: find.text('$prefix…'));
+      expect(tester.widget<Text>(preview).maxLines, 1);
+      expect(tester.getSemantics(preview).label, contains(body));
+      await tester.tap(find.text('Parcel log'));
+      expect(opened?.body, body);
 
       await tester.tap(find.byTooltip('Search notes'));
       await tester.pumpAndSettle();
