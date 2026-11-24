@@ -491,6 +491,8 @@ class _RecordDetails extends StatelessWidget {
     this.reminderSet = false,
     this.onSchedule,
     this.onTimingHistory,
+    this.onTrackActivity,
+    this.onRemoveFutureBlocks,
   });
 
   final Object record;
@@ -511,6 +513,8 @@ class _RecordDetails extends StatelessWidget {
   final bool reminderSet;
   final VoidCallback? onSchedule;
   final VoidCallback? onTimingHistory;
+  final VoidCallback? onTrackActivity;
+  final VoidCallback? onRemoveFutureBlocks;
 
   @override
   Widget build(BuildContext context) {
@@ -623,12 +627,15 @@ class _RecordDetails extends StatelessWidget {
                 style: const TextStyle(height: 1.6, fontSize: 14),
               ),
             ],
-            if (item is! CalendarEvent || !item.isReadOnly) ...[
+            if (item is! CalendarEvent ||
+                !item.isReadOnly ||
+                onTrackActivity != null) ...[
               const SizedBox(height: 14),
               Wrap(
                 spacing: 8,
                 children: [
-                  if (item is! TaskItem || !repeatingTask || !item.done) ...[
+                  if ((item is! CalendarEvent || !item.isReadOnly) &&
+                      (item is! TaskItem || !repeatingTask || !item.done)) ...[
                     FilledButton.tonal(
                       onPressed: onEdit,
                       child: Text(
@@ -701,6 +708,16 @@ class _RecordDetails extends StatelessWidget {
                     TextButton(
                       onPressed: onTimingHistory,
                       child: const Text('Timing history'),
+                    ),
+                  if (onTrackActivity != null)
+                    TextButton(
+                      onPressed: onTrackActivity,
+                      child: const Text('Track time'),
+                    ),
+                  if (onRemoveFutureBlocks != null)
+                    TextButton(
+                      onPressed: onRemoveFutureBlocks,
+                      child: const Text('Review future blocks'),
                     ),
                 ],
               ),

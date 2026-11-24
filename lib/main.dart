@@ -75,6 +75,8 @@ import 'reminders/workspace_record_reminders.dart';
 import 'review/review.dart';
 import 'scheduling/availability_settings.dart';
 import 'scheduling/availability_settings_page.dart';
+import 'scheduling/future_block_removal.dart';
+import 'scheduling/future_block_removal_sheet.dart';
 import 'scheduling/manual_time_block.dart';
 import 'scheduling/manual_time_block_sheet.dart';
 import 'scheduling/plan_day_sheet.dart';
@@ -110,6 +112,7 @@ part 'workspace_planner.dart';
 part 'workspace_manual_plan.dart';
 part 'workspace_task_context.dart';
 part 'workspace_apple_updates.dart';
+part 'workspace_activity_actions.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -255,6 +258,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   int? _persistedRevision;
   var _openingStore = false;
   var _reviewSaving = false;
+  var _activityActionOpen = false;
+  var _futureRemovalOpen = false;
   var _planningDay = false;
   var _recordingVoice = false;
   final _heldVoiceOverlay = HeldVoiceCaptureOverlay();
@@ -3706,6 +3711,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             onTimingHistory: _canSeeTaskTiming(record)
                 ? () => Navigator.pop(context, 'timing')
                 : null,
+            onTrackActivity: _canTrackActivity(record)
+                ? () => Navigator.pop(context, 'track-time')
+                : null,
+            onRemoveFutureBlocks: _canRemoveFutureBlocks(record)
+                ? () => Navigator.pop(context, 'future-blocks')
+                : null,
           ),
         ),
       ),
@@ -3736,6 +3747,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (action == 'reminder') await _editRecordReminder(record);
     if (action == 'schedule') await _openManualBlock(record);
     if (action == 'timing' && record is TaskItem) await _openTaskTiming(record);
+    if (action == 'track-time') await _openActualActivity(record);
+    if (action == 'future-blocks' && record is TaskItem) {
+      await _removeFutureBlocks(record);
+    }
   }
 
   bool _canRepeatEvent(Object? record) =>
@@ -4451,6 +4466,20 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                                               onTimingHistory:
                                                   _canSeeTaskTiming(_inspected)
                                                   ? () => _openTaskTiming(
+                                                      _inspected! as TaskItem,
+                                                    )
+                                                  : null,
+                                              onTrackActivity:
+                                                  _canTrackActivity(_inspected)
+                                                  ? () => _openActualActivity(
+                                                      _inspected!,
+                                                    )
+                                                  : null,
+                                              onRemoveFutureBlocks:
+                                                  _canRemoveFutureBlocks(
+                                                    _inspected,
+                                                  )
+                                                  ? () => _removeFutureBlocks(
                                                       _inspected! as TaskItem,
                                                     )
                                                   : null,
