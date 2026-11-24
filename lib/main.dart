@@ -133,6 +133,7 @@ part 'workspace_workout_capture.dart';
 part 'workspace_task_objectives.dart';
 part 'workspace_automation.dart';
 part 'workspace_apple_access.dart';
+part 'workspace_task_completion.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -2835,36 +2836,6 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     });
   }
 
-  void _toggleTask(TaskItem task) {
-    if (_repeatingTask(task) case final row?) {
-      unawaited(_toggleRepeatingTask(row));
-      return;
-    }
-    final done = !task.done;
-    _setTaskDone(
-      task.id,
-      done,
-      completedAt: done ? DateTime.now().toUtc() : null,
-    );
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(done ? 'Task completed' : 'Task reopened'),
-        duration: const Duration(seconds: 3),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () =>
-              _setTaskDone(task.id, task.done, completedAt: task.completedAt),
-        ),
-      ),
-    );
-  }
-
-  void _setTaskDone(String id, bool done, {DateTime? completedAt}) {
-    final task = _data.tasks.where((task) => task.id == id).firstOrNull;
-    if (task == null || task.done == done) return;
-    _saveRecord(task.withDone(done, completedAt: completedAt));
-  }
-
   List<T> _upsert<T>(List<T> records, T updated, String Function(T) id) => [
     for (final existing in records)
       if (id(existing) == id(updated)) updated else existing,
@@ -3891,9 +3862,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             _RecordDetails(
               record: visibleRecord,
               onEdit: () => Navigator.pop(context, 'edit'),
-              onToggleDone: record is TaskItem
-                  ? () => Navigator.pop(context, 'toggle-done')
-                  : null,
+              onToggleDone: switch (record) {
+                TaskItem task => () => _toggleTaskFromDetails(context, task),
+                _ => null,
+              },
               onDelete: () => Navigator.pop(context, 'delete'),
               noteTargets: record is NoteItem ? _noteTargets() : const [],
               onOpenNoteLink: (link) => Navigator.pop(context, link),
@@ -3940,7 +3912,6 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     );
     if (!mounted) return;
     if (action == 'edit') await _editRecord(record);
-    if (action == 'toggle-done' && record is TaskItem) _toggleTask(record);
     if (action == 'delete') await _deleteRecord(record);
     if (action is NoteLink) await _openNoteLink(action);
     if (action == 'estimate' && record is TaskItem) {

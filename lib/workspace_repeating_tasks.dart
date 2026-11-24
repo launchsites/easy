@@ -169,7 +169,10 @@ extension _WorkspaceRepeatingTasks on _WorkspaceState {
     }
   }
 
-  Future<void> _toggleRepeatingTask(TaskSeriesRow row) async {
+  Future<bool> _toggleRepeatingTask(
+    TaskSeriesRow row, {
+    required bool showFailure,
+  }) async {
     final done = !row.task.done;
     final next = done
         ? row.series.complete(row.occurrence, at: DateTime.now().toUtc())
@@ -180,10 +183,10 @@ extension _WorkspaceRepeatingTasks on _WorkspaceState {
         completed: done ? _automationForRepeatedTask(next, row.task.id) : null,
       );
     } catch (_) {
-      if (mounted) _inform('The task could not be updated.');
-      return;
+      if (mounted && showFailure) _inform(_taskCompletionFailure);
+      return false;
     }
-    if (!mounted) return;
+    if (!mounted) return true;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(done ? 'Task completed' : 'Task reopened'),
@@ -194,6 +197,7 @@ extension _WorkspaceRepeatingTasks on _WorkspaceState {
         ),
       ),
     );
+    return true;
   }
 
   Future<void> _undoRepeatingToggle(TaskSeriesRow before, int revision) async {
