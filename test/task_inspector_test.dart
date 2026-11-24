@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:easy/list_pages.dart';
 import 'package:easy/main.dart';
 import 'package:easy/storage/workspace_store.dart';
@@ -28,35 +30,8 @@ void main() {
     testWidgets('task inspector preserves due time and notes at $size, 200%', (
       tester,
     ) async {
-      final deadline = await _mount(tester, size);
-      final mobile = size.width < 720;
-      final compactSidebar = size.width >= 720 && size.width < 900;
-      if (mobile) {
-        await tester.tap(find.byTooltip('Navigate'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.bySemanticsLabel('Tasks').hitTestable().last);
-      } else if (compactSidebar) {
-        await tester.tap(find.byTooltip('Tasks'));
-      } else {
-        await tester.tap(find.text('Tasks').first);
-      }
-      await tester.pumpAndSettle();
-
-      final task = find.descendant(
-        of: find.byType(TasksPage),
-        matching: find.text(_title),
-      );
-      await tester.scrollUntilVisible(
-        task,
-        90,
-        scrollable: find.descendant(
-          of: find.byType(TasksPage),
-          matching: find.byType(Scrollable),
-        ),
-      );
-      await _reveal(tester, task);
-      await tester.tap(task.hitTestable());
-      await tester.pumpAndSettle();
+      final deadline = (await _mount(tester, size)).deadline;
+      await _openTask(tester, size);
 
       final edit = find.widgetWithText(FilledButton, 'Edit');
       await _reveal(tester, edit);
@@ -77,6 +52,50 @@ void main() {
       final notes = find.widgetWithText(SelectableText, _notes);
       await _reveal(tester, notes);
       expect(notes.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final size in [const Size(320, 568), const Size(1440, 900)]) {
+    testWidgets('inspector completion and reopen survive relaunch at $size', (
+      tester,
+    ) async {
+      final (deadline: _, :app, :read) = await _mount(tester, size);
+      final initial = await read();
+      final original = _savedTask(initial);
+      await _openTask(tester, size);
+      await _press(tester, 'Mark done');
+      final completed = await read();
+      final completedTask = _savedTask(completed);
+      expect(completed.revision, initial.revision + 1);
+      expect(
+        DateTime.tryParse(completedTask.remove('completedAt')! as String),
+        isNotNull,
+      );
+      expect(completedTask, {...original, 'done': true});
+      expect(
+        completed.snapshot.gymSessionJson,
+        initial.snapshot.gymSessionJson,
+      );
+      expect(
+        completed.snapshot.workoutPlanJson,
+        initial.snapshot.workoutPlanJson,
+      );
+
+      await _relaunch(tester, app);
+      expect((await read()).revision, completed.revision);
+      await _openTask(tester, size);
+      expect(find.text('Completed').hitTestable(), findsAtLeastNWidgets(1));
+      await _press(tester, 'Reopen');
+      final reopened = await read();
+      expect(reopened.revision, completed.revision + 1);
+      expect(reopened.snapshot.workspaceJson, initial.snapshot.workspaceJson);
+
+      await _relaunch(tester, app);
+      expect((await read()).revision, reopened.revision);
+      await _openTask(tester, size);
+      await _reveal(tester, find.text('Mark done'));
+      expect(find.text('Mark done').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
@@ -106,7 +125,53 @@ Future<void> _reveal(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
-Future<DateTime> _mount(WidgetTester tester, Size size) async {
+Future<void> _press(WidgetTester tester, String label) async {
+  final button = find.widgetWithText(TextButton, label);
+  await _reveal(tester, button);
+  await tester.tap(button.hitTestable());
+  await tester.pumpAndSettle();
+}
+
+Future<void> _relaunch(WidgetTester tester, EasyApp app) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pumpAndSettle();
+  await tester.pumpWidget(app);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openTask(WidgetTester tester, Size size) async {
+  if (size.width < 720) {
+    await tester.tap(find.byTooltip('Navigate'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Tasks').hitTestable().last);
+  } else if (size.width < 900) {
+    await tester.tap(find.byTooltip('Tasks'));
+  } else {
+    await tester.tap(find.text('Tasks').first);
+  }
+  await tester.pumpAndSettle();
+
+  final list = find.byType(TasksPage);
+  final task = find.descendant(of: list, matching: find.text(_title));
+  await tester.scrollUntilVisible(
+    task,
+    90,
+    scrollable: find.descendant(of: list, matching: find.byType(Scrollable)),
+  );
+  await _reveal(tester, task);
+  await tester.tap(task.hitTestable());
+  await tester.pumpAndSettle();
+}
+
+Map<String, Object?> _savedTask(WorkspaceRevision value) {
+  final document = jsonDecode(value.snapshot.workspaceJson) as Map;
+  return Map<String, Object?>.from((document['tasks'] as List).single as Map);
+}
+
+Future<
+  ({DateTime deadline, EasyApp app, Future<WorkspaceRevision> Function() read})
+>
+_mount(WidgetTester tester, Size size) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
   tester.platformDispatcher.textScaleFactorTestValue = 2;
@@ -135,19 +200,21 @@ Future<DateTime> _mount(WidgetTester tester, Size size) async {
       ),
     ],
   );
-  await tester.pumpWidget(
-    EasyApp(
-      openStore: ({required preferences, required readLegacy}) =>
-          openPreferenceWorkspaceStore(
-            preferences: preferences,
-            readLegacy: () async => WorkspaceSnapshot(
-              workspaceJson: fixture.encode(),
-              gymSessionJson: const [],
-              workoutPlanJson: const [],
-            ),
-          ),
-    ),
+  late WorkspaceStore store;
+  final app = EasyApp(
+    openStore: ({required preferences, required readLegacy}) async {
+      store = await openPreferenceWorkspaceStore(
+        preferences: preferences,
+        readLegacy: () async => WorkspaceSnapshot(
+          workspaceJson: fixture.encode(),
+          gymSessionJson: const [],
+          workoutPlanJson: const [],
+        ),
+      );
+      return store;
+    },
   );
+  await tester.pumpWidget(app);
   await tester.pumpAndSettle();
-  return deadline;
+  return (deadline: deadline, app: app, read: () => store.read());
 }
