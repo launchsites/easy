@@ -2,15 +2,15 @@
 
 ## Native and platform evidence
 
-The frozen Flutter suite at `7c18361` passed 881 tests under `TZ=Europe/London`. Seven checks for other host time zones skipped by design. Strict analysis and four native project declaration checks passed. A separate run passed 30 focused New York tests for calendar source freshness and availability. [Hosted verification](https://github.com/launchsites/easy/actions/runs/45334600558)
+On the frozen `5c4bd85` source, the full Flutter suite passed 881 tests in Europe/London and 886 in America/New_York, with seven and two timezone-specific skips respectively. Fifty-five focused calendar, capture, and scheduling tests passed in Australia/Lord_Howe, with five expected skips. Strict Dart analysis and four native project declaration checks passed. [Earlier hosted Linux verification](https://github.com/launchsites/easy/actions/runs/45334600558)
 
 | Check | Result |
 |---|---|
-| Linux x86-64 release build | The exact `6f18fe9` release was built, archived, extracted and exercised through 38 checks. |
+| Linux x86-64 release build | The exact `5d2ef90` release passed 38 checks after extraction. Five offline journeys exercised another 101 checkpoints with IPv4 and IPv6 sockets blocked. [Release evidence](native-release-smoke.md) |
 | Offline Linux journey | The frozen release passed sixteen desktop and three mobile checks with IPv4 and IPv6 sockets denied. The synthetic 11,721-record workspace retained its record count and digest. |
 | Native release soak | The pinned route test ran for 1,801 seconds. All 156 desktop route probes and 24 hold-and-drag navigation probes passed. The recorded workspace digest was unchanged. |
 | Native viewport review | Home, Tasks and Settings exercised at twelve sizes. The compact 320 × 568 Home layout lifted the first visible checkbox above the navigation dock. A Tasks regression covers 568 × 320 landscape. |
-| Android API 36 | Offline review APKs built for ARMv7, ARM64 and x86-64. Checks inspect development signatures, compiled backup and network rules, and 16 KiB ZIP and ELF load alignment. A hosted AOSP emulator launched the non-debuggable x86-64 release and verified its private empty workspace. [Emulator run](https://github.com/launchsites/easy/actions/runs/45337863946) |
+| Android API 36 | Offline review APKs built for ARMv7, ARM64 and x86-64. Checks inspect development signatures, compiled backup and network rules, and 16 KiB ZIP and ELF load alignment. A hosted AOSP emulator launched the non-debuggable x86-64 release and verified its private empty workspace. [Emulator run](https://github.com/launchsites/easy/actions/runs/45344251920) |
 | macOS and iOS | Hosted Xcode 26.4.1 built the iOS simulator target and unsigned macOS release. The iPhone 17 simulator launched Easy and verified its first private SQLite revision. Provisioning, physical device permissions and real EventKit account verification remain open. [Apple runtime run](https://github.com/launchsites/easy/actions/runs/45341653863) |
 | Browser setup smoke | A local Flutter web release at `7c18361` displayed and saved initial setup in Chromium 156 at 1440 × 900, 390 × 844 and 320 × 568. The choice survived reload, with zero nonlocal page requests or unhandled page errors during the probe. |
 
