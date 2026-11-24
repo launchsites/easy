@@ -202,7 +202,7 @@ class HabitRevision {
     required this.schedule,
   }) : effectiveOn = _civilDay(effectiveOn),
        name = _name(name, 'habit name') {
-    if (schedule.nextOnOrAfter(this.effectiveOn) == null) {
+    if (schedule.nextOnOrAfter(reviewDay(this.effectiveOn)) == null) {
       throw const FormatException(
         'Choose at least one occurrence on or after the start date.',
       );
@@ -311,7 +311,7 @@ class Habit {
     final revision = revisionFor(date);
     return revision != null &&
         !isArchivedOn(date) &&
-        revision.schedule.occursOn(date) &&
+        revision.schedule.occursOn(reviewDay(date)) &&
         !pauses.any((pause) => pause.covers(date));
   }
 

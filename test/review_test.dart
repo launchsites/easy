@@ -190,6 +190,57 @@ void main() {
     );
   });
 
+  test('habit schedules use the same civil date across a DST change', () {
+    final start = DateTime(2026, 10, 31);
+    final habit = Habit(
+      id: 'read',
+      revisions: [
+        HabitRevision(
+          effectiveOn: start,
+          name: 'Read',
+          schedule: WorkoutSchedule(
+            kind: WorkoutScheduleKind.interval,
+            startDate: start,
+            intervalDays: 2,
+          ),
+        ),
+      ],
+    );
+    final data = ReviewData()
+        .withHabit(habit)
+        .checkIn(
+          id: habit.id,
+          day: DateTime(2026, 11, 2, 20),
+          outcome: HabitOutcome.done,
+        );
+    final restored = ReviewData.decode(data.encode());
+    final savedHabit = restored.habits.single;
+    expect(savedHabit.isScheduledOn(DateTime(2026, 11, 1)), isFalse);
+    expect(savedHabit.isScheduledOn(DateTime.utc(2026, 11, 2)), isTrue);
+    expect(savedHabit.isScheduledOn(DateTime(2026, 11, 4, 22)), isTrue);
+    expect(
+      restored.habitCheckin(habit.id, DateTime.utc(2026, 11, 2))?.outcome,
+      HabitOutcome.done,
+    );
+  });
+
+  test(
+    'a habit revision rejects an occurrence before its effective local date',
+    () {
+      expect(
+        () => HabitRevision(
+          effectiveOn: DateTime(2026, 11, 2),
+          name: 'Read once',
+          schedule: WorkoutSchedule(
+            kind: WorkoutScheduleKind.once,
+            startDate: DateTime(2026, 11, 1),
+          ),
+        ),
+        throwsFormatException,
+      );
+    },
+  );
+
   test('availability uses actual duration across a civil day boundary', () {
     final day = DateTime(2026, 3, 29);
     final last = nextReviewDay(day);
