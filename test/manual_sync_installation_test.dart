@@ -1,7 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
-import 'package:easy/sync/manual_sync_installation.dart';
 import 'package:easy/sync/manual_sync_contracts.dart';
+import 'package:easy/sync/manual_sync_installation.dart';
 import 'package:easy/sync/manual_sync_workspace.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,6 +34,8 @@ void main() {
     databasePath: '${temp.path}/journal.sqlite3',
   );
 
+  File marker() => File('${temp.path}/installation.json');
+
   test(
     'opening Settings has no effects until explicit enable, then reuses keys',
     () async {
@@ -49,7 +52,8 @@ void main() {
       expect(await first.openConfigured(), same(created));
       await first.close();
       expect(vault.values, hasLength(2));
-      final config = (await prefs.getString(preferenceKey))!;
+      expect(await prefs.getString(preferenceKey), isNull);
+      final config = await marker().readAsString();
       for (final secret in vault.values.values) {
         expect(config, isNot(contains(secret)));
       }
@@ -74,7 +78,7 @@ void main() {
       final id = SyncWorkspaceId.generate();
       vault.allowJournal = false;
       await expectLater(first.enable(id), throwsA(isA<SyncVaultException>()));
-      expect(await prefs.getString(preferenceKey), contains(id.value));
+      expect(jsonDecode(await marker().readAsString()), [1, id.value, false]);
       expect(vault.values, hasLength(1));
       await first.close();
 
@@ -92,12 +96,49 @@ void main() {
   );
 
   test(
+    'an interrupted identity write does not publish a pending marker',
+    () async {
+      final first = installation();
+      vault.allowIdentity = false;
+      await expectLater(first.enable(null), throwsA(isA<SyncVaultException>()));
+      expect(await marker().exists(), isFalse);
+      expect(vault.values, isEmpty);
+      expect(await File('${temp.path}/journal.sqlite3').exists(), isFalse);
+      await first.close();
+    },
+  );
+
+  test(
+    'reopen migrates the legacy preference and ignores a stale cached value',
+    () async {
+      final id = SyncWorkspaceId.generate();
+      final prior = await ManualSyncWorkspace.create(
+        credentials: SyncDeviceCredentials(vault),
+        workspaceId: id,
+        databasePath: '${temp.path}/journal.sqlite3',
+      );
+      final device = prior.device.fingerprint;
+      await prior.close();
+      await prefs.setString(preferenceKey, jsonEncode([1, id.value, true]));
+      final migrated = installation();
+      expect((await migrated.openConfigured())!.device.fingerprint, device);
+      await migrated.close();
+      expect(jsonDecode(await marker().readAsString()), [1, id.value, true]);
+
+      await prefs.setString(preferenceKey, '[1,"stale",false]');
+      final reopened = installation();
+      expect((await reopened.openConfigured())!.workspaceId, id);
+      await reopened.close();
+    },
+  );
+
+  test(
     'failed vault access or malformed configuration creates no identity',
     () async {
       final first = installation();
       vault.allowAccess = false;
       await expectLater(first.enable(null), throwsA(isA<SyncVaultException>()));
-      expect(await prefs.getString(preferenceKey), isNull);
+      expect(await marker().exists(), isFalse);
       expect(vault.values, isEmpty);
       await first.close();
 
@@ -140,18 +181,36 @@ void main() {
   });
 
   test(
+    'a malformed native marker stays closed even with a valid legacy value',
+    () async {
+      final first = installation();
+      final created = await first.enable(null);
+      await first.close();
+      final credentials = Map.of(vault.values);
+      final ready = jsonEncode([1, created.workspaceId.value, true]);
+      await prefs.setString(preferenceKey, ready);
+      final damaged = 'x' * 101;
+      await marker().writeAsString(damaged);
+
+      final reopened = installation();
+      await expectLater(
+        reopened.openConfigured(),
+        throwsA(isA<SyncVaultException>()),
+      );
+      await expectLater(
+        reopened.enable(null),
+        throwsA(isA<SyncVaultException>()),
+      );
+      expect(vault.values, credentials);
+      expect(await marker().readAsString(), damaged);
+      await reopened.close();
+    },
+  );
+
+  test(
     'passphrase setup and later unlock are distinct and cancellable',
     () async {
       final vaultPath = '${temp.path}/vault.easysync';
-      var wrotePending = false;
-      prefs = _SetupPreferences(
-        onWrite: (key, value) async {
-          if (key == preferenceKey && value.endsWith(',false]')) {
-            expect(await File(vaultPath).exists(), isTrue);
-            wrotePending = true;
-          }
-        },
-      );
       final phases = <bool>[];
       bool cancel = true;
       Future<SyncPasswordVault?> open(bool forSetup) async {
@@ -178,11 +237,11 @@ void main() {
         first.enable(null),
         throwsA(isA<ManualSyncTransferCancelled>()),
       );
-      expect(await prefs.getString(preferenceKey), isNull);
+      expect(await marker().exists(), isFalse);
       expect(await temp.list().isEmpty, isTrue);
       cancel = false;
       final device = (await first.enable(null)).device.fingerprint;
-      expect(wrotePending, isTrue);
+      expect(await File(vaultPath).exists(), isTrue);
       await first.close();
 
       final reopened = newRoute();
@@ -199,22 +258,11 @@ void main() {
   );
 }
 
-class _SetupPreferences extends SharedPreferencesAsync {
-  _SetupPreferences({required this.onWrite});
-
-  final Future<void> Function(String, String) onWrite;
-
-  @override
-  Future<void> setString(String key, String value) async {
-    await onWrite(key, value);
-    await super.setString(key, value);
-  }
-}
-
 final class _Vault implements SyncSecretVault {
   final values = <String, String>{};
   int reads = 0;
   bool allowAccess = true;
+  bool allowIdentity = true;
   bool allowJournal = true;
 
   @override
@@ -226,7 +274,8 @@ final class _Vault implements SyncSecretVault {
 
   @override
   Future<void> write(String reference, String secret) async {
-    if (!allowJournal && reference.contains('.journal.')) {
+    final journal = reference.contains('.journal.');
+    if (journal ? !allowJournal : !allowIdentity) {
       throw StateError('Interrupted setup fixture');
     }
     values[reference] = secret;

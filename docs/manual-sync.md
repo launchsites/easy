@@ -14,6 +14,8 @@ The invitation secret is 32 random bytes. The two ephemeral X25519 keys are boun
 
 On Linux, a passphrase unlocks the local sync vault for the current session. Apple and Android builds use their system credential service. The vault stores the installation identity, journal encryption keys and pair keys. The Linux vault wraps its credential format in the Argon2id and AES-GCM backup envelope. Its writes use a file lock, flushed ciphertext staging, and an atomic rename. Reopening requires the existing vault and journal.
 
+The native installation marker records the workspace ID and setup phase. First enablement takes a profile lock after any passphrase prompt and reads the marker again before creating credentials or a journal. A successful reopen of an older preference marker migrates it to the native marker file.
+
 A journal approval binds the peer's public fingerprint to an immutable key ID. A competing approval can leave its own candidate in protected storage while the committed key remains attached to the active grant. Revocation removes journal permission before cleaning up the vault entry. If vault cleanup fails, the caller can retry while the earlier permission stays revoked. Copies already exported remain with their recipients.
 
 Choose an approved device and open **Choose records** to search saved tasks, calendar events and notes. Check the rows to stage in the journal. **Export changes** then creates an authenticated encrypted file with the journal changes that device is missing. The receiving device can share an encrypted progress code after saving each bundle. The next export uses that device-specific code to continue from its saved watermark.

@@ -4,10 +4,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'manual_sync_contracts.dart';
 import 'manual_sync_workspace.dart';
+import 'src/lock_installation_web.dart'
+    if (dart.library.io) 'src/lock_installation_native.dart';
 
 const _configurationKey = 'easy.manualSync.installation.v1';
 
-/// One open route owns a native journal. The installation preference stores
+typedef _SavedSyncInstallation = ({
+  SyncWorkspaceId id,
+  bool initialized,
+  bool legacyPreference,
+});
+
+/// One open route owns a native journal. The installation marker stores
 /// its opaque workspace ID and setup phase. Keys stay in the credential vault.
 final class ManualSyncInstallation {
   ManualSyncInstallation({
@@ -35,53 +43,87 @@ final class ManualSyncInstallation {
     if (_session case final workspace?) return workspace;
     final saved = await _read();
     if (saved == null || !saved.initialized) return null;
-    return _session = await ManualSyncWorkspace.open(
-      credentials: await _openCredentials(forSetup: false),
-      workspaceId: saved.id,
-      databasePath: _databasePath,
-    );
+    final credentials = await _openCredentials(forSetup: false);
+    if (!saved.legacyPreference) return _openSaved(saved, credentials);
+    return lockSyncInstallation(_databasePath, () async {
+      final current = await _read();
+      if (current == null || current.id != saved.id || !current.initialized) {
+        throw const SyncVaultException('The sync configuration changed.');
+      }
+      return _openSaved(current, credentials);
+    });
   });
 
   Future<ManualSyncWorkspace> enable(SyncWorkspaceId? joinWorkspace) =>
       _queue(() async {
-        final saved = await _read();
-        final id = saved?.id ?? joinWorkspace ?? SyncWorkspaceId.generate();
-        if (joinWorkspace != null && id != joinWorkspace) {
-          throw const SyncPairedWorkspaceException(
-            'This device already has a different sync workspace.',
-          );
-        }
+        final beforeUnlock = await _read();
+        _checkJoinWorkspace(beforeUnlock?.id, joinWorkspace);
         if (_session case final workspace?) return workspace;
-        final credentials = await _openCredentials(forSetup: saved == null);
-        if (saved?.initialized == true) {
-          return _session = await ManualSyncWorkspace.open(
+        final credentials = await _openCredentials(
+          forSetup: beforeUnlock == null,
+        );
+        if (beforeUnlock == null && _credentials != null) {
+          // Check that the system vault is available before creating a lock.
+          // Repeat the lookup under the lock before changing anything.
+          final existing = await credentials.loadIdentity();
+          existing?.destroy();
+        }
+        return lockSyncInstallation(_databasePath, () async {
+          final saved = await _read();
+          _checkJoinWorkspace(saved?.id, joinWorkspace);
+          final id = saved?.id ?? joinWorkspace ?? SyncWorkspaceId.generate();
+          if (saved != null && saved.initialized) {
+            return _openSaved(saved, credentials);
+          }
+          if (saved == null) {
+            // Persist vault contents before the pending marker. A restarted
+            // passphrase setup requires this existing file when it resumes.
+            final identity =
+                await credentials.loadIdentity() ??
+                await credentials.createIdentity();
+            identity.destroy();
+            await _write(id, initialized: false);
+          }
+          final workspace = await ManualSyncWorkspace.create(
             credentials: credentials,
             workspaceId: id,
             databasePath: _databasePath,
           );
-        }
-        if (saved == null) {
-          // Persist vault contents before the pending marker. A restarted
-          // passphrase setup requires this existing file when it resumes.
-          final identity =
-              await credentials.loadIdentity() ??
-              await credentials.createIdentity();
-          identity.destroy();
-          await _write(id, initialized: false);
-        }
-        final workspace = await ManualSyncWorkspace.create(
-          credentials: credentials,
-          workspaceId: id,
-          databasePath: _databasePath,
-        );
-        try {
-          await _write(id, initialized: true);
-          return _session = workspace;
-        } catch (_) {
-          await workspace.close();
-          rethrow;
-        }
+          try {
+            await _write(id, initialized: true);
+            return _session = workspace;
+          } catch (_) {
+            await workspace.close();
+            rethrow;
+          }
+        });
       });
+
+  Future<ManualSyncWorkspace> _openSaved(
+    _SavedSyncInstallation saved,
+    SyncDeviceCredentials credentials,
+  ) async {
+    final workspace = await ManualSyncWorkspace.open(
+      credentials: credentials,
+      workspaceId: saved.id,
+      databasePath: _databasePath,
+    );
+    try {
+      if (saved.legacyPreference) await _write(saved.id, initialized: true);
+      return _session = workspace;
+    } catch (_) {
+      await workspace.close();
+      rethrow;
+    }
+  }
+
+  void _checkJoinWorkspace(SyncWorkspaceId? saved, SyncWorkspaceId? invited) {
+    if (saved != null && invited != null && saved != invited) {
+      throw const SyncPairedWorkspaceException(
+        'This device already has a different sync workspace.',
+      );
+    }
+  }
 
   Future<SyncDeviceCredentials> _openCredentials({
     required bool forSetup,
@@ -93,13 +135,18 @@ final class ManualSyncInstallation {
     return SyncDeviceCredentials(vault);
   }
 
-  Future<({SyncWorkspaceId id, bool initialized})?> _read() async {
-    final value = await _preferences.getString(_configurationKey);
+  Future<_SavedSyncInstallation?> _read() async {
+    final marker = await readSyncInstallation(_databasePath);
+    final value = marker ?? await _preferences.getString(_configurationKey);
     if (value == null) return null;
     if (value.length <= 100) {
       try {
         if (jsonDecode(value) case [1, final String id, final bool ready]) {
-          return (id: SyncWorkspaceId(id), initialized: ready);
+          return (
+            id: SyncWorkspaceId(id),
+            initialized: ready,
+            legacyPreference: marker == null,
+          );
         }
       } on FormatException {
         // This installation cannot open an unrecognized configuration.
@@ -110,8 +157,8 @@ final class ManualSyncInstallation {
 
   Future<void> _write(SyncWorkspaceId id, {required bool initialized}) async {
     final value = jsonEncode([1, id.value, initialized]);
-    await _preferences.setString(_configurationKey, value);
-    if (await _preferences.getString(_configurationKey) != value) {
+    await writeSyncInstallation(_databasePath, value);
+    if (await readSyncInstallation(_databasePath) != value) {
       throw const SyncVaultException('Sync setup could not be saved.');
     }
   }
