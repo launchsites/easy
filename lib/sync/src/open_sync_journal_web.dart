@@ -7,4 +7,5 @@ Future<SyncJournal?> openPlatformSyncJournal({
   required SyncDevicePublicKey localDevicePublicKey,
   required SyncJournalKey journalKey,
   String? databasePath,
+  required bool createIfMissing,
 }) async => null;

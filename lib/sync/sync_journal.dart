@@ -15,9 +15,11 @@ Future<SyncJournal?> openSyncJournal({
   required SyncDevicePublicKey localDevicePublicKey,
   required SyncJournalKey journalKey,
   String? databasePath,
+  bool createIfMissing = true,
 }) => platform.openPlatformSyncJournal(
   workspaceId: workspaceId,
   localDevicePublicKey: localDevicePublicKey,
   journalKey: journalKey,
   databasePath: databasePath,
+  createIfMissing: createIfMissing,
 );

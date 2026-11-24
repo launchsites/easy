@@ -12,6 +12,7 @@ const _signatureTextLength = 88;
 const _publicKeyBytes = 32;
 const _pairKeyBytes = 32;
 const _signatureDomain = 'Easy Sync Change v1\u0000';
+const _pairingProofDomain = 'Easy Pairing Proof v1\u0000';
 
 final _signatureAlgorithm = Ed25519();
 final _encryptionAlgorithm = AesGcm.with256bits();
@@ -30,6 +31,12 @@ final class SyncDevicePublicKey {
 
   SimplePublicKey get key =>
       SimplePublicKey(Uint8List.fromList(_bytes), type: KeyPairType.ed25519);
+
+  Future<bool> verifyPairingProof(String transcript, Uint8List proof) =>
+      _signatureAlgorithm.verify(
+        _pairingProofBytes(transcript),
+        signature: Signature(Uint8List.fromList(proof), publicKey: key),
+      );
 }
 
 final class SyncDeviceIdentity {
@@ -62,6 +69,14 @@ final class SyncDeviceIdentity {
   final SyncDevicePublicKey publicKey;
 
   String get deviceId => publicKey.fingerprint;
+
+  Future<Uint8List> signPairingProof(String transcript) async =>
+      Uint8List.fromList(
+        (await _signatureAlgorithm.sign(
+          _pairingProofBytes(transcript),
+          keyPair: _keyPair,
+        )).bytes,
+      );
 
   Future<Uint8List> copySeedForSecureStorage() async =>
       Uint8List.fromList(await _keyPair.extractPrivateKeyBytes());
@@ -225,6 +240,17 @@ final class SyncAuthenticationException implements Exception {
 Uint8List _signingBytes(SyncChange change) =>
     Uint8List.fromList(utf8.encode('$_signatureDomain${change.canonical}'));
 
+Uint8List _pairingProofBytes(String transcript) {
+  if (transcript.length > 4096) {
+    throw const FormatException('Invalid pairing transcript length.');
+  }
+  final bytes = utf8.encode('$_pairingProofDomain$transcript');
+  if (bytes.length > 4096) {
+    throw const FormatException('Invalid pairing transcript length.');
+  }
+  return Uint8List.fromList(bytes);
+}
+
 /// A dedicated AES key for one approved pair in one workspace. Exchange key
 /// material through authenticated pairing and keep it in the host key store.
 final class SyncPairKey {
@@ -241,6 +267,8 @@ final class SyncPairKey {
   );
 
   final SecretKeyData _secret;
+
+  String get keyId => crypto.sha256.convert(_secret.bytes).toString();
 
   Uint8List copyBytesForSecureStorage() => Uint8List.fromList(_secret.bytes);
 

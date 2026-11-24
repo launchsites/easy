@@ -27,6 +27,7 @@ final class SyncJournalCore implements SyncJournal {
     required SyncWorkspaceId workspaceId,
     required SyncDevicePublicKey local,
     required Uint8List keyBytes,
+    required bool createIfMissing,
   }) async {
     final core = SyncJournalCore._(
       ledger,
@@ -36,6 +37,7 @@ final class SyncJournalCore implements SyncJournal {
     );
     try {
       if (ledger.readHead() == null) {
+        if (!createIfMissing) throw _corrupt;
         ledger.initialize(await core._sealHead(0, 0, Uint8List(32)));
       }
       await core._refresh();
@@ -51,6 +53,7 @@ final class SyncJournalCore implements SyncJournal {
   final SyncDevicePublicKey _local;
   final SyncTrust _trust;
   final SyncReplica _replica;
+  final _approvedPairKeys = <String, String>{};
   final _sessionId = syncHex(syncRandomBytes(16));
   var _revision = 0;
   var _bytes = 0;
@@ -65,6 +68,7 @@ final class SyncJournalCore implements SyncJournal {
     revision: _revision,
     watermark: _replica.watermark,
     changes: _replica.journalLength,
+    approvedPairKeyIds: Map.unmodifiable(_approvedPairKeys),
   );
 
   @override
@@ -83,17 +87,27 @@ final class SyncJournalCore implements SyncJournal {
   Future<SyncJournalStatus> approveDevice(
     SyncDevicePublicKey device, {
     required int expectedRevision,
+    String? pairKeyId,
   }) async {
     await _refresh();
     _expect(expectedRevision);
-    if (_trust.isApproved(device.fingerprint)) return _status();
+    final safeKey = _validatePairKeyId(pairKeyId);
+    if (_trust.isApproved(device.fingerprint)) {
+      if (_approvedPairKeys[device.fingerprint] != safeKey) {
+        throw const SyncTrustException(
+          'Revoke the existing pairing before replacing its key.',
+        );
+      }
+      return _status();
+    }
     if (_trust.approvedDeviceIds.length >= maxSyncDevices) {
       throw const SyncTrustException('The approved device limit was reached.');
     }
     return _append({
       'kind': 'approve',
       'publicKey': base64Url.encode(device.key.bytes),
-    }, () => _trust.approve(device));
+      'pairKeyId': ?safeKey,
+    }, () => _applyApproval(device, safeKey));
   }
 
   @override
@@ -110,7 +124,7 @@ final class SyncJournalCore implements SyncJournal {
     return _append({
       'kind': 'revoke',
       'device': deviceId,
-    }, () => _trust.revoke(deviceId));
+    }, () => _removeApproval(deviceId));
   }
 
   @override
@@ -358,12 +372,16 @@ final class SyncJournalCore implements SyncJournal {
       case 'approve':
         final key = body['publicKey'];
         if (key is! String || key.length != 44) throw _corrupt;
-        _trust.approve(SyncDevicePublicKey.fromBytes(base64Url.decode(key)));
+        _applyApproval(
+          SyncDevicePublicKey.fromBytes(base64Url.decode(key)),
+          _validatePairKeyId(body['pairKeyId']),
+        );
       case 'revoke':
         final id = body['device'];
         if (id is! String || id == _local.fingerprint || !_trust.revoke(id)) {
           throw _corrupt;
         }
+        _approvedPairKeys.remove(id);
       case 'changes':
         final changes = body['changes'];
         if (changes is! List ||
@@ -382,6 +400,24 @@ final class SyncJournalCore implements SyncJournal {
       default:
         throw _corrupt;
     }
+  }
+
+  void _applyApproval(SyncDevicePublicKey device, String? keyId) {
+    _trust.approve(device);
+    if (keyId != null) _approvedPairKeys[device.fingerprint] = keyId;
+  }
+
+  void _removeApproval(String deviceId) {
+    _trust.revoke(deviceId);
+    _approvedPairKeys.remove(deviceId);
+  }
+
+  String? _validatePairKeyId(Object? keyId) {
+    if (keyId == null) return null;
+    if (keyId is! String || !syncMatches(syncDeviceIdPattern, keyId)) {
+      throw const FormatException('Invalid pairing key ID.');
+    }
+    return keyId;
   }
 
   Future<SyncJournalStatus> _append(

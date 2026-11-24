@@ -14,9 +14,14 @@ final class SqliteSyncLedger implements SyncLedger {
   static const _schemaVersion = 1;
   final Database _db;
 
-  static SqliteSyncLedger open(String path) {
-    if (path != ':memory:') File(path).parent.createSync(recursive: true);
-    final database = sqlite3.open(path);
+  static SqliteSyncLedger open(String path, {required bool createIfMissing}) {
+    if (path != ':memory:' && createIfMissing) {
+      File(path).parent.createSync(recursive: true);
+    }
+    final database = sqlite3.open(
+      path,
+      mode: createIfMissing ? OpenMode.readWriteCreate : OpenMode.readWrite,
+    );
     final ledger = SqliteSyncLedger._(database);
     try {
       database.execute('PRAGMA busy_timeout = 5000');
@@ -27,7 +32,8 @@ final class SqliteSyncLedger implements SyncLedger {
         if (applicationId == _applicationId && version == _schemaVersion) {
           return;
         }
-        if (applicationId != 0 ||
+        if (!createIfMissing ||
+            applicationId != 0 ||
             version != 0 ||
             database
                 .select(

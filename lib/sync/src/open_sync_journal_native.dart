@@ -16,6 +16,7 @@ Future<SyncJournal?> openPlatformSyncJournal({
   required SyncDevicePublicKey localDevicePublicKey,
   required SyncJournalKey journalKey,
   String? databasePath,
+  required bool createIfMissing,
 }) async {
   final path =
       databasePath ??
@@ -23,7 +24,13 @@ Future<SyncJournal?> openPlatformSyncJournal({
           .resolve('easy/sync/${workspaceId.value}.sqlite3')
           .toFilePath();
   final client = _JournalClient();
-  await client.start(path, workspaceId, localDevicePublicKey, journalKey);
+  await client.start(
+    path,
+    workspaceId,
+    localDevicePublicKey,
+    journalKey,
+    createIfMissing,
+  );
   return _NativeSyncJournal(client);
 }
 
@@ -64,7 +71,9 @@ final class _NativeSyncJournal implements SyncJournal {
   Future<SyncJournalStatus> approveDevice(
     SyncDevicePublicKey device, {
     required int expectedRevision,
-  }) => _client.request(_Command.approve, (device, expectedRevision));
+    String? pairKeyId,
+  }) =>
+      _client.request(_Command.approve, (device, expectedRevision, pairKeyId));
 
   @override
   Future<SyncJournalStatus> revokeDevice(
@@ -138,6 +147,7 @@ typedef _Configuration = (
   SyncWorkspaceId,
   SyncDevicePublicKey,
   TransferableTypedData,
+  bool,
   SendPort,
 );
 
@@ -155,6 +165,7 @@ final class _JournalClient {
     SyncWorkspaceId workspace,
     SyncDevicePublicKey local,
     SyncJournalKey key,
+    bool createIfMissing,
   ) async {
     _responses.listen(_receive);
     try {
@@ -167,6 +178,7 @@ final class _JournalClient {
             workspace,
             local,
             _transferSecret(key.copyBytesForSecureStorage()),
+            createIfMissing,
             _responses.sendPort,
           ),
           debugName: 'easy-sync-journal',
@@ -242,14 +254,16 @@ final class _JournalClient {
 }
 
 Future<void> _startWorker(_Configuration configuration) async {
-  final (path, workspace, local, secret, responses) = configuration;
+  final (path, workspace, local, secret, createIfMissing, responses) =
+      configuration;
   final SyncJournalCore journal;
   try {
     journal = await SyncJournalCore.open(
-      ledger: SqliteSyncLedger.open(path),
+      ledger: SqliteSyncLedger.open(path, createIfMissing: createIfMissing),
       workspaceId: workspace,
       local: local,
       keyBytes: secret.materialize().asUint8List(),
+      createIfMissing: createIfMissing,
     );
   } catch (error) {
     responses.send(
@@ -299,8 +313,13 @@ Future<Object?> _execute(
     case _Command.record:
       return journal.readRecord(data as SyncRecordKey);
     case _Command.approve:
-      final (key, revision) = data as (SyncDevicePublicKey, int);
-      return journal.approveDevice(key, expectedRevision: revision);
+      final (key, revision, pairKeyId) =
+          data as (SyncDevicePublicKey, int, String?);
+      return journal.approveDevice(
+        key,
+        expectedRevision: revision,
+        pairKeyId: pairKeyId,
+      );
     case _Command.revoke:
       final (device, revision) = data as (String, int);
       return journal.revokeDevice(device, expectedRevision: revision);

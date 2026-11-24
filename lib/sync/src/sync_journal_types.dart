@@ -14,6 +14,7 @@ abstract interface class SyncJournal {
   Future<SyncJournalStatus> approveDevice(
     SyncDevicePublicKey device, {
     required int expectedRevision,
+    String? pairKeyId,
   });
 
   Future<SyncJournalStatus> revokeDevice(
@@ -82,6 +83,7 @@ final class SyncJournalStatus {
     required this.revision,
     required this.watermark,
     required this.changes,
+    this.approvedPairKeyIds = const {},
   });
 
   final SyncWorkspaceId workspaceId;
@@ -90,6 +92,7 @@ final class SyncJournalStatus {
   final int revision;
   final SyncVersionVector watermark;
   final int changes;
+  final Map<String, String> approvedPairKeyIds;
 }
 
 final class SyncJournalDraft {
