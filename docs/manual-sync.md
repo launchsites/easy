@@ -27,7 +27,10 @@ The supported records are standalone tasks, events and notes. Task dependencies 
 ## Validation
 
 ```sh
-flutter test test/sync_pairing_test.dart test/manual_sync_workspace_test.dart test/manual_sync_page_test.dart test/sync_password_vault_test.dart test/sync_journal_test.dart test/workspace_sync_test.dart
+flutter test test/sync_pairing_test.dart test/manual_sync_workspace_test.dart \
+  test/manual_sync_page_test.dart test/manual_sync_installation_test.dart \
+  test/sync_password_vault_test.dart test/sync_password_vault_prompt_test.dart \
+  test/sync_journal_test.dart test/workspace_sync_test.dart
 ```
 
 The tests exercise the code exchange, stale and competing approvals, locked-vault recovery, revoke-before-cleanup, ciphertext transfer and directional progress between synthetic native stores, and passphrase file reopening and corruption checks. They also cover phase-by-phase selection, linked records and protected deletions, retry after intervening edits, exact recovery in SQLite and the preference store, and release of the SQLite journal lock after a failed workspace commit. The paired-device and staging widgets run at 320 pixels with 135% text scaling. The system vault adapter is exercised through the plugin's test backend. Platform keychains and in-person token scanning need separate real-device validation.
@@ -41,3 +44,7 @@ The AOT causal-register benchmark generated 64 five-device histories with tempor
 A Linux release probe used two independent process launches and D-Bus sessions against a disposable GNOME Keyring profile. The system vault retained the installation identity, sealed journal and peer key across the restart. A separate profile with no Secret Service verified the same restart using the encrypted passphrase vault and rejected a wrong passphrase. The passphrase prompt tests cover a 320-pixel portrait viewport at 135% text and a 568×320 right-to-left landscape viewport at 200% text, both with a simulated keyboard. They also confirm that cancellation and an unlock attempt with a missing vault preserve the saved configuration for recovery. [Vault tests](../test/sync_password_vault_test.dart) · [Prompt tests](../test/sync_password_vault_prompt_test.dart)
 
 The Linux release at `74a9fb8` passed the complete Settings setup and restart in a disposable 1280×720 X11 profile without a Secret Service. Cancelling first setup left sync state absent. Enabling produced a valid SQLite journal and an encrypted vault. A fresh app process retained its locked state after cancellation, rejected a wrong passphrase and opened the original vault with the right one. The vault bytes and workspace revision and digest matched the pre-restart values. [Native runner](../tool/benchmark/native_sync_settings.py) · [Raw results](benchmark-results/native-sync-settings-epyc-20261124.json)
+
+The Linux release at `deee4ba` also completed first setup from two separate app processes sharing one disposable profile. The processes opened their setup prompts before either approved. Both then displayed the same device fingerprint and produced one ready marker and one integrity-checked journal. A third process opened the same identity and preserved the earlier vault bytes and workspace. [Native race runner](../tool/benchmark/native_sync_installation_race.py) · [Raw results](benchmark-results/native-sync-installation-race-epyc-20261124.json)
+
+The same release was interrupted after publishing its pending setup marker. The surviving process completed that exact workspace ID, produced an integrity-checked journal and reopened the same identity after another restart. [Process interruption results](benchmark-results/native-sync-installation-interrupted-epyc-20261124.json)

@@ -1,0 +1,20 @@
+{
+  "source_revision": "deee4ba0499fee801a2fffad239c89403b11785c",
+  "executable_sha256": "372ea3842656ed4ccce36e9341d3ea1f123497ef7215422be4dae830a1b2b08b",
+  "aot_sha256": "33ce4c8ef3d02d4a934c19828cf9976f26ac448bbab2c53e9085f0890c5511d8",
+  "viewport": [
+    1280,
+    720
+  ],
+  "private_x11_and_dbus_sessions": true,
+  "elapsed_seconds": 75.87,
+  "checks": {
+    "setup_processes": 2,
+    "journal_count": 1,
+    "journal_integrity": "ok",
+    "restart_identity_matches": true,
+    "vault_and_workspace_unchanged": true,
+    "interrupted_at_pending_marker": true,
+    "resumed_same_pending_workspace": true
+  }
+}

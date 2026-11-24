@@ -88,10 +88,11 @@ exec "$1"
         try:
             yield screen
         finally:
-            try:
-                os.kill(pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
+            if app.poll() is None and Path(f"/proc/{pid}/exe").resolve() == args.binary:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
             app.wait(timeout=12)
 
 
@@ -235,10 +236,13 @@ def run(args, stage):
     preferences = profile / "shared_preferences.json"
     storage = profile / "easy"
     vault = storage / "sync" / "credentials.easyvault"
+    installation = storage / "sync" / "installation.json"
     prompt = (340, 180, 600, 420)
     paired_heading = (315, 213, 270, 38)
 
     def read_marker():
+        if installation.exists():
+            return installation.read_text()
         return json.loads(preferences.read_text()).get(MARKER)
 
     def snapshot():
@@ -302,8 +306,8 @@ def run(args, stage):
             "native_journal_integrity": "ok", "workspace_unchanged": True}
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+def probe_arguments(description, *, accept_interruption=False):
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--revision", required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -314,10 +318,17 @@ def main():
     parser.add_argument("--tesseract", default="tesseract")
     parser.add_argument("--dbus-run-session", default="dbus-run-session")
     parser.add_argument("--timeout", type=float, default=35)
+    if accept_interruption:
+        parser.add_argument("--interrupt-first", action="store_true")
     args = parser.parse_args()
     args.binary = args.binary.resolve(strict=True)
     if re.fullmatch(r"[0-9a-f]{40}", args.revision) is None or args.timeout <= 0:
         parser.error("Provide a full source revision and a positive timeout.")
+    return args
+
+
+def main():
+    args = probe_arguments(__doc__)
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="easy-native-sync-") as scratch:
         checks = run(args, Path(scratch))
