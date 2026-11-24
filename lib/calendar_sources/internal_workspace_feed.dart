@@ -1,9 +1,7 @@
-import 'package:timezone/data/latest_all.dart' as zone_data;
-import 'package:timezone/timezone.dart' as tz;
-
 import '../calendar_page.dart';
 import 'calendar_window_feed.dart';
 import 'ics_calendar.dart';
+import 'ics_zone_support.dart';
 import 'internal_recurrence.dart';
 
 typedef InternalWorkspaceEvent = ({
@@ -11,8 +9,6 @@ typedef InternalWorkspaceEvent = ({
   InternalEventOccurrence occurrence,
   CalendarEvent event,
 });
-
-bool _zoneDataReady = false;
 
 InternalEventDraft adaptSeriesDraft(
   CalendarEvent value, {
@@ -37,11 +33,9 @@ InternalEventDraft adaptSeriesDraft(
   final zone = value.allDay ? null : old?.start.timeZoneId;
   DateTime basis(DateTime value) {
     if (zone != null) {
-      if (!_zoneDataReady) {
-        zone_data.initializeTimeZones();
-        _zoneDataReady = true;
-      }
-      return tz.TZDateTime.from(value, tz.getLocation(zone));
+      return (ianaCalendarZone(zone) ??
+              (throw ArgumentError.value(zone, 'timeZoneId')))
+          .wallAt(value);
     }
     return old?.start.kind == IcsDateTimeKind.utc ? value.toUtc() : value;
   }

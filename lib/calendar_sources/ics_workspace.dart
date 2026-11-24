@@ -30,7 +30,7 @@ class WorkspaceIcsCalendar {
         document: json['document'] as String,
       );
 
-  static const importByteLimit = 4 * 1024 * 1024;
+  static const importByteLimit = IcsCalendar.maxImportBytes;
   static const maxCalendars = 12;
 
   final String id;

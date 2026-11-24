@@ -1,8 +1,6 @@
-import 'package:timezone/data/latest_all.dart' as timezone_data;
-import 'package:timezone/timezone.dart' as timezone;
-
 import 'ics_calendar.dart';
 import 'ics_occurrence_expander.dart';
+import 'ics_zone_support.dart';
 
 enum InternalRecurrenceFrequency { daily, weekly, monthly, yearly }
 
@@ -898,7 +896,7 @@ IcsDateTime _fromResolved(
   final zone = pattern.timeZoneId ?? floatingZone;
   final clock = zone == null
       ? instant.toLocal()
-      : timezone.TZDateTime.from(instant, timezone.getLocation(zone));
+      : _portableZone(zone).wallAt(instant);
   return _atComponents(pattern, clock);
 }
 
@@ -918,47 +916,13 @@ String _exportUntil(IcsDateTime basis, DateTime last) {
     IcsDateTimeKind.floating => _icalClock(wall),
     IcsDateTimeKind.utc => '${_icalClock(wall)}Z',
     IcsDateTimeKind.zoned =>
-      '${_icalClock(_lastInstantAtOrBefore(wall, _portableZone(basis.timeZoneId!)))}Z',
+      '${_icalClock(_portableZone(basis.timeZoneId!).latestAtOrBefore(wall))}Z',
   };
 }
 
-timezone.Location _portableZone(String name) {
-  if (timezone.timeZoneDatabase.locations.isEmpty) {
-    timezone_data.initializeTimeZones();
-  }
-  return timezone.timeZoneDatabase.locations[name] ??
-      (throw IcsExpansionException('Unknown calendar time zone $name.'));
-}
-
-/// Find the last instant still on or before an inclusive wall-clock bound.
-/// This handles offset changes at midnight and entirely skipped civil dates.
-DateTime _lastInstantAtOrBefore(DateTime wall, timezone.Location zone) {
-  const margin = Duration(days: 2);
-  final end = wall.add(margin);
-  var cursor = wall.subtract(margin);
-  DateTime? latest;
-  while (cursor.isBefore(end)) {
-    final period = zone.lookupTimeZone(cursor.millisecondsSinceEpoch);
-    final boundary = period.end >= end.millisecondsSinceEpoch
-        ? end
-        : DateTime.fromMillisecondsSinceEpoch(period.end, isUtc: true);
-    final nominal = wall.subtract(period.timeZone.offset);
-    final candidate = nominal.isBefore(boundary)
-        ? nominal
-        : boundary.subtract(const Duration(seconds: 1));
-    if (!candidate.isBefore(cursor) &&
-        (latest == null || candidate.isAfter(latest))) {
-      latest = candidate;
-    }
-    cursor = boundary;
-  }
-  if (latest == null || latest.year < 1 || latest.year > 9999) {
-    throw const IcsExpansionException(
-      'The last repeat is outside the portable calendar range.',
-    );
-  }
-  return latest;
-}
+IcsZone _portableZone(String name) =>
+    ianaCalendarZone(name) ??
+    (throw IcsExpansionException('Unknown calendar time zone $name.'));
 
 void _validatePortableDraft(
   InternalEventDraft draft,
@@ -979,16 +943,13 @@ bool _hasPortableClock(IcsDateTime value, String? floatingZone) {
     return true;
   }
   final name = value.timeZoneId ?? floatingZone;
-  final zone = name == null ? null : _portableZone(name);
   final wall = value.components;
-  DateTime clock(DateTime instant) => zone == null
-      ? instant.toLocal()
-      : timezone.TZDateTime.from(instant, zone);
+  if (name != null) return _portableZone(name).resolve(wall) != null;
   return [-2, 0, 2]
-      .map((day) => clock(wall.add(Duration(days: day))).timeZoneOffset)
+      .map((day) => wall.add(Duration(days: day)).toLocal().timeZoneOffset)
       .toSet()
       .any((offset) {
-        final actual = clock(wall.subtract(offset));
+        final actual = wall.subtract(offset).toLocal();
         return actual.year == wall.year &&
             actual.month == wall.month &&
             actual.day == wall.day &&

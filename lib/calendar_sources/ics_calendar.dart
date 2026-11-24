@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'ics_zone_support.dart';
+
 enum IcsDateTimeKind { date, utc, floating, zoned }
 
 /// UTC instants and local calendar components are deliberately distinct.
@@ -48,6 +50,26 @@ class IcsRecurrencePeriod {
   final IcsDateTime start;
   final IcsDateTime? end;
   final String? duration;
+}
+
+class IcsZoneObservance {
+  const IcsZoneObservance._({
+    required this.start,
+    required this.offsetFrom,
+    required this.offsetTo,
+    required this.daylight,
+    required this.name,
+    required this.recurrence,
+    required this.dates,
+  });
+
+  final DateTime start;
+  final int offsetFrom;
+  final int offsetTo;
+  final bool daylight;
+  final String name;
+  final String? recurrence;
+  final List<DateTime> dates;
 }
 
 class IcsEvent {
@@ -176,10 +198,14 @@ class IcsCalendar {
     required Iterable<IcsEvent> events,
     this._extra = const [],
     this._components = const [],
+    this._authorZones = true,
   }) : events = List.unmodifiable(events);
 
   factory IcsCalendar.parse(String input) {
-    final root = _parseComponents(_unfold(input));
+    if (input.length > maxImportBytes) {
+      throw const FormatException('The iCalendar file exceeds 4 MB.');
+    }
+    final root = _parseComponents(input);
     if (root.type != 'VCALENDAR' || _single(root, 'VERSION')?.value != '2.0') {
       throw const FormatException('Expected an iCalendar 2.0 document.');
     }
@@ -195,10 +221,21 @@ class IcsCalendar {
       components: root.children
           .where((child) => child.type != 'VEVENT')
           .toList(),
+      authorZones: false,
     );
   }
 
   factory IcsCalendar.parseBytes(List<int> input) {
+    if (input.length > maxImportBytes) {
+      throw const FormatException('The iCalendar file exceeds 4 MB.');
+    }
+    String? decoded;
+    try {
+      decoded = utf8.decode(input);
+    } on FormatException {
+      // Some producers split a UTF-8 scalar across a physical fold.
+    }
+    if (decoded != null) return IcsCalendar.parse(decoded);
     // Undo physical folds first, including producer folds inside UTF-8 scalars.
     final unfolded = <int>[];
     for (var index = 0; index < input.length; index++) {
@@ -219,10 +256,42 @@ class IcsCalendar {
     return IcsCalendar.parse(utf8.decode(unfolded));
   }
 
+  static const maxImportBytes = 4 * 1024 * 1024;
+
   final String? name;
   final List<IcsEvent> events;
   final List<_ContentLine> _extra;
   final List<_Component> _components;
+  final bool _authorZones;
+  late final Map<String, List<_Component>> _zoneDefinitions =
+      _readZoneDefinitions();
+
+  Map<String, List<_Component>> _readZoneDefinitions() {
+    final definitions = <String, List<_Component>>{};
+    for (final component in _components) {
+      if (component.type != 'VTIMEZONE') continue;
+      final id = _decodedField(component, 'TZID');
+      if (id == null || id.isEmpty || _invalidParameter.hasMatch(id)) {
+        throw const FormatException('Invalid time-zone definition ID.');
+      }
+      definitions.putIfAbsent(id, () => []).add(component);
+    }
+    return definitions;
+  }
+
+  /// Original definitions take precedence over built-in names during import.
+  List<IcsZoneObservance>? zoneObservances(String id) {
+    final definitions = _zoneDefinitions[id];
+    if (definitions == null) return null;
+    if (definitions.length != 1) {
+      throw const FormatException('Duplicate time-zone definitions.');
+    }
+    final children = definitions.single.children;
+    if (children.isEmpty || children.length > 1024) {
+      throw const FormatException('Invalid number of time-zone observances.');
+    }
+    return List.unmodifiable(children.map(_parseObservance));
+  }
 
   String? get calendarScale => _extra
       .where((property) => property.name == 'CALSCALE')
@@ -237,28 +306,133 @@ class IcsCalendar {
     events: events,
     extra: _extra,
     components: _components,
+    authorZones: _authorZones,
   );
 
   /// The fallback stamp is only used for events without an explicit DTSTAMP.
   String encode({DateTime? timestamp}) {
     final output = StringBuffer();
     final stamp = IcsDateTime.utc(timestamp ?? DateTime.now());
-    final lines = [
+    for (final line in [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
       if (!_extra.any((property) => property.name == 'PRODID'))
         'PRODID:-//Easy//Calendar//EN',
       if (name != null) 'X-WR-CALNAME:${_encodeText(name!)}',
       for (final property in _extra) property.line,
-      for (final component in _components) ..._componentLines(component),
-      for (final event in events) ..._eventLines(event, stamp),
-      'END:VCALENDAR',
-    ];
-    for (final line in lines) {
+    ]) {
       _writeFolded(output, line);
     }
+    for (final component in _components) {
+      if (component.source case final original?) {
+        output.write(original);
+      } else {
+        for (final line in _componentLines(component)) {
+          _writeFolded(output, line);
+        }
+      }
+    }
+    if (_authorZones) {
+      for (final line in authoredCalendarZoneLines(_zoneReferences(events))) {
+        _writeFolded(output, line);
+      }
+    }
+    for (final event in events) {
+      for (final line in _eventLines(event, stamp)) {
+        _writeFolded(output, line);
+      }
+    }
+    _writeFolded(output, 'END:VCALENDAR');
     return output.toString();
   }
+}
+
+Map<String, DateTime> _zoneReferences(Iterable<IcsEvent> events) {
+  final references = <String, DateTime>{};
+  for (final event in events) {
+    for (final value in [
+      event.start,
+      ?event.end,
+      ?event.recurrenceId,
+      ...event.recurrenceDates,
+      ...event.exceptionDates,
+    ]) {
+      final name = value.timeZoneId;
+      if (name == null) continue;
+      final date = value.components;
+      final earliest = references[name];
+      if (earliest == null || date.isBefore(earliest)) references[name] = date;
+    }
+  }
+  return references;
+}
+
+IcsZoneObservance _parseObservance(_Component component) {
+  if (!{'STANDARD', 'DAYLIGHT'}.contains(component.type) ||
+      component.children.isNotEmpty ||
+      _single(component, 'EXDATE') != null ||
+      _single(component, 'EXRULE') != null) {
+    throw const FormatException('Unsupported time-zone observance.');
+  }
+  final start = _optionalDateTime(component, 'DTSTART');
+  if (start == null || start.kind != IcsDateTimeKind.floating) {
+    throw const FormatException(
+      'A time-zone observance needs a local DTSTART.',
+    );
+  }
+  final recurrence = _single(component, 'RRULE')?.value;
+  if (recurrence != null) _validateRecurrence(recurrence);
+  final dates = <DateTime>[];
+  for (final property in component.properties.where(
+    (row) => row.name == 'RDATE',
+  )) {
+    for (final value in property.value.split(',')) {
+      if (dates.length == 2048) {
+        throw const FormatException('Too many time-zone observance dates.');
+      }
+      final date = _readDateTime(value, property.parameters);
+      if (date.kind != IcsDateTimeKind.floating) {
+        throw const FormatException(
+          'Time-zone observance dates must be local.',
+        );
+      }
+      dates.add(date.components);
+    }
+  }
+  return IcsZoneObservance._(
+    start: start.components,
+    offsetFrom: _readUtcOffset(_single(component, 'TZOFFSETFROM')?.value),
+    offsetTo: _readUtcOffset(_single(component, 'TZOFFSETTO')?.value),
+    daylight: component.type == 'DAYLIGHT',
+    name:
+        component.properties
+            .where((row) => row.name == 'TZNAME')
+            .map((row) => _decodeText(row.value))
+            .firstOrNull ??
+        '',
+    recurrence: recurrence,
+    dates: List.unmodifiable(dates),
+  );
+}
+
+final _utcOffset = RegExp(r'^([+-])(\d{2})(\d{2})(\d{2})?$');
+
+int _readUtcOffset(String? value) {
+  final match = value == null ? null : _utcOffset.firstMatch(value);
+  if (match != null) {
+    final hours = int.parse(match[2]!);
+    final minutes = int.parse(match[3]!);
+    final seconds = int.parse(match[4] ?? '0');
+    final offset = hours * 3600 + minutes * 60 + seconds;
+    final negative = match[1] == '-';
+    if (hours < 24 &&
+        minutes < 60 &&
+        seconds < 60 &&
+        (!negative || offset != 0)) {
+      return negative ? -offset : offset;
+    }
+  }
+  throw const FormatException('Invalid time-zone offset.');
 }
 
 const _calendarFields = {'VERSION', 'X-WR-CALNAME'};
@@ -565,21 +739,46 @@ String _encodeText(String value) => value
     .replaceAll(',', '\\,')
     .replaceAll(';', '\\;');
 
-Iterable<String> _unfold(String value) sync* {
-  final normalized = value.startsWith('\ufeff') ? value.substring(1) : value;
+typedef _UnfoldedLine = ({String line, int start, int end});
+
+final _lineEnding = RegExp(r'\r\n|\r|\n');
+
+Iterable<({int start, int textEnd, int end})> _physicalLines(
+  String value,
+) sync* {
+  var start = value.startsWith('\ufeff') ? 1 : 0;
+  for (final ending in _lineEnding.allMatches(value, start)) {
+    yield (start: start, textEnd: ending.start, end: ending.end);
+    start = ending.end;
+  }
+  if (start < value.length) {
+    yield (start: start, textEnd: value.length, end: value.length);
+  }
+}
+
+Iterable<_UnfoldedLine> _unfold(String value) sync* {
   StringBuffer? pending;
-  for (final line in normalized.split(RegExp(r'\r\n|\r|\n'))) {
+  var start = 0;
+  var end = 0;
+  for (final physical in _physicalLines(value)) {
+    final line = value.substring(physical.start, physical.textEnd);
     if (line.startsWith(' ') || line.startsWith('\t')) {
       if (pending == null || pending.isEmpty) {
         throw const FormatException('Unexpected folded line.');
       }
       pending.write(line.substring(1));
     } else {
-      if (pending != null && pending.isNotEmpty) yield pending.toString();
+      if (pending != null && pending.isNotEmpty) {
+        yield (line: pending.toString(), start: start, end: end);
+      }
       pending = StringBuffer(line);
+      start = physical.start;
     }
+    end = physical.end;
   }
-  if (pending != null && pending.isNotEmpty) yield pending.toString();
+  if (pending != null && pending.isNotEmpty) {
+    yield (line: pending.toString(), start: start, end: end);
+  }
 }
 
 void _writeFolded(StringBuffer output, String line) {
@@ -606,9 +805,11 @@ void _writeFolded(StringBuffer output, String line) {
 }
 
 class _Component {
-  _Component(this.type);
+  _Component(this.type, {this.sourceStart});
 
   final String type;
+  final int? sourceStart;
+  String? source;
   final properties = <_ContentLine>[];
   final children = <_Component>[];
 }
@@ -670,20 +871,27 @@ _ContentLine _parseLine(String line) {
   );
 }
 
-_Component _parseComponents(Iterable<String> lines) {
+_Component _parseComponents(String input) {
   final stack = <_Component>[];
   _Component? root;
-  for (final line in lines) {
+  var count = 0;
+  for (final (:line, :start, :end) in _unfold(input)) {
+    if (++count > 250000) {
+      throw const FormatException('Too many iCalendar content lines.');
+    }
     final property = _parseLine(line);
-    final type = property.value.toUpperCase();
     if (property.name == 'BEGIN') {
+      final type = property.value.toUpperCase();
       if (!_token.hasMatch(type) ||
           property.parameters.isNotEmpty ||
           (stack.isEmpty && root != null) ||
           stack.length >= 32) {
         throw const FormatException('Invalid calendar component.');
       }
-      final component = _Component(type);
+      final component = _Component(
+        type,
+        sourceStart: stack.length == 1 && type == 'VTIMEZONE' ? start : null,
+      );
       if (stack.isEmpty) {
         root = component;
       } else {
@@ -692,11 +900,14 @@ _Component _parseComponents(Iterable<String> lines) {
       stack.add(component);
     } else if (property.name == 'END') {
       if (stack.isEmpty ||
-          stack.last.type != type ||
+          stack.last.type != property.value.toUpperCase() ||
           property.parameters.isNotEmpty) {
         throw const FormatException('Mismatched calendar component.');
       }
-      stack.removeLast();
+      final component = stack.removeLast();
+      if (component.sourceStart case final begin?) {
+        component.source = input.substring(begin, end);
+      }
     } else {
       if (stack.isEmpty) {
         throw const FormatException('Property outside a calendar component.');

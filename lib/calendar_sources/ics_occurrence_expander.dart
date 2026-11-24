@@ -1,10 +1,9 @@
 import 'dart:math' as math;
 
-import 'package:timezone/data/latest_all.dart' as timezone_data;
-import 'package:timezone/timezone.dart' as timezone;
-
 import 'ics_calendar.dart';
+import 'ics_zone_support.dart';
 
+part 'ics_imported_zone.dart';
 part 'ics_recurrence_rule.dart';
 
 class IcsExpansionException implements Exception {
@@ -68,7 +67,7 @@ List<IcsOccurrence> expandIcsCalendar(
   final expansion = _Expansion(
     firstInstant,
     lastInstant,
-    _IcsClock(floatingTimeZone),
+    _IcsClock(calendar, floatingTimeZone),
     limit,
   );
   final groups = <String, List<({int index, IcsEvent event})>>{};
@@ -489,40 +488,40 @@ IcsDateTime _withWall(IcsDateTime original, DateTime components) =>
       ),
     };
 
-bool _timeZonesInitialized = false;
-
 class _IcsClock {
-  _IcsClock(String? floatingTimeZone) {
+  _IcsClock(this._calendar, String? floatingTimeZone) {
     if (floatingTimeZone != null) {
-      _floatingLocation = _location(floatingTimeZone);
+      _floatingLocation =
+          ianaCalendarZone(floatingTimeZone) ??
+          (throw IcsExpansionException(
+            'Unknown calendar time zone $floatingTimeZone.',
+          ));
     }
   }
 
-  timezone.Location? _floatingLocation;
+  final IcsCalendar _calendar;
+  final _zones = <String, IcsZone>{};
+  IcsZone? _floatingLocation;
 
-  timezone.Location _location(String zoneId) {
-    if (!_timeZonesInitialized) {
-      timezone_data.initializeTimeZones();
-      _timeZonesInitialized = true;
+  IcsZone _location(String zoneId) => _zones.putIfAbsent(zoneId, () {
+    try {
+      final definition = _calendar.zoneObservances(zoneId);
+      if (definition != null) return _ImportedIcsZone(zoneId, definition);
+    } on FormatException catch (error) {
+      throw IcsExpansionException('${error.message} ($zoneId)');
     }
-    final location = timezone.timeZoneDatabase.locations[zoneId];
-    if (location == null) {
-      throw IcsExpansionException('Unknown calendar time zone $zoneId.');
-    }
-    return location;
-  }
+    return ianaCalendarZone(zoneId) ??
+        (throw IcsExpansionException('Unknown calendar time zone $zoneId.'));
+  });
 
-  timezone.Location? _zoneFor(IcsDateTime value) =>
-      value.kind == IcsDateTimeKind.zoned
+  IcsZone? _zoneFor(IcsDateTime value) => value.kind == IcsDateTimeKind.zoned
       ? _location(value.timeZoneId!)
       : _floatingLocation;
 
   DateTime wallAt(DateTime instant, IcsDateTime basis) {
     if (basis.kind == IcsDateTimeKind.utc) return instant.toUtc();
     final zone = _zoneFor(basis);
-    final local = zone == null
-        ? instant.toLocal()
-        : timezone.TZDateTime.from(instant, zone);
+    final local = zone?.wallAt(instant) ?? instant.toLocal();
     return _atClock(local, local);
   }
 
@@ -538,27 +537,23 @@ class _IcsClock {
     if (value.kind == IcsDateTimeKind.utc) return components;
     final zone = _zoneFor(value);
     if (value.kind == IcsDateTimeKind.date) {
-      final midnight = zone == null
-          ? DateTime(components.year, components.month, components.day)
-          : timezone.TZDateTime(
-              zone,
-              components.year,
-              components.month,
-              components.day,
-            );
+      if (zone != null) return zone.startOfDay(components);
+      final midnight = DateTime(
+        components.year,
+        components.month,
+        components.day,
+      );
       return _civilDay(midnight) == components ? midnight.toUtc() : null;
     }
-    DateTime localAt(DateTime instant) => zone == null
-        ? instant.toLocal()
-        : timezone.TZDateTime.from(instant, zone);
+    if (zone != null) return zone.resolve(components);
     final offsets = {
       for (final day in [-2, 0, 2])
-        localAt(_addDays(components, day)).timeZoneOffset,
+        _addDays(components, day).toLocal().timeZoneOffset,
     };
     DateTime? first;
     for (final offset in offsets) {
       final candidate = components.subtract(offset);
-      final local = localAt(candidate);
+      final local = candidate.toLocal();
       if (_atClock(local, local) == components &&
           (first == null || candidate.isBefore(first))) {
         first = candidate;
