@@ -31,11 +31,17 @@ def sign_copy(bundle, entitlements, scratch):
     subprocess.run([*sign, "--entitlements", entitlements, copied], check=True, timeout=45)
     subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", copied], check=True, timeout=30)
 
-    embedded = subprocess.check_output(
-        ["/usr/bin/codesign", "--display", "--entitlements", "-", copied], timeout=20,
+    extracted = scratch / "verified-entitlements.plist"
+    subprocess.run(
+        ["/usr/bin/codesign", "--display", "--entitlements", extracted, "--xml", copied],
+        check=True, timeout=20,
     )
     expected = plistlib.loads(entitlements.read_bytes())
-    if expected.get("com.apple.security.app-sandbox") is not True or plistlib.loads(embedded) != expected:
+    try:
+        embedded = plistlib.loads(extracted.read_bytes())
+    except (FileNotFoundError, plistlib.InvalidFileException) as error:
+        raise RuntimeError("macOS codesign did not extract the release entitlements as XML.") from error
+    if expected.get("com.apple.security.app-sandbox") is not True or embedded != expected:
         raise RuntimeError("The runner-local macOS copy did not preserve the release sandbox entitlements.")
     return copied
 

@@ -23,6 +23,7 @@ The workflows request read-only repository contents and use GitHub's checkout ac
 | iPhone simulator | `b20417a` | Xcode 26.4.1 compiled iOS and macOS. The iPhone 17 simulator on iOS 26.4 launched Easy, verified the private empty workspace, and captured the 1206 × 2622 setup screen. [Run](https://github.com/launchsites/easy/actions/runs/45341653863) |
 | Android emulator | `93bdea7` | The non-debuggable x86-64 release launched on AOSP API 36, verified the private workspace, and captured the 1080 × 2400 setup screen. [Run](https://github.com/launchsites/easy/actions/runs/45337863946) |
 | Android setup and meal replay | `975c6e8` | AOSP API 36 verified first launch, 17.27:1 clock and 3.01:1 navigation glyph contrast, one recovered draft at revision 3, and unchanged workspace revision and attachment checksum after replay. [Run](https://github.com/launchsites/easy/actions/runs/45343142083) |
+| Android simplified system theme | `5c4bd85` | The AOSP API 36 first-launch check passed and the photographed clock and navigation glyph contrast matched the previous run. [Run](https://github.com/launchsites/easy/actions/runs/45344251920) |
 
 Run the Linux checks from a clone with the build packages in the README.
 
