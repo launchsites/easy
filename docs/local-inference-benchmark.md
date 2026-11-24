@@ -303,3 +303,15 @@ python3 tool/benchmark/provider_estimate_local.py \
   --client /tmp/easy-estimate-range --source-revision 3e2a6e41c37be74a5747a9e7efff05b52a9328cd \
   --cpu 4 --address-space-mib 1536 --compare-ranges --output /tmp/easy-estimate-range-qwen05.json
 ```
+
+### Native estimate review control
+
+A verified Linux release at `6f18fe9` configured the Local route through Settings in a private X11 session. Declining the first manual estimate disclosure produced zero requests. Approving the disclosure made one unauthenticated loopback request containing the synthetic task title and request identity fields. The mock replied with a 35-minute point using the four-field protocol. The dialog showed title-only provenance and saved the estimate to workspace SQLite after **Use estimate**.
+
+In the same session, **Timing history** displayed three matching confirmed timers of 28, 34, and 41 minutes and offered their 34-minute median. **Use median estimate** saved that value with zero additional requests. The workspace retained all five fixture tasks and passed SQLite integrity checks. [Native review evidence](benchmark-results/native-local-estimate-review-epyc-20261124.json)
+
+```sh
+dbus-run-session -- python3 tool/benchmark/native_local_estimate.py \
+  --binary "$easy_bundle/easy" --app-revision 6f18fe901e9c3b2622240ff8b17e26d626b0df3e \
+  --output /tmp/easy-native-local-estimate.json
+```

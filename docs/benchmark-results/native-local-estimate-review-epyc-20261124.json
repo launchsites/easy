@@ -1,0 +1,41 @@
+{
+  "status": "passed",
+  "app_revision": "6f18fe901e9c3b2622240ff8b17e26d626b0df3e",
+  "run_at_utc": "2026-11-24T06:20:18.741252+00:00",
+  "executable_sha256": "0925c8b655a4cb8fb21b1a3606afa94887588f4e4e94b08534b45f0d67557523",
+  "aot_library_sha256": "298cc09f17cc35d09a12f6cb7e6ae2e327623954d35e139adc5a2fc96fedbd31",
+  "declined_no_request": true,
+  "request": {
+    "at_utc": "2026-11-24T06:20:39.703843+00:00",
+    "kind": "estimate",
+    "path": "/v1/chat/completions",
+    "api_credential": false,
+    "model_matched": true,
+    "fields": [
+      "captureId",
+      "contextRevision",
+      "sourceRevision",
+      "title"
+    ],
+    "expected_input": true
+  },
+  "point_minutes": 35,
+  "evidence_minutes": [
+    28,
+    34,
+    41
+  ],
+  "median_minutes": 34,
+  "total_provider_requests": 1,
+  "workspace": {
+    "revision": 3,
+    "digest": "6e86858d9de5b444835e205faf99e8e041fe0dfc6f07a8cc18c059454e07b658",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 0,
+      "tasks": 5,
+      "notes": 0
+    },
+    "quick_check": "ok"
+  }
+}
