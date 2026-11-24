@@ -22,7 +22,7 @@ env:
 
 jobs:
   apple:
-    runs-on: macos-15
+    runs-on: ${{ inputs.ios_simulator_smoke && 'macos-15-intel' || 'macos-15' }}
     timeout-minutes: 45
     defaults:
       run:
@@ -36,6 +36,7 @@ jobs:
       - name: Verify the checkout and Apple SDKs
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          uname -m
           xcodebuild -version
           xcrun --sdk iphonesimulator --show-sdk-version
           xcrun --sdk macosx --show-sdk-version

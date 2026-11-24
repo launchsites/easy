@@ -39,19 +39,88 @@ def select_iphone(inventory, sdk_version):
     return selected["name"], selected["deviceTypeIdentifier"], runtime
 
 
-def wait_for_workspace(database, pid):
-    deadline = time.monotonic() + 45
+def reported_pid(launch, bundle_id):
+    output = launch.communicate()[0].strip()
+    match = re.search(rf"^{re.escape(bundle_id)}:\s+([1-9][0-9]*)$", output, re.MULTILINE)
+    if launch.returncode != 0 or match is None:
+        raise RuntimeError(f"CoreSimulator could not confirm app launch. {output}")
+    return int(match[1])
+
+
+def wait_for_workspace(database, launch, bundle_id):
+    deadline = time.monotonic() + 150
+    pid = None
     while time.monotonic() < deadline:
-        os.kill(pid, 0)
+        if pid is None and launch.poll() is not None:
+            pid = reported_pid(launch, bundle_id)
+        if pid is not None:
+            os.kill(pid, 0)
         if database.is_file():
             try:
                 if read_pending_workspace(database):
-                    return
+                    return pid
             except sqlite3.OperationalError:
                 # The schema and first revision may still be getting committed.
                 pass
         time.sleep(0.25)
-    raise RuntimeError("Easy did not initialize its private workspace within 45 seconds.")
+    raise RuntimeError("Easy did not initialize its private workspace within 150 seconds.")
+
+
+def simulator_pid(device_id, bundle_id):
+    processes = simctl("spawn", device_id, "launchctl", "list", timeout=25).stdout
+    label = f"UIKitApplication:{bundle_id}["
+    for line in processes.splitlines():
+        columns = line.split(maxsplit=2)
+        if len(columns) == 3 and columns[2].startswith(label) and columns[0].isdigit():
+            return int(columns[0])
+    raise RuntimeError("The simulator did not report a running app process.")
+
+
+def print_launch_diagnostics(device_id, bundle_id):
+    predicate = f'process == "Runner" OR eventMessage CONTAINS[c] "{bundle_id}"'
+    for commands, timeout in (
+        (("spawn", device_id, "log", "show", "--last", "4m", "--style", "compact", "--predicate", predicate), 30),
+        (("launch", device_id, "com.apple.Preferences"), 30),
+    ):
+        try:
+            result = simctl(*commands, check=False, timeout=timeout)
+            print(f"CoreSimulator {commands[0]} diagnostic (exit {result.returncode}):", flush=True)
+            print("\n".join(result.stdout.splitlines()[-35:]), flush=True)
+        except subprocess.TimeoutExpired:
+            print(f"CoreSimulator {commands[0]} diagnostic timed out.", flush=True)
+
+
+def verify_launch(device_id, bundle_id, database, screenshot):
+    launch = subprocess.Popen(
+        ["xcrun", "simctl", "launch", device_id, bundle_id], stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, text=True,
+    )
+    try:
+        pid = wait_for_workspace(database, launch, bundle_id)
+        if pid is None:
+            pid = reported_pid(launch, bundle_id) if launch.poll() is not None else simulator_pid(device_id, bundle_id)
+        print("Verified the app's empty private workspace and pending setup state.", flush=True)
+
+        # The SQLite commit precedes the first frame of the setup screen.
+        time.sleep(1)
+        screenshot.parent.mkdir(parents=True, exist_ok=True)
+        simctl("io", device_id, "screenshot", "--type=png", str(screenshot), timeout=60)
+        os.kill(pid, 0)
+        with screenshot.open("rb") as captured:
+            if captured.read(8) != b"\x89PNG\r\n\x1a\n":
+                raise RuntimeError("CoreSimulator did not write a valid PNG screenshot.")
+    except (OSError, RuntimeError, sqlite3.DatabaseError, subprocess.SubprocessError):
+        print_launch_diagnostics(device_id, bundle_id)
+        raise
+    finally:
+        if launch.poll() is None:
+            launch.terminate()
+            try:
+                launch.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                launch.kill()
+                launch.wait()
+        launch.stdout.close()
 
 
 def check_ios_launch(bundle, screenshot):
@@ -78,22 +147,7 @@ def check_ios_launch(bundle, screenshot):
         if database.exists():
             raise RuntimeError("The app's simulator container already has a workspace.")
 
-        launched = simctl("launch", device_id, bundle_id, timeout=90).stdout.strip()
-        match = re.fullmatch(rf"{re.escape(bundle_id)}:\s+([1-9][0-9]*)", launched)
-        if match is None:
-            raise RuntimeError("CoreSimulator did not report a PID for the launched app.")
-        pid = int(match[1])
-        wait_for_workspace(database, pid)
-        print("Verified the app's empty private workspace and pending setup state.", flush=True)
-
-        # The SQLite commit precedes the first frame of the setup screen.
-        time.sleep(1)
-        screenshot.parent.mkdir(parents=True, exist_ok=True)
-        simctl("io", device_id, "screenshot", "--type=png", str(screenshot), timeout=60)
-        os.kill(pid, 0)
-        with screenshot.open("rb") as captured:
-            if captured.read(8) != b"\x89PNG\r\n\x1a\n":
-                raise RuntimeError("CoreSimulator did not write a valid PNG screenshot.")
+        verify_launch(device_id, bundle_id, database, screenshot)
     finally:
         for command in ("shutdown", "delete"):
             try:
