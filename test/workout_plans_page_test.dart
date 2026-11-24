@@ -3,6 +3,8 @@ import 'package:easy/workout_plan.dart';
 import 'package:easy/workout_plans_page.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
   testWidgets('schedules a one-off workout with two editable strength sets', (
@@ -85,6 +87,48 @@ void main() {
     expect(cardio.distanceKm, 2.5);
     expect(cardio.inclinePercent, 4);
     expect(cardio.minutes, 20);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('adds exercise and set metrics without rounding stored weight', (
+    tester,
+  ) async {
+    final previous = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+    List<WorkoutPlan> saved = [];
+    await _showPlans(tester, onChanged: (plans) => saved = plans);
+    await _tap(tester, 'New workout');
+    await _enter(tester, 'Workout name', 'Strength work');
+    await _tap(tester, 'Add exercise');
+    await _enter(tester, 'Exercise name', 'Deadlift');
+    await _enter(tester, 'Weight (kg)', '62.5123456');
+    await tester.tap(find.byTooltip('Weight unit'));
+    await tester.pumpAndSettle();
+    await _tap(tester, 'Pounds (lb)');
+    expect(find.widgetWithText(TextFormField, 'Weight (lb)'), findsOneWidget);
+
+    await _tap(tester, 'Add set metric');
+    await _enter(tester, 'Label', 'Tempo');
+    await _enter(tester, 'Unit (optional)', 's');
+    await _enter(tester, 'Value', '2,5');
+    await _tap(tester, 'Save metric');
+    expect(find.text('Tempo · 2.5 s'), findsOneWidget);
+
+    await _tap(tester, 'Add exercise metric');
+    await _enter(tester, 'Label', 'Range');
+    await _enter(tester, 'Unit (optional)', 'cm');
+    await _enter(tester, 'Value', '24');
+    await _tap(tester, 'Save metric');
+    await _tap(tester, 'Save exercise');
+    await _tap(tester, 'Save workout');
+
+    final lift = saved.single.exercises.single;
+    expect(lift.metrics.single.toJson(), containsPair('unit', 'cm'));
+    expect(lift.metrics.single.value, 24);
+    expect(lift.sets.single.metrics.single.value, 2.5);
+    expect(lift.sets.single.weightKg, 62.5123456);
     expect(tester.takeException(), isNull);
   });
 

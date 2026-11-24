@@ -5,6 +5,107 @@ enum WorkoutScheduleKind { once, weekdays, interval }
 
 enum WorkoutExerciseKind { cardio, strength }
 
+enum WorkoutWeightUnit {
+  kilograms('kg', 1),
+  pounds('lb', 0.45359237);
+
+  const WorkoutWeightUnit(this.symbol, this._kilogramsPerUnit);
+
+  final String symbol;
+  final double _kilogramsPerUnit;
+
+  double fromKilograms(double kilograms) => kilograms / _kilogramsPerUnit;
+  double toKilograms(double amount) => amount * _kilogramsPerUnit;
+}
+
+final class WorkoutMetric {
+  WorkoutMetric({
+    required this.id,
+    required String label,
+    String unit = '',
+    required this.value,
+  }) : label = label.trim(),
+       unit = unit.trim() {
+    if (id.trim().isEmpty || id.length > 128) {
+      throw ArgumentError.value(id, 'id', 'Use a valid metric ID.');
+    }
+    if (!isValidLabel(this.label)) {
+      throw ArgumentError.value(label, 'label', 'Use a short metric label.');
+    }
+    if (!isValidUnit(this.unit)) {
+      throw ArgumentError.value(unit, 'unit', 'Use a short unit label.');
+    }
+    if (!isValidValue(value)) {
+      throw ArgumentError.value(value, 'value', 'Use a bounded numeric value.');
+    }
+  }
+
+  factory WorkoutMetric.fromJson(Map<String, dynamic> json) => WorkoutMetric(
+    id: _readString(json, 'id'),
+    label: _readString(json, 'label'),
+    unit: json['unit'] == null ? '' : _readString(json, 'unit'),
+    value: _readNumber(json['value'], 'value').toDouble(),
+  );
+
+  static const maxLabelLength = 40;
+  static const maxUnitLength = 12;
+  static const maxAbsoluteValue = 1000000;
+  static const maxPerItem = 12;
+
+  static bool isValidValue(num value) =>
+      value.isFinite && value.abs() <= maxAbsoluteValue;
+
+  static bool isValidLabel(String source) {
+    final text = source.trim();
+    return text.isNotEmpty &&
+        text.length <= maxLabelLength &&
+        !_disallowedMetricText.hasMatch(text);
+  }
+
+  static bool isValidUnit(String source) {
+    final text = source.trim();
+    return text.length <= maxUnitLength &&
+        !_disallowedMetricText.hasMatch(text);
+  }
+
+  final String id;
+  final String label;
+  final String unit;
+  final double value;
+
+  WorkoutMetric copyWith({String? label, String? unit, double? value}) =>
+      WorkoutMetric(
+        id: id,
+        label: label ?? this.label,
+        unit: unit ?? this.unit,
+        value: value ?? this.value,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'label': label,
+    'unit': unit,
+    'value': value,
+  };
+}
+
+final _disallowedMetricText = RegExp(
+  r'[\x00-\x1f\x7f-\x9f\u2028-\u202e\u2066-\u2069]',
+);
+
+List<WorkoutMetric> _freezeMetrics(List<WorkoutMetric> metrics) {
+  if (metrics.length > WorkoutMetric.maxPerItem ||
+      metrics.map((metric) => metric.id).toSet().length != metrics.length) {
+    throw ArgumentError('Use unique metric IDs and at most 12 metrics.');
+  }
+  return List.unmodifiable(metrics);
+}
+
+List<WorkoutMetric> _readMetrics(Map<String, dynamic> json) => [
+  for (final item in _readList(json, 'metrics'))
+    WorkoutMetric.fromJson(_readObject(item, 'metrics')),
+];
+
 class WorkoutSchedule {
   WorkoutSchedule({
     required this.kind,
@@ -80,7 +181,12 @@ class WorkoutSchedule {
 }
 
 class WorkoutSet {
-  WorkoutSet({required this.id, this.weightKg = 0, this.reps = 8}) {
+  WorkoutSet({
+    required this.id,
+    this.weightKg = 0,
+    this.reps = 8,
+    List<WorkoutMetric> metrics = const [],
+  }) : metrics = _freezeMetrics(metrics) {
     _requireNonnegative(weightKg, 'weightKg');
     _requireNonnegative(reps, 'reps');
   }
@@ -89,22 +195,32 @@ class WorkoutSet {
     id: _readString(json, 'id'),
     weightKg: _readNumber(json['weightKg'] ?? 0, 'weightKg').toDouble(),
     reps: _readInt(json['reps'] ?? 8, 'reps'),
+    metrics: _readMetrics(json),
   );
 
   final String id;
   final double weightKg;
   final int reps;
+  final List<WorkoutMetric> metrics;
 
-  WorkoutSet copyWith({String? id, double? weightKg, int? reps}) => WorkoutSet(
+  WorkoutSet copyWith({
+    String? id,
+    double? weightKg,
+    int? reps,
+    List<WorkoutMetric>? metrics,
+  }) => WorkoutSet(
     id: id ?? this.id,
     weightKg: weightKg ?? this.weightKg,
     reps: reps ?? this.reps,
+    metrics: metrics ?? this.metrics,
   );
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'weightKg': weightKg,
     'reps': reps,
+    if (metrics.isNotEmpty)
+      'metrics': metrics.map((item) => item.toJson()).toList(),
   };
 }
 
@@ -117,7 +233,9 @@ class WorkoutExercise {
     this.inclinePercent = 0,
     this.minutes = 0,
     List<WorkoutSet> sets = const [],
-  }) : sets = List.unmodifiable(sets) {
+    List<WorkoutMetric> metrics = const [],
+  }) : sets = List.unmodifiable(sets),
+       metrics = _freezeMetrics(metrics) {
     _requireNonnegative(distanceKm, 'distanceKm');
     _requireNonnegative(minutes, 'minutes');
     if (!inclinePercent.isFinite) {
@@ -146,6 +264,7 @@ class WorkoutExercise {
         sets: _readList(json, 'sets')
             .map((value) => WorkoutSet.fromJson(_readObject(value, 'sets')))
             .toList(),
+        metrics: _readMetrics(json),
       );
 
   final String id;
@@ -155,6 +274,7 @@ class WorkoutExercise {
   final double inclinePercent;
   final int minutes;
   final List<WorkoutSet> sets;
+  final List<WorkoutMetric> metrics;
 
   WorkoutExercise copyWith({
     String? id,
@@ -164,6 +284,7 @@ class WorkoutExercise {
     double? inclinePercent,
     int? minutes,
     List<WorkoutSet>? sets,
+    List<WorkoutMetric>? metrics,
   }) => WorkoutExercise(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -172,6 +293,7 @@ class WorkoutExercise {
     inclinePercent: inclinePercent ?? this.inclinePercent,
     minutes: minutes ?? this.minutes,
     sets: sets ?? this.sets,
+    metrics: metrics ?? this.metrics,
   );
 
   Map<String, dynamic> toJson() => {
@@ -182,6 +304,8 @@ class WorkoutExercise {
     'inclinePercent': inclinePercent,
     'minutes': minutes,
     'sets': sets.map((set) => set.toJson()).toList(),
+    if (metrics.isNotEmpty)
+      'metrics': metrics.map((item) => item.toJson()).toList(),
   };
 }
 

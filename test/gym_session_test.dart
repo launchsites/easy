@@ -2,6 +2,8 @@ import 'package:easy/gym_session.dart';
 import 'package:easy/workout_plan.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
   testWidgets('Planned work, adjusted actuals, and extras stay chronological', (
@@ -121,6 +123,17 @@ void main() {
       await _tapTooltip(tester, 'Edit reps for Bench press, set 1');
       await _typeAndLog(tester, '6');
       await _tapTooltip(tester, 'Mark Bench press set 1 done');
+      final skipped = snapshot.withSkippedExercises(['bench', 'missing']);
+      expect(skipped.progressFor('bench', setId: 'first'), GymProgress.done);
+      expect(
+        skipped.progressFor('bench', setId: 'second'),
+        GymProgress.skipped,
+      );
+      expect(skipped.progressFor('cardio'), GymProgress.done);
+      expect(
+        snapshot.progressFor('bench', setId: 'second'),
+        GymProgress.pending,
+      );
       await _tapTooltip(tester, 'Skip Bench press set 2');
       expect(snapshot.upcomingExercises, isEmpty);
       expect(plan.exercises.last.sets.first.reps, 8);
@@ -149,6 +162,93 @@ void main() {
         restored.progressFor('bench', setId: 'second'),
         GymProgress.skipped,
       );
+    },
+  );
+
+  testWidgets(
+    'live metrics use the bottom input and pounds preserve canonical kg',
+    (tester) async {
+      _phoneViewport(tester);
+      final previous = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+      final base = _plan();
+      final bench = base.exercises.last;
+      final plan = base.copyWith(
+        exercises: [
+          bench.copyWith(
+            sets: [
+              bench.sets.first.copyWith(
+                metrics: [
+                  WorkoutMetric(
+                    id: 'tempo',
+                    label: 'Tempo',
+                    unit: 's',
+                    value: 2,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      );
+      var snapshot = GymSession.start(plan: plan);
+      Widget screen() => MaterialApp(
+        home: GymSessionPage(
+          session: snapshot,
+          onChanged: (updated) => snapshot = updated!,
+        ),
+      );
+      await tester.pumpWidget(screen());
+      await tester.pumpAndSettle();
+      await _tapTooltip(tester, 'Weight unit');
+      await tester.tap(find.text('Pounds (lb)'));
+      await tester.pumpAndSettle();
+      expect(find.text('110.23 lb'), findsOneWidget);
+      await _tapTooltip(tester, 'Edit weight for Bench press, set 1');
+      await _tapTooltip(tester, 'Save value');
+      expect(snapshot.exercises.single.sets.single.weightKg, 50);
+      await _tapTooltip(tester, 'Edit weight for Bench press, set 1');
+      await _typeAndLog(tester, '135');
+      expect(
+        snapshot.exercises.single.sets.single.weightKg,
+        closeTo(61.23497, .00001),
+      );
+
+      await _tapTooltip(tester, 'Edit Tempo for Bench press, set 1');
+      await _typeAndLog(tester, '1000001');
+      expect(
+        find.text('Enter a number from −1,000,000 to 1,000,000.'),
+        findsOneWidget,
+      );
+      await _typeAndLog(tester, '3.5');
+      expect(find.text('Tempo · 3.5 s'), findsOneWidget);
+
+      await _tapTooltip(tester, 'Set 1 options for Bench press');
+      await tester.tap(find.text('Add metric'));
+      await tester.pumpAndSettle();
+      final dialog = find.byType(AlertDialog);
+      final fields = find.descendant(
+        of: dialog,
+        matching: find.byType(TextFormField),
+      );
+      await tester.enterText(fields.at(0), 'RPE');
+      await tester.enterText(fields.at(2), '8');
+      await tester.tap(find.text('Save metric'));
+      await tester.pumpAndSettle();
+      final set = snapshot.exercises.single.sets.single;
+      expect(set.metrics.map((item) => item.value), [3.5, 8]);
+      expect(plan.exercises.single.sets.single.metrics.single.value, 2);
+      expect(plan.exercises.single.sets.single.weightKg, 50);
+
+      snapshot = GymSession.decode(snapshot.encode());
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(screen());
+      await tester.pumpAndSettle();
+      expect(find.text('135 lb'), findsOneWidget);
+      expect(find.text('RPE · 8'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 

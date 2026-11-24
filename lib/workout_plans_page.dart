@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'gym_mode_ui.dart';
 import 'ui_theme.dart';
+import 'workout_metrics_ui.dart';
 import 'workout_plan.dart';
 
 class WorkoutPlansPage extends StatefulWidget {
@@ -420,11 +421,14 @@ class _WorkoutExerciseEditorState extends State<_WorkoutExerciseEditor> {
   late String _km = _decimalText(widget.exercise?.distanceKm ?? 0);
   late String _incline = _decimalText(widget.exercise?.inclinePercent ?? 0);
   late String _minutes = (widget.exercise?.minutes ?? 0).toString();
+  late List<WorkoutMetric> _metrics = [...?widget.exercise?.metrics];
   late final List<_SetDraft> _sets = [
     for (final set in widget.exercise?.sets ?? const <WorkoutSet>[])
       _SetDraft(set),
   ];
   bool _dirty = false;
+  WorkoutWeightUnit _weightUnit = WorkoutWeightUnit.kilograms;
+  bool _selectedWeightUnit = false;
 
   @override
   void initState() {
@@ -432,6 +436,48 @@ class _WorkoutExerciseEditorState extends State<_WorkoutExerciseEditor> {
     if (widget.exercise == null && _kind == WorkoutExerciseKind.strength) {
       _sets.add(_SetDraft(WorkoutSet(id: newWorkoutId())));
     }
+    _loadWeightUnit();
+  }
+
+  Future<void> _loadWeightUnit() async {
+    final unit = await readWorkoutWeightUnit();
+    if (!mounted ||
+        _selectedWeightUnit ||
+        _sets.any((set) => set.weightInput != null)) {
+      return;
+    }
+    setState(() => _weightUnit = unit);
+  }
+
+  void _changeWeightUnit(WorkoutWeightUnit unit) {
+    if (unit == _weightUnit) return;
+    if (_sets.any((set) => !set.validWeight)) {
+      _validateForm(_form);
+      return;
+    }
+    setState(() {
+      for (final set in _sets) {
+        set.storeWeight(_weightUnit);
+      }
+      _selectedWeightUnit = true;
+      _weightUnit = unit;
+    });
+    rememberWorkoutWeightUnit(unit);
+  }
+
+  Future<void> _editMetric({_SetDraft? set, WorkoutMetric? metric}) async {
+    final edit = await showWorkoutMetricEditor(context, metric: metric);
+    if (!mounted || edit == null || (set != null && !_sets.contains(set))) {
+      return;
+    }
+    setState(() {
+      if (set == null) {
+        _metrics = applyWorkoutMetricEdit(_metrics, edit);
+      } else {
+        set.metrics = applyWorkoutMetricEdit(set.metrics, edit);
+      }
+      _dirty = true;
+    });
   }
 
   void _markDirty() {
@@ -448,7 +494,10 @@ class _WorkoutExerciseEditorState extends State<_WorkoutExerciseEditor> {
       distanceKm: cardio ? _parseDecimal(_km) ?? 0 : 0,
       inclinePercent: cardio ? _parseDecimal(_incline) ?? 0 : 0,
       minutes: cardio ? int.tryParse(_minutes.trim()) ?? 0 : 0,
-      sets: cardio ? const [] : [for (final draft in _sets) draft.toSet()],
+      sets: cardio
+          ? const []
+          : [for (final draft in _sets) draft.toSet(_weightUnit)],
+      metrics: _metrics,
     );
     Navigator.pop<_ExerciseEdit>(context, (exercise: exercise, removed: false));
   }
@@ -533,13 +582,24 @@ class _WorkoutExerciseEditorState extends State<_WorkoutExerciseEditor> {
               ],
             )
           else ...[
-            const _Heading('Sets'),
+            Row(
+              children: [
+                const Expanded(child: _Heading('Sets')),
+                WorkoutWeightUnitMenu(
+                  unit: _weightUnit,
+                  onSelected: _changeWeightUnit,
+                ),
+              ],
+            ),
             for (final (index, draft) in _sets.indexed) ...[
               _StrengthSetFields(
                 key: ValueKey(draft.id),
                 index: index,
                 draft: draft,
+                weightUnit: _weightUnit,
                 onChange: _markDirty,
+                onEditMetric: (metric) =>
+                    _editMetric(set: draft, metric: metric),
                 onRemove: () => setState(() {
                   _sets.removeAt(index);
                   _dirty = true;
@@ -559,6 +619,11 @@ class _WorkoutExerciseEditorState extends State<_WorkoutExerciseEditor> {
               ),
             ),
           ],
+          _WorkoutMetricControls(
+            metrics: _metrics,
+            addLabel: 'Add exercise metric',
+            onEdit: (metric) => _editMetric(metric: metric),
+          ),
           if (exercise != null) ...[
             const SizedBox(height: 18),
             Align(
@@ -584,17 +649,39 @@ class _WorkoutExerciseEditorState extends State<_WorkoutExerciseEditor> {
 class _SetDraft {
   _SetDraft(WorkoutSet set)
     : id = set.id,
-      weight = _decimalText(set.weightKg),
-      reps = set.reps.toString();
+      _weightKg = set.weightKg,
+      reps = set.reps.toString(),
+      metrics = set.metrics;
 
   final String id;
-  String weight;
+  double _weightKg;
+  String? weightInput;
   String reps;
+  List<WorkoutMetric> metrics;
 
-  WorkoutSet toSet() => WorkoutSet(
+  String weightText(WorkoutWeightUnit unit) =>
+      weightInput ?? workoutWeightText(_weightKg, unit);
+
+  bool get validWeight {
+    if (weightInput == null || weightInput!.trim().isEmpty) return true;
+    final amount = _parseDecimal(weightInput!);
+    return amount != null && amount.isFinite && amount >= 0;
+  }
+
+  double _kilograms(WorkoutWeightUnit unit) => weightInput == null
+      ? _weightKg
+      : unit.toKilograms(_parseDecimal(weightInput!) ?? 0);
+
+  void storeWeight(WorkoutWeightUnit unit) {
+    _weightKg = _kilograms(unit);
+    weightInput = null;
+  }
+
+  WorkoutSet toSet(WorkoutWeightUnit unit) => WorkoutSet(
     id: id,
-    weightKg: _parseDecimal(weight) ?? 0,
+    weightKg: _kilograms(unit),
     reps: int.parse(reps.trim()),
+    metrics: metrics,
   );
 }
 
@@ -602,24 +689,29 @@ class _StrengthSetFields extends StatelessWidget {
   const _StrengthSetFields({
     required this.index,
     required this.draft,
+    required this.weightUnit,
     required this.onChange,
+    required this.onEditMetric,
     required this.onRemove,
     super.key,
   });
 
   final int index;
   final _SetDraft draft;
+  final WorkoutWeightUnit weightUnit;
   final VoidCallback onChange;
+  final ValueChanged<WorkoutMetric?> onEditMetric;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     final number = index + 1;
     final weight = _NumberField(
-      label: 'Weight (kg)',
-      value: draft.weight,
+      key: ValueKey(weightUnit),
+      label: 'Weight (${weightUnit.symbol})',
+      value: draft.weightText(weightUnit),
       onChanged: (value) {
-        draft.weight = value;
+        draft.weightInput = value;
         onChange();
       },
     );
@@ -673,9 +765,57 @@ class _StrengthSetFields extends StatelessWidget {
             },
           ),
         ),
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 0, 12, 6),
+          child: _WorkoutMetricControls(
+            metrics: draft.metrics,
+            addLabel: 'Add set metric',
+            onEdit: onEditMetric,
+          ),
+        ),
       ],
     );
   }
+}
+
+class _WorkoutMetricControls extends StatelessWidget {
+  const _WorkoutMetricControls({
+    required this.metrics,
+    required this.addLabel,
+    required this.onEdit,
+  });
+
+  final List<WorkoutMetric> metrics;
+  final String addLabel;
+  final ValueChanged<WorkoutMetric?> onEdit;
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: AlignmentDirectional.centerStart,
+    child: Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (final metric in metrics)
+          ActionChip(
+            tooltip: 'Edit ${metric.label}',
+            label: Text(
+              '${metric.label} · ${workoutMetricValueText(metric)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            onPressed: () => onEdit(metric),
+          ),
+        if (metrics.length < WorkoutMetric.maxPerItem)
+          TextButton.icon(
+            onPressed: () => onEdit(null),
+            icon: const Icon(Icons.add_rounded, size: 17),
+            label: Text(addLabel),
+          ),
+      ],
+    ),
+  );
 }
 
 class _NumberField extends StatelessWidget {
@@ -686,6 +826,7 @@ class _NumberField extends StatelessWidget {
     this.integer = false,
     this.minimum = 0,
     this.isRequired = false,
+    super.key,
   });
 
   final String label;

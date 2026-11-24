@@ -179,6 +179,46 @@ void main() {
     expect(changed.exercises.single.sets.single.reps, 10);
   });
 
+  test('custom metrics round-trip, validate bounds and freeze their lists', () {
+    final metric = WorkoutMetric(
+      id: 'tempo',
+      label: 'Tempo',
+      unit: 's',
+      value: 2.5,
+    );
+    final draft = [metric];
+    final set = WorkoutSet(id: 'set', metrics: draft);
+    final exercise = WorkoutExercise(
+      id: 'lift',
+      name: 'Squat',
+      kind: WorkoutExerciseKind.strength,
+      metrics: draft,
+      sets: [set],
+    );
+    draft.clear();
+    expect(() => set.metrics.clear(), throwsUnsupportedError);
+    expect(() => exercise.metrics.clear(), throwsUnsupportedError);
+    expect(
+      WorkoutExercise.fromJson(exercise.toJson()).toJson(),
+      exercise.toJson(),
+    );
+    expect(WorkoutSet.fromJson({'id': 'old'}).metrics, isEmpty);
+    expect(WorkoutSet(id: 'old').toJson(), isNot(contains('metrics')));
+    expect(
+      () => WorkoutSet(id: 'invalid', metrics: [metric, metric]),
+      throwsArgumentError,
+    );
+    expect(() => metric.copyWith(label: ' '), throwsArgumentError);
+    for (final invalid in [
+      double.infinity,
+      double.nan,
+      -1000001.0,
+      1000001.0,
+    ]) {
+      expect(() => metric.copyWith(value: invalid), throwsArgumentError);
+    }
+  });
+
   test('invalid stored dates and recurrence cannot become valid plans', () {
     expect(
       () => WorkoutPlan.decode('''{
