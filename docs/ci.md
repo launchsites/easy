@@ -31,9 +31,9 @@ The workflows request read-only repository contents and use GitHub's checkout ac
 
 ## Review builds
 
-The downloadable previews were built from `477594a` and include SHA-256 checksums. GitHub sign-in is required. Unzip the Linux download, extract `easy-linux-x64.tar.gz`, and run `./easy` from the inner `easy` directory. The Android archives contain development-signed APKs.
+The review builds were built from `477594a` and include SHA-256 checksums. Extract the public Linux archive and run `./easy` from the extracted `easy` directory. The Android ZIPs require GitHub sign-in and contain development-signed APKs.
 
-- [Linux x86-64](https://github.com/launchsites/easy/actions/runs/45363213755/artifacts/14906820186)
+- [Linux x86-64](https://github.com/launchsites/easy/releases/download/linux-review-477594a/easy-linux-x64.tar.gz) · [SHA-256 checksum](https://github.com/launchsites/easy/releases/download/linux-review-477594a/SHA256SUMS)
 - [Android ARM64](https://github.com/launchsites/easy/actions/runs/45363351696/artifacts/14906785512)
 - [Android ARMv7](https://github.com/launchsites/easy/actions/runs/45363351696/artifacts/14906246598)
 - [Android x86-64](https://github.com/launchsites/easy/actions/runs/45363351696/artifacts/14906331419)
