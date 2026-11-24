@@ -96,6 +96,27 @@ python3 tool/benchmark/local_inference.py \
 
 ## Offline speech pilot
 
-For speech, stage the MIT-licensed whisper.cpp b5907 Linux x86-64 CPU archive with SHA-256 `a6199027fe5b4239c84171d2bca4c0ff44ec86a515494d5a39b237b212d429bd`. The MIT model repository at revision `5359861c739e955e79d9a303bcbc70fb988958b1` supplies English `ggml-tiny.en.bin` at SHA-256 `921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f` and `ggml-base.en.bin` at SHA-256 `a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002`. Use synthetic local speech from at least two eSpeak NG voices, with fixed 16 kHz mono PCM fixtures. Include clean recordings and seeded noise, and reuse the same WAV files for each model and profile. [whisper.cpp b5907 release](https://github.com/ggml-org/whisper.cpp/releases/tag/b5907) · [Model files](https://huggingface.co/ggerganov/whisper.cpp/tree/5359861c739e955e79d9a303bcbc70fb988958b1) · [OpenAI Whisper license](https://github.com/openai/whisper/blob/main/LICENSE)
+The tested whisper.cpp b5907 Linux x86-64 CPU archive has SHA-256 `a6199027fe5b4239c84171d2bca4c0ff44ec86a515494d5a39b237b212d429bd`. The MIT model repository at revision `5359861c739e955e79d9a303bcbc70fb988958b1` supplied English `ggml-tiny.en.bin` at SHA-256 `921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f` and `ggml-base.en.bin` at SHA-256 `a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002`. [whisper.cpp b5907 release](https://github.com/ggml-org/whisper.cpp/releases/tag/b5907) · [Model files](https://huggingface.co/ggerganov/whisper.cpp/tree/5359861c739e955e79d9a303bcbc70fb988958b1) · [OpenAI Whisper license](https://github.com/openai/whisper/blob/main/LICENSE)
 
-Measure transcript word error rate alongside the accuracy of names, times, durations and workout metrics. Record process startup, inference wall time, audio duration, real-time factor and peak RSS for one and four CPUs. Apply the same review requirement to typed, model-proposed and transcribed records. Show the interpreted fields for correction, and require explicit confirmation before any write. This is an experiment plan. Measurements and device support remain to be established.
+Eight synthetic capture phrases used eSpeak NG 1.52.0 British and American English, then 16 kHz mono PCM conversion with FFmpeg. Each clean clip was paired with a seeded Gaussian-noise version at 12 dB target SNR. Each profile reused the same 32 clips, totaling 126.27 seconds. Cold trials launched a process per clip. Each batch reused one model process for all clips and includes its initial load in elapsed time. [Speech cases](../tool/benchmark/speech_cases.json)
+
+| English model and profile | Cold p50 | Cold p95 | Batch wall time | Batch real-time factor | Batch peak RSS | All tested facts kept | Word error rate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Tiny, four CPUs | 1.12 s | 3.97 s | 31.84 s | 0.252 | 175 MiB | 9/32 | 63.7% |
+| Tiny, one CPU under 1 GiB | 1.50 s | 2.17 s | 56.47 s | 0.447 | 172 MiB | 9/32 | 63.7% |
+| Base, four CPUs | 1.49 s | 5.85 s | 87.38 s | 0.692 | 283 MiB | 11/32 | 52.0% |
+| Base, one CPU under 1 GiB | 3.34 s | 4.52 s | 101.39 s | 0.803 | 281 MiB | 11/32 | 52.0% |
+
+Both CPU profiles produced the same scored transcripts for each model. The Tiny model kept all tested facts on six clean clips and three noisy clips. Base kept them on nine clean clips and two noisy clips. The Base memory-floor probe under 128 MiB exited during initialization and generated zero transcripts. [Raw speech sweep](benchmark-results/local-speech-epyc-20261124.json)
+
+Fact checks use declared text alternatives for the names, times, quantities and labels. This lexical method also flags merged labels such as “Gymlog” on a clip that preserved the treadmill distance, incline and time. An example with a changed critical value is Tiny's clean coffee clip, which returned “10-11M” for the specified 10 to 11 A.M. range. These synthetic fixtures measure comparative behavior. Real microphones and human speech remain separate verification work.
+
+With Python 3, eSpeak NG, FFmpeg and GNU time installed, run this command from the repository root using the verified runtime and model paths.
+
+```sh
+python3 tool/benchmark/local_speech.py \
+  --whisper "$easy_bench_dir/whisper-bin-ubuntu-x64/whisper-cli" \
+  --model "$easy_bench_dir/ggml-tiny.en.bin" \
+  --model "$easy_bench_dir/ggml-base.en.bin" \
+  --output "$easy_bench_dir/speech-results.json"
+```

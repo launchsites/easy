@@ -1,0 +1,6031 @@
+{
+  "run_at_utc": "2026-11-24T02:24:43.581500+00:00",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "host_memory_kib": 18440100,
+    "cgroup_cpu_max": "400000 100000",
+    "cgroup_memory_max": "17179869184",
+    "cgroup_memory_events_before": "low 0\nhigh 0\nmax 43325\noom 0\noom_kill 0\noom_group_kill 0",
+    "cgroup_memory_events_after": "low 0\nhigh 0\nmax 43325\noom 0\noom_kill 0\noom_group_kill 0"
+  },
+  "whisper_sha256": "83dc7b79be42a240583f83ee7f8ebfe7b5e06b527a8f217c18a1d4101d215dff",
+  "models": [
+    {
+      "name": "ggml-tiny.en.bin",
+      "sha256": "921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f",
+      "size_bytes": 77704715
+    },
+    {
+      "name": "ggml-base.en.bin",
+      "sha256": "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002",
+      "size_bytes": 147964211
+    }
+  ],
+  "cases_sha256": "ce321b6bcf0050086a6cd7c86272b9c831274f1d62ef9a675b34076ec1209145",
+  "signal": {
+    "rate_hz": 16000,
+    "voices": [
+      "en-gb",
+      "en-us"
+    ],
+    "noise_db": 12,
+    "seed": 20261124,
+    "espeak": "eSpeak NG text-to-speech: 1.52.0",
+    "ffmpeg": "ffmpeg version 7.1.5-0+deb13u1 Copyright (c) 2000-2026 the FFmpeg developers"
+  },
+  "clips": [
+    {
+      "id": "work_deadline-en-gb-clean",
+      "case": {
+        "id": "work_deadline",
+        "text": "Email Jordan the revised estimate by Friday.",
+        "required": [
+          [
+            "jordan"
+          ],
+          [
+            "revised estimate"
+          ],
+          [
+            "friday"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "clean",
+      "audio_ms": 3221.88,
+      "audio_sha256": "6c786ccdde09be2aa0c1686966497562b1abd2588e1705c0c888642ae202328b"
+    },
+    {
+      "id": "work_deadline-en-gb-noisy",
+      "case": {
+        "id": "work_deadline",
+        "text": "Email Jordan the revised estimate by Friday.",
+        "required": [
+          [
+            "jordan"
+          ],
+          [
+            "revised estimate"
+          ],
+          [
+            "friday"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "noisy",
+      "audio_ms": 3221.88,
+      "audio_sha256": "36aec9b5ef79779815a4c0159d675149579b9b2832139e2dff21e1886a9e87f2"
+    },
+    {
+      "id": "work_deadline-en-us-clean",
+      "case": {
+        "id": "work_deadline",
+        "text": "Email Jordan the revised estimate by Friday.",
+        "required": [
+          [
+            "jordan"
+          ],
+          [
+            "revised estimate"
+          ],
+          [
+            "friday"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "clean",
+      "audio_ms": 3127.81,
+      "audio_sha256": "cc1cdfde1eaebc97e962155be3aaca8144038cf2c38b59f1012ea0e08f313b82"
+    },
+    {
+      "id": "work_deadline-en-us-noisy",
+      "case": {
+        "id": "work_deadline",
+        "text": "Email Jordan the revised estimate by Friday.",
+        "required": [
+          [
+            "jordan"
+          ],
+          [
+            "revised estimate"
+          ],
+          [
+            "friday"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "noisy",
+      "audio_ms": 3127.81,
+      "audio_sha256": "972a460284e8785aee8d369292472dadbc4fe5afd7ab839fecf6e44b3085c368"
+    },
+    {
+      "id": "coffee_range-en-gb-clean",
+      "case": {
+        "id": "coffee_range",
+        "text": "Coffee with Alex tomorrow from ten to eleven A M.",
+        "required": [
+          [
+            "coffee with alex"
+          ],
+          [
+            "tomorrow"
+          ],
+          [
+            "ten to eleven a m",
+            "10 11 a m",
+            "10 11 am",
+            "10 to 11 am",
+            "10 to 11 a m"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "clean",
+      "audio_ms": 2840.81,
+      "audio_sha256": "30689fd828fccce17e8d108ab5a447903db04d4933b1e9e4ed9eb40f0801d4fa"
+    },
+    {
+      "id": "coffee_range-en-gb-noisy",
+      "case": {
+        "id": "coffee_range",
+        "text": "Coffee with Alex tomorrow from ten to eleven A M.",
+        "required": [
+          [
+            "coffee with alex"
+          ],
+          [
+            "tomorrow"
+          ],
+          [
+            "ten to eleven a m",
+            "10 11 a m",
+            "10 11 am",
+            "10 to 11 am",
+            "10 to 11 a m"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "noisy",
+      "audio_ms": 2840.81,
+      "audio_sha256": "97e1df0b4b2ba3cf7a3f265a8e73c7b15a13fb7b959943642fce40c83572e7f6"
+    },
+    {
+      "id": "coffee_range-en-us-clean",
+      "case": {
+        "id": "coffee_range",
+        "text": "Coffee with Alex tomorrow from ten to eleven A M.",
+        "required": [
+          [
+            "coffee with alex"
+          ],
+          [
+            "tomorrow"
+          ],
+          [
+            "ten to eleven a m",
+            "10 11 a m",
+            "10 11 am",
+            "10 to 11 am",
+            "10 to 11 a m"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "clean",
+      "audio_ms": 3002.94,
+      "audio_sha256": "e7d088017214af0497d87ba4ee79f8f0e6f7e26ac4491bee38f6175dfa5e9af6"
+    },
+    {
+      "id": "coffee_range-en-us-noisy",
+      "case": {
+        "id": "coffee_range",
+        "text": "Coffee with Alex tomorrow from ten to eleven A M.",
+        "required": [
+          [
+            "coffee with alex"
+          ],
+          [
+            "tomorrow"
+          ],
+          [
+            "ten to eleven a m",
+            "10 11 a m",
+            "10 11 am",
+            "10 to 11 am",
+            "10 to 11 a m"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "noisy",
+      "audio_ms": 3002.94,
+      "audio_sha256": "e745e113ec6a34cd2f8356871c43f7db4358dcdd4d896e0c517fe17266fba2fc"
+    },
+    {
+      "id": "timed_appointment-en-gb-clean",
+      "case": {
+        "id": "timed_appointment",
+        "text": "Dentist on Thursday at nine thirty for forty five minutes.",
+        "required": [
+          [
+            "dentist"
+          ],
+          [
+            "thursday"
+          ],
+          [
+            "nine thirty",
+            "9 30"
+          ],
+          [
+            "forty five minutes",
+            "45 minutes"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "clean",
+      "audio_ms": 4027.94,
+      "audio_sha256": "c449e33295d679013d798c1a4ff39ceb3c6441fc29b6ecc758540e0630866de9"
+    },
+    {
+      "id": "timed_appointment-en-gb-noisy",
+      "case": {
+        "id": "timed_appointment",
+        "text": "Dentist on Thursday at nine thirty for forty five minutes.",
+        "required": [
+          [
+            "dentist"
+          ],
+          [
+            "thursday"
+          ],
+          [
+            "nine thirty",
+            "9 30"
+          ],
+          [
+            "forty five minutes",
+            "45 minutes"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "noisy",
+      "audio_ms": 4027.94,
+      "audio_sha256": "6ccf97a1329412a0df4a7211f615b9956a20bef0975fcafe1abf803f97fd4799"
+    },
+    {
+      "id": "timed_appointment-en-us-clean",
+      "case": {
+        "id": "timed_appointment",
+        "text": "Dentist on Thursday at nine thirty for forty five minutes.",
+        "required": [
+          [
+            "dentist"
+          ],
+          [
+            "thursday"
+          ],
+          [
+            "nine thirty",
+            "9 30"
+          ],
+          [
+            "forty five minutes",
+            "45 minutes"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "clean",
+      "audio_ms": 4082.25,
+      "audio_sha256": "38e40bf0cf3d35761088ec9ab483181cb8326702ec9a872deb3050026d86c694"
+    },
+    {
+      "id": "timed_appointment-en-us-noisy",
+      "case": {
+        "id": "timed_appointment",
+        "text": "Dentist on Thursday at nine thirty for forty five minutes.",
+        "required": [
+          [
+            "dentist"
+          ],
+          [
+            "thursday"
+          ],
+          [
+            "nine thirty",
+            "9 30"
+          ],
+          [
+            "forty five minutes",
+            "45 minutes"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "noisy",
+      "audio_ms": 4082.25,
+      "audio_sha256": "17d4459253ec589c59838ca3523af486f63309fbdc5268cbd2d6d2131fa1499b"
+    },
+    {
+      "id": "study_note-en-gb-clean",
+      "case": {
+        "id": "study_note",
+        "text": "Add a note for study. Chapter four uses the same lemma twice.",
+        "required": [
+          [
+            "note for study"
+          ],
+          [
+            "chapter four",
+            "chapter 4"
+          ],
+          [
+            "same lemma twice"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "clean",
+      "audio_ms": 4620.69,
+      "audio_sha256": "9bcb525a7acd82e3d5247778fbbb869fd30d6bfec80203c4c4ba75c990d5b0de"
+    },
+    {
+      "id": "study_note-en-gb-noisy",
+      "case": {
+        "id": "study_note",
+        "text": "Add a note for study. Chapter four uses the same lemma twice.",
+        "required": [
+          [
+            "note for study"
+          ],
+          [
+            "chapter four",
+            "chapter 4"
+          ],
+          [
+            "same lemma twice"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "noisy",
+      "audio_ms": 4620.69,
+      "audio_sha256": "d3b5c2cd29698d9fd5816efc9678639f9cebda3ac7883202f23f3d3066e1e876"
+    },
+    {
+      "id": "study_note-en-us-clean",
+      "case": {
+        "id": "study_note",
+        "text": "Add a note for study. Chapter four uses the same lemma twice.",
+        "required": [
+          [
+            "note for study"
+          ],
+          [
+            "chapter four",
+            "chapter 4"
+          ],
+          [
+            "same lemma twice"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "clean",
+      "audio_ms": 4686.31,
+      "audio_sha256": "e5decc5af450abaf6767fff7d9849f7f9896baa72e438293416ef731455d0813"
+    },
+    {
+      "id": "study_note-en-us-noisy",
+      "case": {
+        "id": "study_note",
+        "text": "Add a note for study. Chapter four uses the same lemma twice.",
+        "required": [
+          [
+            "note for study"
+          ],
+          [
+            "chapter four",
+            "chapter 4"
+          ],
+          [
+            "same lemma twice"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "noisy",
+      "audio_ms": 4686.31,
+      "audio_sha256": "bac71ea8d7ee0a0f75b5b49573f5571dd178426172e8723079f5c7a99fa23d8f"
+    },
+    {
+      "id": "cardio-en-gb-clean",
+      "case": {
+        "id": "cardio",
+        "text": "Gym log. Treadmill zero point seven five kilometers at two percent incline for five minutes.",
+        "required": [
+          [
+            "gym log"
+          ],
+          [
+            "treadmill"
+          ],
+          [
+            "zero point seven five",
+            "0 75"
+          ],
+          [
+            "two percent",
+            "2 percent",
+            "2 incline"
+          ],
+          [
+            "five minutes",
+            "5 minutes"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "clean",
+      "audio_ms": 6786.12,
+      "audio_sha256": "22ab2d5acccf46ea0f7bd5f35562dceb2b03dbd329f4b13f2cf61058684b41ae"
+    },
+    {
+      "id": "cardio-en-gb-noisy",
+      "case": {
+        "id": "cardio",
+        "text": "Gym log. Treadmill zero point seven five kilometers at two percent incline for five minutes.",
+        "required": [
+          [
+            "gym log"
+          ],
+          [
+            "treadmill"
+          ],
+          [
+            "zero point seven five",
+            "0 75"
+          ],
+          [
+            "two percent",
+            "2 percent",
+            "2 incline"
+          ],
+          [
+            "five minutes",
+            "5 minutes"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "noisy",
+      "audio_ms": 6786.12,
+      "audio_sha256": "65153aef6c23c3c6d2fe5ebb23d4ed2dfeb9ed6b6294ce4b45af868d628bbd83"
+    },
+    {
+      "id": "cardio-en-us-clean",
+      "case": {
+        "id": "cardio",
+        "text": "Gym log. Treadmill zero point seven five kilometers at two percent incline for five minutes.",
+        "required": [
+          [
+            "gym log"
+          ],
+          [
+            "treadmill"
+          ],
+          [
+            "zero point seven five",
+            "0 75"
+          ],
+          [
+            "two percent",
+            "2 percent",
+            "2 incline"
+          ],
+          [
+            "five minutes",
+            "5 minutes"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "clean",
+      "audio_ms": 7019.12,
+      "audio_sha256": "f9676899403bb4c9d472f433fa51ea5fc17e00248a1097759855b9338e1a8b9b"
+    },
+    {
+      "id": "cardio-en-us-noisy",
+      "case": {
+        "id": "cardio",
+        "text": "Gym log. Treadmill zero point seven five kilometers at two percent incline for five minutes.",
+        "required": [
+          [
+            "gym log"
+          ],
+          [
+            "treadmill"
+          ],
+          [
+            "zero point seven five",
+            "0 75"
+          ],
+          [
+            "two percent",
+            "2 percent",
+            "2 incline"
+          ],
+          [
+            "five minutes",
+            "5 minutes"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "noisy",
+      "audio_ms": 7019.12,
+      "audio_sha256": "ba0abbd42c2e025194a4d92596cb5dcb3a38655a509e04e05c3cc8159fd44884"
+    },
+    {
+      "id": "strength-en-gb-clean",
+      "case": {
+        "id": "strength",
+        "text": "Bench press, fifty kilos, eight reps, for Gym.",
+        "required": [
+          [
+            "bench press"
+          ],
+          [
+            "fifty kilos",
+            "50 kilos",
+            "50 kg"
+          ],
+          [
+            "eight reps",
+            "8 reps"
+          ],
+          [
+            "gym"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "clean",
+      "audio_ms": 4105.62,
+      "audio_sha256": "e8c2df26ef4a58c14a0fbe26266c29150c9cbf0b5672a33f3efc6e0d576bff42"
+    },
+    {
+      "id": "strength-en-gb-noisy",
+      "case": {
+        "id": "strength",
+        "text": "Bench press, fifty kilos, eight reps, for Gym.",
+        "required": [
+          [
+            "bench press"
+          ],
+          [
+            "fifty kilos",
+            "50 kilos",
+            "50 kg"
+          ],
+          [
+            "eight reps",
+            "8 reps"
+          ],
+          [
+            "gym"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "noisy",
+      "audio_ms": 4105.62,
+      "audio_sha256": "5f5ea9dd70d09dff57a7215b1f0bfcfd3f66159429afaece99fc1b2b7ebebdb8"
+    },
+    {
+      "id": "strength-en-us-clean",
+      "case": {
+        "id": "strength",
+        "text": "Bench press, fifty kilos, eight reps, for Gym.",
+        "required": [
+          [
+            "bench press"
+          ],
+          [
+            "fifty kilos",
+            "50 kilos",
+            "50 kg"
+          ],
+          [
+            "eight reps",
+            "8 reps"
+          ],
+          [
+            "gym"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "clean",
+      "audio_ms": 4313.44,
+      "audio_sha256": "b9c7933aa12c46c99af4aaca0c9d4f6a10116fda47126419b7befa94ce3101e6"
+    },
+    {
+      "id": "strength-en-us-noisy",
+      "case": {
+        "id": "strength",
+        "text": "Bench press, fifty kilos, eight reps, for Gym.",
+        "required": [
+          [
+            "bench press"
+          ],
+          [
+            "fifty kilos",
+            "50 kilos",
+            "50 kg"
+          ],
+          [
+            "eight reps",
+            "8 reps"
+          ],
+          [
+            "gym"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "noisy",
+      "audio_ms": 4313.44,
+      "audio_sha256": "d285964b77ac676d641a33d6e3e1a30fdf651bdfdbeb96e84ea3570ffe56bfce"
+    },
+    {
+      "id": "personal_note-en-gb-clean",
+      "case": {
+        "id": "personal_note",
+        "text": "For a personal note, get the weekend shopping list.",
+        "required": [
+          [
+            "personal note"
+          ],
+          [
+            "weekend shopping list"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "clean",
+      "audio_ms": 3409.75,
+      "audio_sha256": "5f1fa0273d8ad00edd33e22d03ee9d66d75cfb14a5292781d7e23d64b0d90ac6"
+    },
+    {
+      "id": "personal_note-en-gb-noisy",
+      "case": {
+        "id": "personal_note",
+        "text": "For a personal note, get the weekend shopping list.",
+        "required": [
+          [
+            "personal note"
+          ],
+          [
+            "weekend shopping list"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "noisy",
+      "audio_ms": 3409.75,
+      "audio_sha256": "9069a0845b943c2949e69b929d34fdc9c0c399737398a0b0fd10b68d3e2d3cf0"
+    },
+    {
+      "id": "personal_note-en-us-clean",
+      "case": {
+        "id": "personal_note",
+        "text": "For a personal note, get the weekend shopping list.",
+        "required": [
+          [
+            "personal note"
+          ],
+          [
+            "weekend shopping list"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "clean",
+      "audio_ms": 3484.56,
+      "audio_sha256": "93638ed63dd303d238f7105cd3fb119207adba52197304de125524a8da0c2084"
+    },
+    {
+      "id": "personal_note-en-us-noisy",
+      "case": {
+        "id": "personal_note",
+        "text": "For a personal note, get the weekend shopping list.",
+        "required": [
+          [
+            "personal note"
+          ],
+          [
+            "weekend shopping list"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "noisy",
+      "audio_ms": 3484.56,
+      "audio_sha256": "66e00f445f371a29989d3aa5badd322b60f5f301bdaecdc1f0c558ca51dcd9b2"
+    },
+    {
+      "id": "destructive_request-en-gb-clean",
+      "case": {
+        "id": "destructive_request",
+        "text": "Cancel all meetings tomorrow.",
+        "required": [
+          [
+            "cancel all meetings"
+          ],
+          [
+            "tomorrow"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "clean",
+      "audio_ms": 2190.12,
+      "audio_sha256": "6415e11c4aeca4282e072e4250049ba3e7d25e69f82fa333ebbe15b98e488d0c"
+    },
+    {
+      "id": "destructive_request-en-gb-noisy",
+      "case": {
+        "id": "destructive_request",
+        "text": "Cancel all meetings tomorrow.",
+        "required": [
+          [
+            "cancel all meetings"
+          ],
+          [
+            "tomorrow"
+          ]
+        ]
+      },
+      "voice": "en-gb",
+      "condition": "noisy",
+      "audio_ms": 2190.12,
+      "audio_sha256": "c322c671bba20e2b15a7a42639805d1dfa1fbdeab1e450ab916d188f050bb065"
+    },
+    {
+      "id": "destructive_request-en-us-clean",
+      "case": {
+        "id": "destructive_request",
+        "text": "Cancel all meetings tomorrow.",
+        "required": [
+          [
+            "cancel all meetings"
+          ],
+          [
+            "tomorrow"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "clean",
+      "audio_ms": 2217.25,
+      "audio_sha256": "ded5dbdc24d71fe3378d0da53ab4e5c9afc1e5887a6902d302e810dcba6ef4d4"
+    },
+    {
+      "id": "destructive_request-en-us-noisy",
+      "case": {
+        "id": "destructive_request",
+        "text": "Cancel all meetings tomorrow.",
+        "required": [
+          [
+            "cancel all meetings"
+          ],
+          [
+            "tomorrow"
+          ]
+        ]
+      },
+      "voice": "en-us",
+      "condition": "noisy",
+      "audio_ms": 2217.25,
+      "audio_sha256": "67dc621eceba60d13a6d0c112293b7722beeafe34350e173a92724b5283279bd"
+    }
+  ],
+  "profiles": [
+    {
+      "model": "ggml-tiny.en.bin",
+      "cpu_affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "address_space_mib": null,
+      "cold": [
+        {
+          "clip_id": "work_deadline-en-gb-clean",
+          "wall_ms": 2080.53,
+          "audio_ms": 3221.88,
+          "peak_rss_kib": 174836,
+          "model_load_ms": 385.89,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.6458,
+          "transcription": {
+            "clip_id": "work_deadline-en-gb-clean",
+            "transcript": "e-mail. \"Dawgden, the revised vestibat high Friday.\"",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "jordan"
+              ],
+              [
+                "revised estimate"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-gb-noisy",
+          "wall_ms": 1301.34,
+          "audio_ms": 3221.88,
+          "peak_rss_kib": 174856,
+          "model_load_ms": 60.76,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.4039,
+          "transcription": {
+            "clip_id": "work_deadline-en-gb-noisy",
+            "transcript": "email Jordan the reminds me of my dry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-us-clean",
+          "wall_ms": 873.11,
+          "audio_ms": 3127.81,
+          "peak_rss_kib": 174812,
+          "model_load_ms": 97.76,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2791,
+          "transcription": {
+            "clip_id": "work_deadline-en-us-clean",
+            "transcript": "e-mail Jordan the revised estimate high Friday.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-us-noisy",
+          "wall_ms": 1385.88,
+          "audio_ms": 3127.81,
+          "peak_rss_kib": 174176,
+          "model_load_ms": 175.28,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.4431,
+          "transcription": {
+            "clip_id": "work_deadline-en-us-noisy",
+            "transcript": "the email Jordan the reminds me of the next time it's my cry of day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-gb-clean",
+          "wall_ms": 1286.75,
+          "audio_ms": 2840.81,
+          "peak_rss_kib": 174088,
+          "model_load_ms": 205.9,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.453,
+          "transcription": {
+            "clip_id": "coffee_range-en-gb-clean",
+            "transcript": "Coffee with Alex Tomorrow from 10-11M",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-gb-noisy",
+          "wall_ms": 2922.76,
+          "audio_ms": 2840.81,
+          "peak_rss_kib": 175024,
+          "model_load_ms": 75.23,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.0288,
+          "transcription": {
+            "clip_id": "coffee_range-en-gb-noisy",
+            "transcript": "coffee with Alex to follow from 10 to 11.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-us-clean",
+          "wall_ms": 679.95,
+          "audio_ms": 3002.94,
+          "peak_rss_kib": 174772,
+          "model_load_ms": 108.54,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2264,
+          "transcription": {
+            "clip_id": "coffee_range-en-us-clean",
+            "transcript": "Coffee with Alex tomorrow from 10-11M",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-us-noisy",
+          "wall_ms": 1079.59,
+          "audio_ms": 3002.94,
+          "peak_rss_kib": 175096,
+          "model_load_ms": 68.5,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3595,
+          "transcription": {
+            "clip_id": "coffee_range-en-us-noisy",
+            "transcript": "coffee with my lips to my local intent of an M.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-gb-clean",
+          "wall_ms": 1241.25,
+          "audio_ms": 4027.94,
+          "peak_rss_kib": 174908,
+          "model_load_ms": 86.39,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3082,
+          "transcription": {
+            "clip_id": "timed_appointment-en-gb-clean",
+            "transcript": "Then it's time for the date of 93445 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-gb-noisy",
+          "wall_ms": 1122.35,
+          "audio_ms": 4027.94,
+          "peak_rss_kib": 174256,
+          "model_load_ms": 69.58,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2786,
+          "transcription": {
+            "clip_id": "timed_appointment-en-gb-noisy",
+            "transcript": "This is the dentist on Thursday, 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-us-clean",
+          "wall_ms": 837.39,
+          "audio_ms": 4082.25,
+          "peak_rss_kib": 173840,
+          "model_load_ms": 117.23,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2051,
+          "transcription": {
+            "clip_id": "timed_appointment-en-us-clean",
+            "transcript": "Then it is done Thursday at 93445 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-us-noisy",
+          "wall_ms": 919.07,
+          "audio_ms": 4082.25,
+          "peak_rss_kib": 175160,
+          "model_load_ms": 62.24,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2251,
+          "transcription": {
+            "clip_id": "timed_appointment-en-us-noisy",
+            "transcript": "them this time, they have to hide in 30, or 40, I'm minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-gb-clean",
+          "wall_ms": 699.7,
+          "audio_ms": 4620.69,
+          "peak_rss_kib": 174980,
+          "model_load_ms": 69.29,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.1514,
+          "transcription": {
+            "clip_id": "study_note-en-gb-clean",
+            "transcript": "I don't know what force to do, Chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 11,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-gb-noisy",
+          "wall_ms": 942.33,
+          "audio_ms": 4620.69,
+          "peak_rss_kib": 175024,
+          "model_load_ms": 71.28,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2039,
+          "transcription": {
+            "clip_id": "study_note-en-gb-noisy",
+            "transcript": "Ah, no, no, of course, to admit, Chapter 4 used in the same lemuth wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 12,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-us-clean",
+          "wall_ms": 1468.74,
+          "audio_ms": 4686.31,
+          "peak_rss_kib": 175084,
+          "model_load_ms": 151.46,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3134,
+          "transcription": {
+            "clip_id": "study_note-en-us-clean",
+            "transcript": "and a note for study, chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-us-noisy",
+          "wall_ms": 1800.56,
+          "audio_ms": 4686.31,
+          "peak_rss_kib": 174140,
+          "model_load_ms": 83.22,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3842,
+          "transcription": {
+            "clip_id": "study_note-en-us-noisy",
+            "transcript": "and a note or study, chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-gb-clean",
+          "wall_ms": 3970.73,
+          "audio_ms": 6786.12,
+          "peak_rss_kib": 175040,
+          "model_load_ms": 291.06,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.5851,
+          "transcription": {
+            "clip_id": "cardio-en-gb-clean",
+            "transcript": "Jim Log, treadmill 0.75 km at 2% in climb for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-gb-noisy",
+          "wall_ms": 5899.11,
+          "audio_ms": 6786.12,
+          "peak_rss_kib": 175224,
+          "model_load_ms": 83.94,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.8693,
+          "transcription": {
+            "clip_id": "cardio-en-gb-noisy",
+            "transcript": "in log. Tremile near 0.7, I'd kill on it on at 2% in climb for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 15,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "zero point seven five",
+                "0 75"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-us-clean",
+          "wall_ms": 1092.26,
+          "audio_ms": 7019.12,
+          "peak_rss_kib": 174472,
+          "model_load_ms": 69.49,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.1556,
+          "transcription": {
+            "clip_id": "cardio-en-us-clean",
+            "transcript": "In log, treadmill 0.75 km at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "gym log"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-us-noisy",
+          "wall_ms": 1198.99,
+          "audio_ms": 7019.12,
+          "peak_rss_kib": 175312,
+          "model_load_ms": 56.27,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.1708,
+          "transcription": {
+            "clip_id": "cardio-en-us-noisy",
+            "transcript": "Gen-Wod, 12mm 0.75mm, 2% inclined for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-gb-clean",
+          "wall_ms": 847.08,
+          "audio_ms": 4105.62,
+          "peak_rss_kib": 174752,
+          "model_load_ms": 62.17,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2063,
+          "transcription": {
+            "clip_id": "strength-en-gb-clean",
+            "transcript": "Bench Press, 50 kilos, 8 reps, 4 gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "strength-en-gb-noisy",
+          "wall_ms": 606.5,
+          "audio_ms": 4105.62,
+          "peak_rss_kib": 173488,
+          "model_load_ms": 108.55,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.1477,
+          "transcription": {
+            "clip_id": "strength-en-gb-noisy",
+            "transcript": "bench press, 50 kilo, 8 reps, or gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-us-clean",
+          "wall_ms": 577.57,
+          "audio_ms": 4313.44,
+          "peak_rss_kib": 174844,
+          "model_load_ms": 65.93,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.1339,
+          "transcription": {
+            "clip_id": "strength-en-us-clean",
+            "transcript": "Mange dress, 50 kilos, 8 reps, 4 gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-us-noisy",
+          "wall_ms": 781.28,
+          "audio_ms": 4313.44,
+          "peak_rss_kib": 174984,
+          "model_load_ms": 70.51,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.1811,
+          "transcription": {
+            "clip_id": "strength-en-us-noisy",
+            "transcript": "10th Class 50 K Long 8th Raps Origin.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "bench press"
+              ],
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ],
+              [
+                "eight reps",
+                "8 reps"
+              ],
+              [
+                "gym"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "personal_note-en-gb-clean",
+          "wall_ms": 639.28,
+          "audio_ms": 3409.75,
+          "peak_rss_kib": 174732,
+          "model_load_ms": 71.93,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.1875,
+          "transcription": {
+            "clip_id": "personal_note-en-gb-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-gb-noisy",
+          "wall_ms": 3118.42,
+          "audio_ms": 3409.75,
+          "peak_rss_kib": 173708,
+          "model_load_ms": 60.73,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.9146,
+          "transcription": {
+            "clip_id": "personal_note-en-gb-noisy",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-us-clean",
+          "wall_ms": 1387.25,
+          "audio_ms": 3484.56,
+          "peak_rss_kib": 173984,
+          "model_load_ms": 62.2,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3981,
+          "transcription": {
+            "clip_id": "personal_note-en-us-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-us-noisy",
+          "wall_ms": 1503.88,
+          "audio_ms": 3484.56,
+          "peak_rss_kib": 174064,
+          "model_load_ms": 126.43,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.4316,
+          "transcription": {
+            "clip_id": "personal_note-en-us-noisy",
+            "transcript": "for a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-gb-clean",
+          "wall_ms": 1066.49,
+          "audio_ms": 2190.12,
+          "peak_rss_kib": 172932,
+          "model_load_ms": 74.03,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.487,
+          "transcription": {
+            "clip_id": "destructive_request-en-gb-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-gb-noisy",
+          "wall_ms": 2937.46,
+          "audio_ms": 2190.12,
+          "peak_rss_kib": 174080,
+          "model_load_ms": 72.88,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.3412,
+          "transcription": {
+            "clip_id": "destructive_request-en-gb-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-us-clean",
+          "wall_ms": 1123.46,
+          "audio_ms": 2217.25,
+          "peak_rss_kib": 174720,
+          "model_load_ms": 125.8,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.5067,
+          "transcription": {
+            "clip_id": "destructive_request-en-us-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-us-noisy",
+          "wall_ms": 713.95,
+          "audio_ms": 2217.25,
+          "peak_rss_kib": 173772,
+          "model_load_ms": 64.89,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.322,
+          "transcription": {
+            "clip_id": "destructive_request-en-us-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        }
+      ],
+      "warm_batch": {
+        "wall_ms": 31839.42,
+        "audio_ms": 126273.22,
+        "peak_rss_kib": 178940,
+        "model_load_ms": 92.57,
+        "exit_code": 0,
+        "timed_out": false,
+        "real_time_factor": 0.2521,
+        "transcriptions": [
+          {
+            "clip_id": "work_deadline-en-gb-clean",
+            "transcript": "e-mail. \"Dawgden, the revised vestibat high Friday.\"",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "jordan"
+              ],
+              [
+                "revised estimate"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "work_deadline-en-gb-noisy",
+            "transcript": "email Jordan the reminds me of my dry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "work_deadline-en-us-clean",
+            "transcript": "e-mail Jordan the revised estimate high Friday.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "work_deadline-en-us-noisy",
+            "transcript": "the email Jordan the reminds me of the next time it's my cry of day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-gb-clean",
+            "transcript": "Coffee with Alex Tomorrow from 10-11M",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-gb-noisy",
+            "transcript": "coffee with Alex to follow from 10 to 11.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-us-clean",
+            "transcript": "Coffee with Alex tomorrow from 10-11M",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-us-noisy",
+            "transcript": "coffee with my lips to my local intent of an M.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-gb-clean",
+            "transcript": "Then it's time for the date of 93445 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-gb-noisy",
+            "transcript": "This is the dentist on Thursday, 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "timed_appointment-en-us-clean",
+            "transcript": "Then it is done Thursday at 93445 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-us-noisy",
+            "transcript": "them this time, they have to hide in 30, or 40, I'm minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-gb-clean",
+            "transcript": "I don't know what force to do, Chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 11,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-gb-noisy",
+            "transcript": "Ah, no, no, of course, to admit, Chapter 4 used in the same lemuth wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 12,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-us-clean",
+            "transcript": "and a note for study, chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-us-noisy",
+            "transcript": "and a note or study, chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-gb-clean",
+            "transcript": "Jim Log, treadmill 0.75 km at 2% in climb for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-gb-noisy",
+            "transcript": "in log. Tremile near 0.7, I'd kill on it on at 2% in climb for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 15,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "zero point seven five",
+                "0 75"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-us-clean",
+            "transcript": "In log, treadmill 0.75 km at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "gym log"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-us-noisy",
+            "transcript": "Gen-Wod, 12mm 0.75mm, 2% inclined for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-gb-clean",
+            "transcript": "Bench Press, 50 kilos, 8 reps, 4 gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "strength-en-gb-noisy",
+            "transcript": "bench press, 50 kilo, 8 reps, or gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-us-clean",
+            "transcript": "Mange dress, 50 kilos, 8 reps, 4 gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-us-noisy",
+            "transcript": "10th Class 50 K Long 8th Raps Origin.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "bench press"
+              ],
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ],
+              [
+                "eight reps",
+                "8 reps"
+              ],
+              [
+                "gym"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "personal_note-en-gb-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-gb-noisy",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-us-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-us-noisy",
+            "transcript": "for a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-gb-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-gb-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "destructive_request-en-us-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-us-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        ]
+      },
+      "summary": {
+        "cold_requests": 32,
+        "cold_accepted": 32,
+        "cold_p50_ms": 1122.9,
+        "cold_p95_ms": 3970.73,
+        "peak_cold_rss_kib": 175312,
+        "warm_transcripts": 32,
+        "warm_fact_pass": 9,
+        "warm_exact_transcripts": 6,
+        "warm_word_error_rate": 0.6367
+      },
+      "quality_by_condition": {
+        "clean": {
+          "transcripts": 16,
+          "fact_pass": 6,
+          "word_error_rate": 0.5067
+        },
+        "noisy": {
+          "transcripts": 16,
+          "fact_pass": 3,
+          "word_error_rate": 0.7667
+        }
+      }
+    },
+    {
+      "model": "ggml-tiny.en.bin",
+      "cpu_affinity": [
+        0
+      ],
+      "address_space_mib": 1024,
+      "cold": [
+        {
+          "clip_id": "work_deadline-en-gb-clean",
+          "wall_ms": 1835.73,
+          "audio_ms": 3221.88,
+          "peak_rss_kib": 172740,
+          "model_load_ms": 133.54,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.5698,
+          "transcription": {
+            "clip_id": "work_deadline-en-gb-clean",
+            "transcript": "e-mail. \"Dawgden, the revised vestibat high Friday.\"",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "jordan"
+              ],
+              [
+                "revised estimate"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-gb-noisy",
+          "wall_ms": 1830.55,
+          "audio_ms": 3221.88,
+          "peak_rss_kib": 172532,
+          "model_load_ms": 224.74,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.5682,
+          "transcription": {
+            "clip_id": "work_deadline-en-gb-noisy",
+            "transcript": "email Jordan the reminds me of my dry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-us-clean",
+          "wall_ms": 1449.02,
+          "audio_ms": 3127.81,
+          "peak_rss_kib": 172604,
+          "model_load_ms": 67.84,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.4633,
+          "transcription": {
+            "clip_id": "work_deadline-en-us-clean",
+            "transcript": "e-mail Jordan the revised estimate high Friday.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-us-noisy",
+          "wall_ms": 2165.51,
+          "audio_ms": 3127.81,
+          "peak_rss_kib": 172652,
+          "model_load_ms": 91.4,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.6923,
+          "transcription": {
+            "clip_id": "work_deadline-en-us-noisy",
+            "transcript": "the email Jordan the reminds me of the next time it's my cry of day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-gb-clean",
+          "wall_ms": 1235.75,
+          "audio_ms": 2840.81,
+          "peak_rss_kib": 172348,
+          "model_load_ms": 95.81,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.435,
+          "transcription": {
+            "clip_id": "coffee_range-en-gb-clean",
+            "transcript": "Coffee with Alex Tomorrow from 10-11M",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-gb-noisy",
+          "wall_ms": 3810.27,
+          "audio_ms": 2840.81,
+          "peak_rss_kib": 172848,
+          "model_load_ms": 482.85,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.3413,
+          "transcription": {
+            "clip_id": "coffee_range-en-gb-noisy",
+            "transcript": "coffee with Alex to follow from 10 to 11.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-us-clean",
+          "wall_ms": 1541.58,
+          "audio_ms": 3002.94,
+          "peak_rss_kib": 172632,
+          "model_load_ms": 106.57,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.5134,
+          "transcription": {
+            "clip_id": "coffee_range-en-us-clean",
+            "transcript": "Coffee with Alex tomorrow from 10-11M",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-us-noisy",
+          "wall_ms": 1934.7,
+          "audio_ms": 3002.94,
+          "peak_rss_kib": 172612,
+          "model_load_ms": 86.36,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.6443,
+          "transcription": {
+            "clip_id": "coffee_range-en-us-noisy",
+            "transcript": "coffee with my lips to my local intent of an M.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-gb-clean",
+          "wall_ms": 1469.56,
+          "audio_ms": 4027.94,
+          "peak_rss_kib": 172652,
+          "model_load_ms": 93.23,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3648,
+          "transcription": {
+            "clip_id": "timed_appointment-en-gb-clean",
+            "transcript": "Then it's time for the date of 93445 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-gb-noisy",
+          "wall_ms": 1910.38,
+          "audio_ms": 4027.94,
+          "peak_rss_kib": 172660,
+          "model_load_ms": 64.19,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.4743,
+          "transcription": {
+            "clip_id": "timed_appointment-en-gb-noisy",
+            "transcript": "This is the dentist on Thursday, 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-us-clean",
+          "wall_ms": 1493.47,
+          "audio_ms": 4082.25,
+          "peak_rss_kib": 172516,
+          "model_load_ms": 73.12,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3658,
+          "transcription": {
+            "clip_id": "timed_appointment-en-us-clean",
+            "transcript": "Then it is done Thursday at 93445 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-us-noisy",
+          "wall_ms": 1985.3,
+          "audio_ms": 4082.25,
+          "peak_rss_kib": 172708,
+          "model_load_ms": 81.67,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.4863,
+          "transcription": {
+            "clip_id": "timed_appointment-en-us-noisy",
+            "transcript": "them this time, they have to hide in 30, or 40, I'm minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-gb-clean",
+          "wall_ms": 1647.73,
+          "audio_ms": 4620.69,
+          "peak_rss_kib": 172820,
+          "model_load_ms": 93.39,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3566,
+          "transcription": {
+            "clip_id": "study_note-en-gb-clean",
+            "transcript": "I don't know what force to do, Chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 11,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-gb-noisy",
+          "wall_ms": 1512.38,
+          "audio_ms": 4620.69,
+          "peak_rss_kib": 172584,
+          "model_load_ms": 103.19,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3273,
+          "transcription": {
+            "clip_id": "study_note-en-gb-noisy",
+            "transcript": "Ah, no, no, of course, to admit, Chapter 4 used in the same lemuth wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 12,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-us-clean",
+          "wall_ms": 1315.95,
+          "audio_ms": 4686.31,
+          "peak_rss_kib": 172680,
+          "model_load_ms": 58.42,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2808,
+          "transcription": {
+            "clip_id": "study_note-en-us-clean",
+            "transcript": "and a note for study, chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-us-noisy",
+          "wall_ms": 1519.6,
+          "audio_ms": 4686.31,
+          "peak_rss_kib": 172880,
+          "model_load_ms": 78.06,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3243,
+          "transcription": {
+            "clip_id": "study_note-en-us-noisy",
+            "transcript": "and a note or study, chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-gb-clean",
+          "wall_ms": 1402.78,
+          "audio_ms": 6786.12,
+          "peak_rss_kib": 172884,
+          "model_load_ms": 93.9,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2067,
+          "transcription": {
+            "clip_id": "cardio-en-gb-clean",
+            "transcript": "Jim Log, treadmill 0.75 km at 2% in climb for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-gb-noisy",
+          "wall_ms": 1891.1,
+          "audio_ms": 6786.12,
+          "peak_rss_kib": 173228,
+          "model_load_ms": 62.63,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2787,
+          "transcription": {
+            "clip_id": "cardio-en-gb-noisy",
+            "transcript": "in log. Tremile near 0.7, I'd kill on it on at 2% in climb for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 15,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "zero point seven five",
+                "0 75"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-us-clean",
+          "wall_ms": 1299.57,
+          "audio_ms": 7019.12,
+          "peak_rss_kib": 172984,
+          "model_load_ms": 56.54,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.1851,
+          "transcription": {
+            "clip_id": "cardio-en-us-clean",
+            "transcript": "In log, treadmill 0.75 km at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "gym log"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-us-noisy",
+          "wall_ms": 1635.59,
+          "audio_ms": 7019.12,
+          "peak_rss_kib": 173112,
+          "model_load_ms": 57.53,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.233,
+          "transcription": {
+            "clip_id": "cardio-en-us-noisy",
+            "transcript": "Gen-Wod, 12mm 0.75mm, 2% inclined for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-gb-clean",
+          "wall_ms": 1296.6,
+          "audio_ms": 4105.62,
+          "peak_rss_kib": 172616,
+          "model_load_ms": 57.49,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3158,
+          "transcription": {
+            "clip_id": "strength-en-gb-clean",
+            "transcript": "Bench Press, 50 kilos, 8 reps, 4 gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "strength-en-gb-noisy",
+          "wall_ms": 1444.2,
+          "audio_ms": 4105.62,
+          "peak_rss_kib": 172760,
+          "model_load_ms": 63.72,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3518,
+          "transcription": {
+            "clip_id": "strength-en-gb-noisy",
+            "transcript": "bench press, 50 kilo, 8 reps, or gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-us-clean",
+          "wall_ms": 1505.99,
+          "audio_ms": 4313.44,
+          "peak_rss_kib": 172760,
+          "model_load_ms": 95.12,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3491,
+          "transcription": {
+            "clip_id": "strength-en-us-clean",
+            "transcript": "Mange dress, 50 kilos, 8 reps, 4 gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-us-noisy",
+          "wall_ms": 1697.48,
+          "audio_ms": 4313.44,
+          "peak_rss_kib": 172928,
+          "model_load_ms": 83.19,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3935,
+          "transcription": {
+            "clip_id": "strength-en-us-noisy",
+            "transcript": "10th Class 50 K Long 8th Raps Origin.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "bench press"
+              ],
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ],
+              [
+                "eight reps",
+                "8 reps"
+              ],
+              [
+                "gym"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "personal_note-en-gb-clean",
+          "wall_ms": 1262.19,
+          "audio_ms": 3409.75,
+          "peak_rss_kib": 172444,
+          "model_load_ms": 94.14,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3702,
+          "transcription": {
+            "clip_id": "personal_note-en-gb-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-gb-noisy",
+          "wall_ms": 1412.52,
+          "audio_ms": 3409.75,
+          "peak_rss_kib": 172464,
+          "model_load_ms": 60.72,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.4143,
+          "transcription": {
+            "clip_id": "personal_note-en-gb-noisy",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-us-clean",
+          "wall_ms": 1243.79,
+          "audio_ms": 3484.56,
+          "peak_rss_kib": 172460,
+          "model_load_ms": 82.03,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3569,
+          "transcription": {
+            "clip_id": "personal_note-en-us-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-us-noisy",
+          "wall_ms": 1348.68,
+          "audio_ms": 3484.56,
+          "peak_rss_kib": 172492,
+          "model_load_ms": 60.2,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.387,
+          "transcription": {
+            "clip_id": "personal_note-en-us-noisy",
+            "transcript": "for a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-gb-clean",
+          "wall_ms": 1431.41,
+          "audio_ms": 2190.12,
+          "peak_rss_kib": 172556,
+          "model_load_ms": 67.49,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.6536,
+          "transcription": {
+            "clip_id": "destructive_request-en-gb-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-gb-noisy",
+          "wall_ms": 1349.99,
+          "audio_ms": 2190.12,
+          "peak_rss_kib": 172664,
+          "model_load_ms": 73.86,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.6164,
+          "transcription": {
+            "clip_id": "destructive_request-en-gb-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-us-clean",
+          "wall_ms": 1298.69,
+          "audio_ms": 2217.25,
+          "peak_rss_kib": 172308,
+          "model_load_ms": 79.53,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.5857,
+          "transcription": {
+            "clip_id": "destructive_request-en-us-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-us-noisy",
+          "wall_ms": 1713.39,
+          "audio_ms": 2217.25,
+          "peak_rss_kib": 172316,
+          "model_load_ms": 71.11,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.7728,
+          "transcription": {
+            "clip_id": "destructive_request-en-us-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        }
+      ],
+      "warm_batch": {
+        "wall_ms": 56465.32,
+        "audio_ms": 126273.22,
+        "peak_rss_kib": 176620,
+        "model_load_ms": 253.38,
+        "exit_code": 0,
+        "timed_out": false,
+        "real_time_factor": 0.4472,
+        "transcriptions": [
+          {
+            "clip_id": "work_deadline-en-gb-clean",
+            "transcript": "e-mail. \"Dawgden, the revised vestibat high Friday.\"",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "jordan"
+              ],
+              [
+                "revised estimate"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "work_deadline-en-gb-noisy",
+            "transcript": "email Jordan the reminds me of my dry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "work_deadline-en-us-clean",
+            "transcript": "e-mail Jordan the revised estimate high Friday.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "work_deadline-en-us-noisy",
+            "transcript": "the email Jordan the reminds me of the next time it's my cry of day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-gb-clean",
+            "transcript": "Coffee with Alex Tomorrow from 10-11M",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-gb-noisy",
+            "transcript": "coffee with Alex to follow from 10 to 11.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-us-clean",
+            "transcript": "Coffee with Alex tomorrow from 10-11M",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-us-noisy",
+            "transcript": "coffee with my lips to my local intent of an M.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-gb-clean",
+            "transcript": "Then it's time for the date of 93445 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-gb-noisy",
+            "transcript": "This is the dentist on Thursday, 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "timed_appointment-en-us-clean",
+            "transcript": "Then it is done Thursday at 93445 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-us-noisy",
+            "transcript": "them this time, they have to hide in 30, or 40, I'm minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ],
+              [
+                "nine thirty",
+                "9 30"
+              ],
+              [
+                "forty five minutes",
+                "45 minutes"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-gb-clean",
+            "transcript": "I don't know what force to do, Chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 11,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-gb-noisy",
+            "transcript": "Ah, no, no, of course, to admit, Chapter 4 used in the same lemuth wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 12,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-us-clean",
+            "transcript": "and a note for study, chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-us-noisy",
+            "transcript": "and a note or study, chapter 4 uses the same limit wise.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "note for study"
+              ],
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-gb-clean",
+            "transcript": "Jim Log, treadmill 0.75 km at 2% in climb for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-gb-noisy",
+            "transcript": "in log. Tremile near 0.7, I'd kill on it on at 2% in climb for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 15,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "zero point seven five",
+                "0 75"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-us-clean",
+            "transcript": "In log, treadmill 0.75 km at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "gym log"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-us-noisy",
+            "transcript": "Gen-Wod, 12mm 0.75mm, 2% inclined for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-gb-clean",
+            "transcript": "Bench Press, 50 kilos, 8 reps, 4 gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "strength-en-gb-noisy",
+            "transcript": "bench press, 50 kilo, 8 reps, or gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-us-clean",
+            "transcript": "Mange dress, 50 kilos, 8 reps, 4 gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-us-noisy",
+            "transcript": "10th Class 50 K Long 8th Raps Origin.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "bench press"
+              ],
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ],
+              [
+                "eight reps",
+                "8 reps"
+              ],
+              [
+                "gym"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "personal_note-en-gb-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-gb-noisy",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-us-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-us-noisy",
+            "transcript": "for a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-gb-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-gb-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "destructive_request-en-us-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-us-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        ]
+      },
+      "summary": {
+        "cold_requests": 32,
+        "cold_accepted": 32,
+        "cold_p50_ms": 1499.73,
+        "cold_p95_ms": 2165.51,
+        "peak_cold_rss_kib": 173228,
+        "warm_transcripts": 32,
+        "warm_fact_pass": 9,
+        "warm_exact_transcripts": 6,
+        "warm_word_error_rate": 0.6367
+      },
+      "quality_by_condition": {
+        "clean": {
+          "transcripts": 16,
+          "fact_pass": 6,
+          "word_error_rate": 0.5067
+        },
+        "noisy": {
+          "transcripts": 16,
+          "fact_pass": 3,
+          "word_error_rate": 0.7667
+        }
+      }
+    },
+    {
+      "model": "ggml-base.en.bin",
+      "cpu_affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "address_space_mib": null,
+      "cold": [
+        {
+          "clip_id": "work_deadline-en-gb-clean",
+          "wall_ms": 1620.7,
+          "audio_ms": 3221.88,
+          "peak_rss_kib": 283808,
+          "model_load_ms": 250.59,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.503,
+          "transcription": {
+            "clip_id": "work_deadline-en-gb-clean",
+            "transcript": "e-mail Jordan, the revised estimate, high-fry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-gb-noisy",
+          "wall_ms": 2257.9,
+          "audio_ms": 3221.88,
+          "peak_rss_kib": 284544,
+          "model_load_ms": 188.78,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.7008,
+          "transcription": {
+            "clip_id": "work_deadline-en-gb-noisy",
+            "transcript": "The email's logon to remind best image by Friday.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 7,
+            "missing_facts": [
+              [
+                "jordan"
+              ],
+              [
+                "revised estimate"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-us-clean",
+          "wall_ms": 2096.82,
+          "audio_ms": 3127.81,
+          "peak_rss_kib": 285440,
+          "model_load_ms": 110.25,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.6704,
+          "transcription": {
+            "clip_id": "work_deadline-en-us-clean",
+            "transcript": "e-mail Jordan, the revised estimate, high-fry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-us-noisy",
+          "wall_ms": 5846.94,
+          "audio_ms": 3127.81,
+          "peak_rss_kib": 284568,
+          "model_load_ms": 111.14,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.8693,
+          "transcription": {
+            "clip_id": "work_deadline-en-us-noisy",
+            "transcript": "The details of the email Jordan are in my investments by driving.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-gb-clean",
+          "wall_ms": 1225.13,
+          "audio_ms": 2840.81,
+          "peak_rss_kib": 284476,
+          "model_load_ms": 102.09,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.4313,
+          "transcription": {
+            "clip_id": "coffee_range-en-gb-clean",
+            "transcript": "Coffee with Alex tomorrow from 10 to 11 a.m.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 2,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-gb-noisy",
+          "wall_ms": 1718.04,
+          "audio_ms": 2840.81,
+          "peak_rss_kib": 285504,
+          "model_load_ms": 199.43,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.6048,
+          "transcription": {
+            "clip_id": "coffee_range-en-gb-noisy",
+            "transcript": "I'm copied with Alex to my local on 10/10 and then with M.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 12,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-us-clean",
+          "wall_ms": 1239.67,
+          "audio_ms": 3002.94,
+          "peak_rss_kib": 284364,
+          "model_load_ms": 77.36,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.4128,
+          "transcription": {
+            "clip_id": "coffee_range-en-us-clean",
+            "transcript": "Coffee with Alex tomorrow from 10 to 11 a.m.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 2,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-us-noisy",
+          "wall_ms": 1365.05,
+          "audio_ms": 3002.94,
+          "peak_rss_kib": 284524,
+          "model_load_ms": 78.04,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.4546,
+          "transcription": {
+            "clip_id": "coffee_range-en-us-noisy",
+            "transcript": "I'll copy with my lips to my local M10 to the M10.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-gb-clean",
+          "wall_ms": 1280.75,
+          "audio_ms": 4027.94,
+          "peak_rss_kib": 285688,
+          "model_load_ms": 80.0,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.318,
+          "transcription": {
+            "clip_id": "timed_appointment-en-gb-clean",
+            "transcript": "dentist on Thursday at 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-gb-noisy",
+          "wall_ms": 2033.19,
+          "audio_ms": 4027.94,
+          "peak_rss_kib": 285448,
+          "model_load_ms": 153.58,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.5048,
+          "transcription": {
+            "clip_id": "timed_appointment-en-gb-noisy",
+            "transcript": "The event is on turn at 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-us-clean",
+          "wall_ms": 1522.41,
+          "audio_ms": 4082.25,
+          "peak_rss_kib": 283832,
+          "model_load_ms": 256.9,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3729,
+          "transcription": {
+            "clip_id": "timed_appointment-en-us-clean",
+            "transcript": "dentist on Thursday at 934-45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "nine thirty",
+                "9 30"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-us-noisy",
+          "wall_ms": 1319.02,
+          "audio_ms": 4082.25,
+          "peak_rss_kib": 285660,
+          "model_load_ms": 95.08,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3231,
+          "transcription": {
+            "clip_id": "timed_appointment-en-us-noisy",
+            "transcript": "The attempt is on Thursday at 9.30 or 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "dentist"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-gb-clean",
+          "wall_ms": 1674.09,
+          "audio_ms": 4620.69,
+          "peak_rss_kib": 285624,
+          "model_load_ms": 124.73,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3623,
+          "transcription": {
+            "clip_id": "study_note-en-gb-clean",
+            "transcript": "other note for study. Chapter 4 uses the same lemma twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "study_note-en-gb-noisy",
+          "wall_ms": 1570.85,
+          "audio_ms": 4620.69,
+          "peak_rss_kib": 285584,
+          "model_load_ms": 168.05,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.34,
+          "transcription": {
+            "clip_id": "study_note-en-gb-noisy",
+            "transcript": "are not forced to meet. Chapter 4 uses the same lemma twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "note for study"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-us-clean",
+          "wall_ms": 1357.53,
+          "audio_ms": 4686.31,
+          "peak_rss_kib": 285572,
+          "model_load_ms": 81.12,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2897,
+          "transcription": {
+            "clip_id": "study_note-en-us-clean",
+            "transcript": "Add a note for study. Chapter 4 uses the same limit twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 2,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-us-noisy",
+          "wall_ms": 1325.19,
+          "audio_ms": 4686.31,
+          "peak_rss_kib": 284580,
+          "model_load_ms": 81.49,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2828,
+          "transcription": {
+            "clip_id": "study_note-en-us-noisy",
+            "transcript": "and a note for study. Chapter 4 uses the same limit twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 3,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-gb-clean",
+          "wall_ms": 1493.7,
+          "audio_ms": 6786.12,
+          "peak_rss_kib": 284260,
+          "model_load_ms": 79.73,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2201,
+          "transcription": {
+            "clip_id": "cardio-en-gb-clean",
+            "transcript": "Gymlog. Treadmill 0.75 km at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-gb-noisy",
+          "wall_ms": 1521.07,
+          "audio_ms": 6786.12,
+          "peak_rss_kib": 285648,
+          "model_load_ms": 83.69,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.2241,
+          "transcription": {
+            "clip_id": "cardio-en-gb-noisy",
+            "transcript": "engine log, Tremville near 0.7-ide kilometre at 2% inclined for five minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "zero point seven five",
+                "0 75"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-us-clean",
+          "wall_ms": 1263.27,
+          "audio_ms": 7019.12,
+          "peak_rss_kib": 285092,
+          "model_load_ms": 105.21,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.18,
+          "transcription": {
+            "clip_id": "cardio-en-us-clean",
+            "transcript": "Gym log, treadmill 0.75 kilometers at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 7,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "cardio-en-us-noisy",
+          "wall_ms": 1342.21,
+          "audio_ms": 7019.12,
+          "peak_rss_kib": 285540,
+          "model_load_ms": 84.5,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.1912,
+          "transcription": {
+            "clip_id": "cardio-en-us-noisy",
+            "transcript": "Gym log, treadmill 0.75 kmF 2% inclined for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-gb-clean",
+          "wall_ms": 1305.33,
+          "audio_ms": 4105.62,
+          "peak_rss_kib": 283880,
+          "model_load_ms": 77.81,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3179,
+          "transcription": {
+            "clip_id": "strength-en-gb-clean",
+            "transcript": "match press, 50 kilos, 8 reps, 4 gym",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-gb-noisy",
+          "wall_ms": 1104.47,
+          "audio_ms": 4105.62,
+          "peak_rss_kib": 284932,
+          "model_load_ms": 74.7,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.269,
+          "transcription": {
+            "clip_id": "strength-en-gb-noisy",
+            "transcript": "bench press if the kilo a threat or gin.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 7,
+            "missing_facts": [
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ],
+              [
+                "eight reps",
+                "8 reps"
+              ],
+              [
+                "gym"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-us-clean",
+          "wall_ms": 1398.57,
+          "audio_ms": 4313.44,
+          "peak_rss_kib": 285016,
+          "model_load_ms": 73.71,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3242,
+          "transcription": {
+            "clip_id": "strength-en-us-clean",
+            "transcript": "Manch Press, 50 kilos, 8 reps for gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 3,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-us-noisy",
+          "wall_ms": 1495.38,
+          "audio_ms": 4313.44,
+          "peak_rss_kib": 285612,
+          "model_load_ms": 112.78,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3467,
+          "transcription": {
+            "clip_id": "strength-en-us-noisy",
+            "transcript": "Bunch, Press, 50 key on 8 reps or gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "bench press"
+              ],
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "personal_note-en-gb-clean",
+          "wall_ms": 1200.36,
+          "audio_ms": 3409.75,
+          "peak_rss_kib": 284776,
+          "model_load_ms": 164.55,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.352,
+          "transcription": {
+            "clip_id": "personal_note-en-gb-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-gb-noisy",
+          "wall_ms": 1121.23,
+          "audio_ms": 3409.75,
+          "peak_rss_kib": 285576,
+          "model_load_ms": 78.18,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3288,
+          "transcription": {
+            "clip_id": "personal_note-en-gb-noisy",
+            "transcript": "For the personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 1,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-us-clean",
+          "wall_ms": 1228.98,
+          "audio_ms": 3484.56,
+          "peak_rss_kib": 284596,
+          "model_load_ms": 90.39,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.3527,
+          "transcription": {
+            "clip_id": "personal_note-en-us-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-us-noisy",
+          "wall_ms": 1668.97,
+          "audio_ms": 3484.56,
+          "peak_rss_kib": 285672,
+          "model_load_ms": 85.86,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.479,
+          "transcription": {
+            "clip_id": "personal_note-en-us-noisy",
+            "transcript": "For a personal note, get my weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 1,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-gb-clean",
+          "wall_ms": 6192.24,
+          "audio_ms": 2190.12,
+          "peak_rss_kib": 284456,
+          "model_load_ms": 84.66,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 2.8274,
+          "transcription": {
+            "clip_id": "destructive_request-en-gb-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-gb-noisy",
+          "wall_ms": 3928.38,
+          "audio_ms": 2190.12,
+          "peak_rss_kib": 284324,
+          "model_load_ms": 142.35,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.7937,
+          "transcription": {
+            "clip_id": "destructive_request-en-gb-noisy",
+            "transcript": "cancel oil meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 2,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-us-clean",
+          "wall_ms": 3241.56,
+          "audio_ms": 2217.25,
+          "peak_rss_kib": 285208,
+          "model_load_ms": 219.88,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.462,
+          "transcription": {
+            "clip_id": "destructive_request-en-us-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-us-noisy",
+          "wall_ms": 3586.66,
+          "audio_ms": 2217.25,
+          "peak_rss_kib": 285396,
+          "model_load_ms": 86.4,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.6176,
+          "transcription": {
+            "clip_id": "destructive_request-en-us-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        }
+      ],
+      "warm_batch": {
+        "wall_ms": 87382.08,
+        "audio_ms": 126273.22,
+        "peak_rss_kib": 289840,
+        "model_load_ms": 147.53,
+        "exit_code": 0,
+        "timed_out": false,
+        "real_time_factor": 0.692,
+        "transcriptions": [
+          {
+            "clip_id": "work_deadline-en-gb-clean",
+            "transcript": "e-mail Jordan, the revised estimate, high-fry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "work_deadline-en-gb-noisy",
+            "transcript": "The email's logon to remind best image by Friday.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 7,
+            "missing_facts": [
+              [
+                "jordan"
+              ],
+              [
+                "revised estimate"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "work_deadline-en-us-clean",
+            "transcript": "e-mail Jordan, the revised estimate, high-fry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "work_deadline-en-us-noisy",
+            "transcript": "The details of the email Jordan are in my investments by driving.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-gb-clean",
+            "transcript": "Coffee with Alex tomorrow from 10 to 11 a.m.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 2,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "coffee_range-en-gb-noisy",
+            "transcript": "I'm copied with Alex to my local on 10/10 and then with M.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 12,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-us-clean",
+            "transcript": "Coffee with Alex tomorrow from 10 to 11 a.m.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 2,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "coffee_range-en-us-noisy",
+            "transcript": "I'll copy with my lips to my local M10 to the M10.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-gb-clean",
+            "transcript": "dentist on Thursday at 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "timed_appointment-en-gb-noisy",
+            "transcript": "The event is on turn at 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-us-clean",
+            "transcript": "dentist on Thursday at 934-45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "nine thirty",
+                "9 30"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-us-noisy",
+            "transcript": "The attempt is on Thursday at 9.30 or 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "dentist"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-gb-clean",
+            "transcript": "other note for study. Chapter 4 uses the same lemma twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "study_note-en-gb-noisy",
+            "transcript": "are not forced to meet. Chapter 4 uses the same lemma twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "note for study"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-us-clean",
+            "transcript": "Add a note for study. Chapter 4 uses the same limit twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 2,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-us-noisy",
+            "transcript": "and a note for study. Chapter 4 uses the same limit twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 3,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-gb-clean",
+            "transcript": "Gymlog. Treadmill 0.75 km at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-gb-noisy",
+            "transcript": "engine log, Tremville near 0.7-ide kilometre at 2% inclined for five minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "zero point seven five",
+                "0 75"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-us-clean",
+            "transcript": "Gym log, treadmill 0.75 kilometers at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 7,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "cardio-en-us-noisy",
+            "transcript": "Gym log, treadmill 0.75 kmF 2% inclined for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-gb-clean",
+            "transcript": "match press, 50 kilos, 8 reps, 4 gym",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-gb-noisy",
+            "transcript": "bench press if the kilo a threat or gin.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 7,
+            "missing_facts": [
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ],
+              [
+                "eight reps",
+                "8 reps"
+              ],
+              [
+                "gym"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-us-clean",
+            "transcript": "Manch Press, 50 kilos, 8 reps for gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 3,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-us-noisy",
+            "transcript": "Bunch, Press, 50 key on 8 reps or gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "bench press"
+              ],
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "personal_note-en-gb-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-gb-noisy",
+            "transcript": "For the personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 1,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-us-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-us-noisy",
+            "transcript": "For a personal note, get my weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 1,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-gb-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-gb-noisy",
+            "transcript": "cancel oil meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 2,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "destructive_request-en-us-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-us-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        ]
+      },
+      "summary": {
+        "cold_requests": 32,
+        "cold_accepted": 32,
+        "cold_p50_ms": 1494.54,
+        "cold_p95_ms": 5846.94,
+        "peak_cold_rss_kib": 285688,
+        "warm_transcripts": 32,
+        "warm_fact_pass": 11,
+        "warm_exact_transcripts": 4,
+        "warm_word_error_rate": 0.52
+      },
+      "quality_by_condition": {
+        "clean": {
+          "transcripts": 16,
+          "fact_pass": 9,
+          "word_error_rate": 0.3467
+        },
+        "noisy": {
+          "transcripts": 16,
+          "fact_pass": 2,
+          "word_error_rate": 0.6933
+        }
+      }
+    },
+    {
+      "model": "ggml-base.en.bin",
+      "cpu_affinity": [
+        0
+      ],
+      "address_space_mib": 1024,
+      "cold": [
+        {
+          "clip_id": "work_deadline-en-gb-clean",
+          "wall_ms": 3488.74,
+          "audio_ms": 3221.88,
+          "peak_rss_kib": 283216,
+          "model_load_ms": 218.18,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.0828,
+          "transcription": {
+            "clip_id": "work_deadline-en-gb-clean",
+            "transcript": "e-mail Jordan, the revised estimate, high-fry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-gb-noisy",
+          "wall_ms": 3463.78,
+          "audio_ms": 3221.88,
+          "peak_rss_kib": 283032,
+          "model_load_ms": 91.13,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.0751,
+          "transcription": {
+            "clip_id": "work_deadline-en-gb-noisy",
+            "transcript": "The email's logon to remind best image by Friday.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 7,
+            "missing_facts": [
+              [
+                "jordan"
+              ],
+              [
+                "revised estimate"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-us-clean",
+          "wall_ms": 3133.25,
+          "audio_ms": 3127.81,
+          "peak_rss_kib": 283108,
+          "model_load_ms": 88.6,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.0017,
+          "transcription": {
+            "clip_id": "work_deadline-en-us-clean",
+            "transcript": "e-mail Jordan, the revised estimate, high-fry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "work_deadline-en-us-noisy",
+          "wall_ms": 7145.21,
+          "audio_ms": 3127.81,
+          "peak_rss_kib": 283404,
+          "model_load_ms": 106.33,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 2.2844,
+          "transcription": {
+            "clip_id": "work_deadline-en-us-noisy",
+            "transcript": "The details of the email Jordan are in my investments by driving.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-gb-clean",
+          "wall_ms": 2704.49,
+          "audio_ms": 2840.81,
+          "peak_rss_kib": 283024,
+          "model_load_ms": 81.9,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.952,
+          "transcription": {
+            "clip_id": "coffee_range-en-gb-clean",
+            "transcript": "Coffee with Alex tomorrow from 10 to 11 a.m.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 2,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-gb-noisy",
+          "wall_ms": 3728.37,
+          "audio_ms": 2840.81,
+          "peak_rss_kib": 283140,
+          "model_load_ms": 92.36,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.3124,
+          "transcription": {
+            "clip_id": "coffee_range-en-gb-noisy",
+            "transcript": "I'm copied with Alex to my local on 10/10 and then with M.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 12,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-us-clean",
+          "wall_ms": 2746.54,
+          "audio_ms": 3002.94,
+          "peak_rss_kib": 283112,
+          "model_load_ms": 78.93,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.9146,
+          "transcription": {
+            "clip_id": "coffee_range-en-us-clean",
+            "transcript": "Coffee with Alex tomorrow from 10 to 11 a.m.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 2,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "coffee_range-en-us-noisy",
+          "wall_ms": 3545.54,
+          "audio_ms": 3002.94,
+          "peak_rss_kib": 283244,
+          "model_load_ms": 88.65,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.1807,
+          "transcription": {
+            "clip_id": "coffee_range-en-us-noisy",
+            "transcript": "I'll copy with my lips to my local M10 to the M10.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-gb-clean",
+          "wall_ms": 3064.04,
+          "audio_ms": 4027.94,
+          "peak_rss_kib": 283088,
+          "model_load_ms": 103.71,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.7607,
+          "transcription": {
+            "clip_id": "timed_appointment-en-gb-clean",
+            "transcript": "dentist on Thursday at 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-gb-noisy",
+          "wall_ms": 4519.47,
+          "audio_ms": 4027.94,
+          "peak_rss_kib": 283508,
+          "model_load_ms": 79.82,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.122,
+          "transcription": {
+            "clip_id": "timed_appointment-en-gb-noisy",
+            "transcript": "The event is on turn at 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-us-clean",
+          "wall_ms": 3210.52,
+          "audio_ms": 4082.25,
+          "peak_rss_kib": 283348,
+          "model_load_ms": 104.93,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.7865,
+          "transcription": {
+            "clip_id": "timed_appointment-en-us-clean",
+            "transcript": "dentist on Thursday at 934-45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "nine thirty",
+                "9 30"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "timed_appointment-en-us-noisy",
+          "wall_ms": 3472.4,
+          "audio_ms": 4082.25,
+          "peak_rss_kib": 283404,
+          "model_load_ms": 74.14,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.8506,
+          "transcription": {
+            "clip_id": "timed_appointment-en-us-noisy",
+            "transcript": "The attempt is on Thursday at 9.30 or 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "dentist"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-gb-clean",
+          "wall_ms": 3148.54,
+          "audio_ms": 4620.69,
+          "peak_rss_kib": 283340,
+          "model_load_ms": 104.02,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.6814,
+          "transcription": {
+            "clip_id": "study_note-en-gb-clean",
+            "transcript": "other note for study. Chapter 4 uses the same lemma twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "study_note-en-gb-noisy",
+          "wall_ms": 3803.5,
+          "audio_ms": 4620.69,
+          "peak_rss_kib": 283336,
+          "model_load_ms": 103.79,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.8231,
+          "transcription": {
+            "clip_id": "study_note-en-gb-noisy",
+            "transcript": "are not forced to meet. Chapter 4 uses the same lemma twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "note for study"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-us-clean",
+          "wall_ms": 3197.55,
+          "audio_ms": 4686.31,
+          "peak_rss_kib": 283400,
+          "model_load_ms": 108.2,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.6823,
+          "transcription": {
+            "clip_id": "study_note-en-us-clean",
+            "transcript": "Add a note for study. Chapter 4 uses the same limit twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 2,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "study_note-en-us-noisy",
+          "wall_ms": 3751.08,
+          "audio_ms": 4686.31,
+          "peak_rss_kib": 283404,
+          "model_load_ms": 84.81,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.8004,
+          "transcription": {
+            "clip_id": "study_note-en-us-noisy",
+            "transcript": "and a note for study. Chapter 4 uses the same limit twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 3,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-gb-clean",
+          "wall_ms": 3264.07,
+          "audio_ms": 6786.12,
+          "peak_rss_kib": 283636,
+          "model_load_ms": 96.28,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.481,
+          "transcription": {
+            "clip_id": "cardio-en-gb-clean",
+            "transcript": "Gymlog. Treadmill 0.75 km at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-gb-noisy",
+          "wall_ms": 3386.2,
+          "audio_ms": 6786.12,
+          "peak_rss_kib": 283356,
+          "model_load_ms": 94.58,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.499,
+          "transcription": {
+            "clip_id": "cardio-en-gb-noisy",
+            "transcript": "engine log, Tremville near 0.7-ide kilometre at 2% inclined for five minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "zero point seven five",
+                "0 75"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "cardio-en-us-clean",
+          "wall_ms": 3210.97,
+          "audio_ms": 7019.12,
+          "peak_rss_kib": 283748,
+          "model_load_ms": 83.62,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.4575,
+          "transcription": {
+            "clip_id": "cardio-en-us-clean",
+            "transcript": "Gym log, treadmill 0.75 kilometers at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 7,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "cardio-en-us-noisy",
+          "wall_ms": 2996.85,
+          "audio_ms": 7019.12,
+          "peak_rss_kib": 283624,
+          "model_load_ms": 76.89,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.427,
+          "transcription": {
+            "clip_id": "cardio-en-us-noisy",
+            "transcript": "Gym log, treadmill 0.75 kmF 2% inclined for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-gb-clean",
+          "wall_ms": 3554.07,
+          "audio_ms": 4105.62,
+          "peak_rss_kib": 283452,
+          "model_load_ms": 79.18,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.8657,
+          "transcription": {
+            "clip_id": "strength-en-gb-clean",
+            "transcript": "match press, 50 kilos, 8 reps, 4 gym",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-gb-noisy",
+          "wall_ms": 2664.94,
+          "audio_ms": 4105.62,
+          "peak_rss_kib": 283344,
+          "model_load_ms": 80.87,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.6491,
+          "transcription": {
+            "clip_id": "strength-en-gb-noisy",
+            "transcript": "bench press if the kilo a threat or gin.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 7,
+            "missing_facts": [
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ],
+              [
+                "eight reps",
+                "8 reps"
+              ],
+              [
+                "gym"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-us-clean",
+          "wall_ms": 3023.85,
+          "audio_ms": 4313.44,
+          "peak_rss_kib": 283200,
+          "model_load_ms": 74.3,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.701,
+          "transcription": {
+            "clip_id": "strength-en-us-clean",
+            "transcript": "Manch Press, 50 kilos, 8 reps for gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 3,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "strength-en-us-noisy",
+          "wall_ms": 3891.23,
+          "audio_ms": 4313.44,
+          "peak_rss_kib": 283360,
+          "model_load_ms": 149.96,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.9021,
+          "transcription": {
+            "clip_id": "strength-en-us-noisy",
+            "transcript": "Bunch, Press, 50 key on 8 reps or gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "bench press"
+              ],
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "personal_note-en-gb-clean",
+          "wall_ms": 3644.67,
+          "audio_ms": 3409.75,
+          "peak_rss_kib": 283176,
+          "model_load_ms": 85.35,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.0689,
+          "transcription": {
+            "clip_id": "personal_note-en-gb-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-gb-noisy",
+          "wall_ms": 3448.95,
+          "audio_ms": 3409.75,
+          "peak_rss_kib": 283240,
+          "model_load_ms": 102.49,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.0115,
+          "transcription": {
+            "clip_id": "personal_note-en-gb-noisy",
+            "transcript": "For the personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 1,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-us-clean",
+          "wall_ms": 3293.26,
+          "audio_ms": 3484.56,
+          "peak_rss_kib": 283396,
+          "model_load_ms": 96.22,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.9451,
+          "transcription": {
+            "clip_id": "personal_note-en-us-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "personal_note-en-us-noisy",
+          "wall_ms": 2801.89,
+          "audio_ms": 3484.56,
+          "peak_rss_kib": 283256,
+          "model_load_ms": 87.02,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 0.8041,
+          "transcription": {
+            "clip_id": "personal_note-en-us-noisy",
+            "transcript": "For a personal note, get my weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 1,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-gb-clean",
+          "wall_ms": 2894.41,
+          "audio_ms": 2190.12,
+          "peak_rss_kib": 283172,
+          "model_load_ms": 78.84,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.3216,
+          "transcription": {
+            "clip_id": "destructive_request-en-gb-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-gb-noisy",
+          "wall_ms": 3263.86,
+          "audio_ms": 2190.12,
+          "peak_rss_kib": 283144,
+          "model_load_ms": 80.69,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.4903,
+          "transcription": {
+            "clip_id": "destructive_request-en-gb-noisy",
+            "transcript": "cancel oil meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 2,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-us-clean",
+          "wall_ms": 4494.69,
+          "audio_ms": 2217.25,
+          "peak_rss_kib": 282964,
+          "model_load_ms": 152.4,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 2.0271,
+          "transcription": {
+            "clip_id": "destructive_request-en-us-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          }
+        },
+        {
+          "clip_id": "destructive_request-en-us-noisy",
+          "wall_ms": 3621.58,
+          "audio_ms": 2217.25,
+          "peak_rss_kib": 283044,
+          "model_load_ms": 181.79,
+          "exit_code": 0,
+          "timed_out": false,
+          "real_time_factor": 1.6334,
+          "transcription": {
+            "clip_id": "destructive_request-en-us-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        }
+      ],
+      "warm_batch": {
+        "wall_ms": 101394.38,
+        "audio_ms": 126273.22,
+        "peak_rss_kib": 287272,
+        "model_load_ms": 98.33,
+        "exit_code": 0,
+        "timed_out": false,
+        "real_time_factor": 0.803,
+        "transcriptions": [
+          {
+            "clip_id": "work_deadline-en-gb-clean",
+            "transcript": "e-mail Jordan, the revised estimate, high-fry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "work_deadline-en-gb-noisy",
+            "transcript": "The email's logon to remind best image by Friday.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 7,
+            "missing_facts": [
+              [
+                "jordan"
+              ],
+              [
+                "revised estimate"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "work_deadline-en-us-clean",
+            "transcript": "e-mail Jordan, the revised estimate, high-fry day.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "work_deadline-en-us-noisy",
+            "transcript": "The details of the email Jordan are in my investments by driving.",
+            "language": "en",
+            "reference_words": 7,
+            "word_errors": 9,
+            "missing_facts": [
+              [
+                "revised estimate"
+              ],
+              [
+                "friday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-gb-clean",
+            "transcript": "Coffee with Alex tomorrow from 10 to 11 a.m.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 2,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "coffee_range-en-gb-noisy",
+            "transcript": "I'm copied with Alex to my local on 10/10 and then with M.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 12,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "coffee_range-en-us-clean",
+            "transcript": "Coffee with Alex tomorrow from 10 to 11 a.m.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 2,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "coffee_range-en-us-noisy",
+            "transcript": "I'll copy with my lips to my local M10 to the M10.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 13,
+            "missing_facts": [
+              [
+                "coffee with alex"
+              ],
+              [
+                "tomorrow"
+              ],
+              [
+                "ten to eleven a m",
+                "10 11 a m",
+                "10 11 am",
+                "10 to 11 am",
+                "10 to 11 a m"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-gb-clean",
+            "transcript": "dentist on Thursday at 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 4,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "timed_appointment-en-gb-noisy",
+            "transcript": "The event is on turn at 9.30 for 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "dentist"
+              ],
+              [
+                "thursday"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-us-clean",
+            "transcript": "dentist on Thursday at 934-45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 5,
+            "missing_facts": [
+              [
+                "nine thirty",
+                "9 30"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "timed_appointment-en-us-noisy",
+            "transcript": "The attempt is on Thursday at 9.30 or 45 minutes.",
+            "language": "en",
+            "reference_words": 10,
+            "word_errors": 8,
+            "missing_facts": [
+              [
+                "dentist"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-gb-clean",
+            "transcript": "other note for study. Chapter 4 uses the same lemma twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 3,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "study_note-en-gb-noisy",
+            "transcript": "are not forced to meet. Chapter 4 uses the same lemma twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "note for study"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-us-clean",
+            "transcript": "Add a note for study. Chapter 4 uses the same limit twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 2,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "study_note-en-us-noisy",
+            "transcript": "and a note for study. Chapter 4 uses the same limit twice.",
+            "language": "en",
+            "reference_words": 12,
+            "word_errors": 3,
+            "missing_facts": [
+              [
+                "same lemma twice"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-gb-clean",
+            "transcript": "Gymlog. Treadmill 0.75 km at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-gb-noisy",
+            "transcript": "engine log, Tremville near 0.7-ide kilometre at 2% inclined for five minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "gym log"
+              ],
+              [
+                "treadmill"
+              ],
+              [
+                "zero point seven five",
+                "0 75"
+              ],
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "cardio-en-us-clean",
+            "transcript": "Gym log, treadmill 0.75 kilometers at 2% incline for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 7,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "cardio-en-us-noisy",
+            "transcript": "Gym log, treadmill 0.75 kmF 2% inclined for 5 minutes.",
+            "language": "en",
+            "reference_words": 15,
+            "word_errors": 10,
+            "missing_facts": [
+              [
+                "two percent",
+                "2 percent",
+                "2 incline"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-gb-clean",
+            "transcript": "match press, 50 kilos, 8 reps, 4 gym",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 4,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-gb-noisy",
+            "transcript": "bench press if the kilo a threat or gin.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 7,
+            "missing_facts": [
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ],
+              [
+                "eight reps",
+                "8 reps"
+              ],
+              [
+                "gym"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-us-clean",
+            "transcript": "Manch Press, 50 kilos, 8 reps for gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 3,
+            "missing_facts": [
+              [
+                "bench press"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "strength-en-us-noisy",
+            "transcript": "Bunch, Press, 50 key on 8 reps or gym.",
+            "language": "en",
+            "reference_words": 8,
+            "word_errors": 6,
+            "missing_facts": [
+              [
+                "bench press"
+              ],
+              [
+                "fifty kilos",
+                "50 kilos",
+                "50 kg"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "personal_note-en-gb-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-gb-noisy",
+            "transcript": "For the personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 1,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-us-clean",
+            "transcript": "For a personal note, get the weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "personal_note-en-us-noisy",
+            "transcript": "For a personal note, get my weekend shopping list.",
+            "language": "en",
+            "reference_words": 9,
+            "word_errors": 1,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-gb-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-gb-noisy",
+            "transcript": "cancel oil meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 2,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          },
+          {
+            "clip_id": "destructive_request-en-us-clean",
+            "transcript": "Cancel all meetings tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 0,
+            "missing_facts": [],
+            "fact_pass": true
+          },
+          {
+            "clip_id": "destructive_request-en-us-noisy",
+            "transcript": "cancel all meeting tomorrow.",
+            "language": "en",
+            "reference_words": 4,
+            "word_errors": 1,
+            "missing_facts": [
+              [
+                "cancel all meetings"
+              ]
+            ],
+            "fact_pass": false
+          }
+        ]
+      },
+      "summary": {
+        "cold_requests": 32,
+        "cold_accepted": 32,
+        "cold_p50_ms": 3339.73,
+        "cold_p95_ms": 4519.47,
+        "peak_cold_rss_kib": 283748,
+        "warm_transcripts": 32,
+        "warm_fact_pass": 11,
+        "warm_exact_transcripts": 4,
+        "warm_word_error_rate": 0.52
+      },
+      "quality_by_condition": {
+        "clean": {
+          "transcripts": 16,
+          "fact_pass": 9,
+          "word_error_rate": 0.3467
+        },
+        "noisy": {
+          "transcripts": 16,
+          "fact_pass": 2,
+          "word_error_rate": 0.6933
+        }
+      }
+    },
+    {
+      "model": "ggml-base.en.bin",
+      "cpu_affinity": [
+        0
+      ],
+      "address_space_mib": 128,
+      "cold": [
+        {
+          "clip_id": "work_deadline-en-gb-clean",
+          "wall_ms": 55.39,
+          "audio_ms": 3221.88,
+          "peak_rss_kib": 12720,
+          "model_load_ms": null,
+          "exit_code": 134,
+          "timed_out": false,
+          "real_time_factor": 0.0172,
+          "failure_log_tail": [
+            "/tmp/easy-whisper-bench/runtime/whisper-bin-ubuntu-x64/libwhisper.so.1(+0x3b16b) [0x7f4b7b63c16b]",
+            "/tmp/easy-whisper-bench/runtime/whisper-bin-ubuntu-x64/libwhisper.so.1(whisper_init_with_params_no_state+0x2e7) [0x7f4b7b63d387]",
+            "/tmp/easy-whisper-bench/runtime/whisper-bin-ubuntu-x64/libwhisper.so.1(whisper_init_from_file_with_params_no_state+0x1aa) [0x7f4b7b63d75a]",
+            "/tmp/easy-whisper-bench/runtime/whisper-bin-ubuntu-x64/libwhisper.so.1(whisper_init_from_file_with_params+0x23) [0x7f4b7b63d973]",
+            "/tmp/easy-whisper-bench/runtime/whisper-bin-ubuntu-x64/whisper-cli(+0x12d26) [0x55601849fd26]",
+            "/lib/x86_64-linux-gnu/libc.so.6(+0x29ca8) [0x7f4b7b082ca8]",
+            "/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x85) [0x7f4b7b082d65]",
+            "/tmp/easy-whisper-bench/runtime/whisper-bin-ubuntu-x64/whisper-cli(+0x16215) [0x5560184a3215]"
+          ],
+          "transcription": null
+        }
+      ],
+      "summary": {
+        "cold_requests": 1,
+        "cold_accepted": 0,
+        "cold_p50_ms": null,
+        "cold_p95_ms": null,
+        "peak_cold_rss_kib": null,
+        "warm_transcripts": 0,
+        "warm_fact_pass": 0,
+        "warm_exact_transcripts": 0,
+        "warm_word_error_rate": null
+      },
+      "quality_by_condition": {
+        "clean": {
+          "transcripts": 0,
+          "fact_pass": 0,
+          "word_error_rate": null
+        },
+        "noisy": {
+          "transcripts": 0,
+          "fact_pass": 0,
+          "word_error_rate": null
+        }
+      }
+    }
+  ]
+}

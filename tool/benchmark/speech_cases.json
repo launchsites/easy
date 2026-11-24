@@ -1,0 +1,42 @@
+[
+  {
+    "id": "work_deadline",
+    "text": "Email Jordan the revised estimate by Friday.",
+    "required": [["jordan"], ["revised estimate"], ["friday"]]
+  },
+  {
+    "id": "coffee_range",
+    "text": "Coffee with Alex tomorrow from ten to eleven A M.",
+    "required": [["coffee with alex"], ["tomorrow"], ["ten to eleven a m", "10 11 a m", "10 11 am", "10 to 11 am", "10 to 11 a m"]]
+  },
+  {
+    "id": "timed_appointment",
+    "text": "Dentist on Thursday at nine thirty for forty five minutes.",
+    "required": [["dentist"], ["thursday"], ["nine thirty", "9 30"], ["forty five minutes", "45 minutes"]]
+  },
+  {
+    "id": "study_note",
+    "text": "Add a note for study. Chapter four uses the same lemma twice.",
+    "required": [["note for study"], ["chapter four", "chapter 4"], ["same lemma twice"]]
+  },
+  {
+    "id": "cardio",
+    "text": "Gym log. Treadmill zero point seven five kilometers at two percent incline for five minutes.",
+    "required": [["gym log"], ["treadmill"], ["zero point seven five", "0 75"], ["two percent", "2 percent", "2 incline"], ["five minutes", "5 minutes"]]
+  },
+  {
+    "id": "strength",
+    "text": "Bench press, fifty kilos, eight reps, for Gym.",
+    "required": [["bench press"], ["fifty kilos", "50 kilos", "50 kg"], ["eight reps", "8 reps"], ["gym"]]
+  },
+  {
+    "id": "personal_note",
+    "text": "For a personal note, get the weekend shopping list.",
+    "required": [["personal note"], ["weekend shopping list"]]
+  },
+  {
+    "id": "destructive_request",
+    "text": "Cancel all meetings tomorrow.",
+    "required": [["cancel all meetings"], ["tomorrow"]]
+  }
+]
