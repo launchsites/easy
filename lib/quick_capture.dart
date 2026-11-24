@@ -18,6 +18,8 @@ class QuickCapture extends StatefulWidget {
     this.initialTaskDate,
     this.noteToSelf = false,
     this.allowReview = false,
+    this.allowVoice = false,
+    this.categories = const {},
     super.key,
   });
 
@@ -27,12 +29,20 @@ class QuickCapture extends StatefulWidget {
   final DateTime? initialTaskDate;
   final bool noteToSelf;
   final bool allowReview;
+  final bool allowVoice;
+  final Map<String, String> categories;
 
   @override
   State<QuickCapture> createState() => _QuickCaptureState();
 }
 
 enum _CaptureStep { text, start, end }
+
+class VoiceCaptureRequest {
+  const VoiceCaptureRequest(this.text);
+
+  final String text;
+}
 
 class _QuickCaptureState extends State<QuickCapture> {
   final _text = TextEditingController();
@@ -341,7 +351,7 @@ class _QuickCaptureState extends State<QuickCapture> {
             onPressed: () => _chooseCategory(null),
             child: const Text('General'),
           ),
-        for (final category in spaceColors.keys)
+        for (final category in {...spaceColors.keys, ...widget.categories.keys})
           MenuItemButton(
             onPressed: () => _chooseCategory(category),
             leadingIcon: Icon(
@@ -352,7 +362,7 @@ class _QuickCaptureState extends State<QuickCapture> {
             trailingIcon: current == category
                 ? const Icon(Icons.check_rounded, size: 17)
                 : null,
-            child: Text(spaceName(category)),
+            child: Text(widget.categories[category] ?? spaceName(category)),
           ),
       ],
     );
@@ -542,6 +552,16 @@ class _QuickCaptureState extends State<QuickCapture> {
                                   )
                                 : _kindSelector(),
                           ),
+                          if (widget.allowVoice && _step == _CaptureStep.text)
+                            IconButton(
+                              tooltip: 'Record voice',
+                              onPressed: () =>
+                                  _finish(VoiceCaptureRequest(_text.text)),
+                              icon: const Icon(
+                                Icons.mic_none_rounded,
+                                color: muted,
+                              ),
+                            ),
                           if (widget.allowReview && _step == _CaptureStep.text)
                             IconButton(
                               tooltip: 'Open capture review',

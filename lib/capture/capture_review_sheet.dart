@@ -19,6 +19,11 @@ typedef ApplyCaptureItems = Future<String?> Function(
   CaptureReview,
   List<CaptureProposal>,
 );
+typedef ReviewCaptureWithAi =
+    Future<
+      ({CaptureArchiveEntry? draft, CaptureReview? review, String? message})
+    >
+    Function(BuildContext context, {String? draftId, required String text});
 
 class CaptureReviewSheet extends StatefulWidget {
   const CaptureReviewSheet({
@@ -26,6 +31,12 @@ class CaptureReviewSheet extends StatefulWidget {
     required this.drafts,
     required this.onReview,
     required this.onApply,
+    this.initialDraft,
+    this.onPlayDraft,
+    this.onAiReview,
+    this.onCancelAi,
+    this.onTranscribe,
+    this.onCancelTranscription,
     super.key,
   });
 
@@ -33,6 +44,12 @@ class CaptureReviewSheet extends StatefulWidget {
   final List<CaptureArchiveEntry> drafts;
   final ReviewCaptureText onReview;
   final ApplyCaptureItems onApply;
+  final CaptureArchiveEntry? initialDraft;
+  final Future<void> Function(CaptureArchiveEntry)? onPlayDraft;
+  final ReviewCaptureWithAi? onAiReview;
+  final VoidCallback? onCancelAi;
+  final Future<CaptureArchiveEntry> Function(CaptureArchiveEntry)? onTranscribe;
+  final VoidCallback? onCancelTranscription;
 
   @override
   State<CaptureReviewSheet> createState() => _CaptureReviewSheetState();
@@ -41,10 +58,19 @@ class CaptureReviewSheet extends StatefulWidget {
 class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
   late final _controller = TextEditingController(text: widget.initialText);
   CaptureReview? _review;
-  String? _draftId;
+  CaptureArchiveEntry? _selectedDraft;
+  int _draftLimit = 10;
   String? _error;
   var _working = false;
+  var _usingAi = false;
+  var _transcribing = false;
   final _selected = <CaptureProposal>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDraft = widget.initialDraft;
+  }
 
   @override
   void dispose() {
@@ -52,19 +78,45 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
     super.dispose();
   }
 
-  Future<void> _reviewText() async {
+  Future<void> _reviewText({bool useAi = false}) async {
     final text = _controller.text.trim();
     if (_working || text.isEmpty) return;
     setState(() {
       _working = true;
+      _usingAi = useAi;
       _error = null;
     });
     FocusScope.of(context).unfocus();
     try {
-      final review = await widget.onReview(draftId: _draftId, text: text);
+      final id = _selectedDraft?.id;
+      final result = useAi && widget.onAiReview != null
+          ? await widget.onAiReview!(context, draftId: id, text: text)
+          : (
+              draft: null,
+              review: await widget.onReview(draftId: id, text: text),
+              message: null,
+            );
       if (!mounted) return;
+      final review = result.review;
+      if (review == null) {
+        setState(() {
+          _selectedDraft = result.draft ?? _selectedDraft;
+          _error = result.message;
+        });
+        return;
+      }
       setState(() {
-        _draftId = review.input.id;
+        _error = result.message;
+        final old = _selectedDraft;
+        _selectedDraft =
+            result.draft ??
+            CaptureArchiveEntry(
+              id: review.input.id,
+              text: text,
+              capturedAt: old?.capturedAt ?? review.input.context.anchor,
+              revision: review.input.revision,
+              audio: old?.audio,
+            );
         _review = review;
         _selected
           ..clear()
@@ -73,7 +125,12 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
     } catch (_) {
       if (mounted) setState(() => _error = 'This capture could not be saved.');
     } finally {
-      if (mounted) setState(() => _working = false);
+      if (mounted) {
+        setState(() {
+          _working = false;
+          _usingAi = false;
+        });
+      }
     }
   }
 
@@ -112,11 +169,46 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
     });
   }
 
+  Future<void> _transcribe() async {
+    final draft = _selectedDraft;
+    if (_working || draft?.audio == null || widget.onTranscribe == null) return;
+    // The transcript is separate from any text already entered by the user.
+    if (_controller.text.trim().isNotEmpty) return;
+    setState(() {
+      _working = true;
+      _transcribing = true;
+      _error = null;
+    });
+    try {
+      final transcript = await widget.onTranscribe!(draft!);
+      if (!mounted) return;
+      setState(() {
+        _selectedDraft = transcript;
+        _controller.text = transcript.text;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () =>
+              _error = 'The recording is saved. Transcription did not finish.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _working = false;
+          _transcribing = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final review = _review;
     final mobile = MediaQuery.sizeOf(context).width < 720;
     final drafts = widget.drafts.reversed.where((entry) => !entry.applied);
+    final selectedDraft = _selectedDraft;
     return PopScope(
       canPop: !_working,
       child: Padding(
@@ -155,6 +247,34 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
                     ],
                   ),
                   const SizedBox(height: 8),
+                  if (selectedDraft?.audio != null &&
+                      widget.onPlayDraft != null)
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton.icon(
+                          onPressed: _working
+                              ? null
+                              : () => widget.onPlayDraft!(selectedDraft!),
+                          icon: const Icon(
+                            Icons.play_circle_outline_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('Play recording'),
+                        ),
+                        if (_transcribing)
+                          TextButton(
+                            onPressed: widget.onCancelTranscription,
+                            child: const Text('Stop transcription'),
+                          )
+                        else if (widget.onTranscribe != null &&
+                            _controller.text.trim().isEmpty)
+                          TextButton(
+                            onPressed: _working ? null : _transcribe,
+                            child: const Text('Transcribe locally'),
+                          ),
+                      ],
+                    ),
                   TextField(
                     controller: _controller,
                     enabled: !_working,
@@ -164,8 +284,12 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
                     onChanged: (_) => _clearReview(),
                     textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(
-                      labelText: 'Capture text',
-                      hintText: 'Add a task, event, or note',
+                      labelText: selectedDraft?.audio == null
+                          ? 'Capture text'
+                          : 'Transcript',
+                      hintText: selectedDraft?.audio == null
+                          ? 'Add a task, event, or note'
+                          : 'Type what you said',
                       counterText: '',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -174,26 +298,32 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
                   ),
                   if (review == null &&
                       _controller.text.isEmpty &&
+                      selectedDraft == null &&
                       drafts.isNotEmpty)
                     ExpansionTile(
                       title: const Text('Saved drafts'),
                       tilePadding: EdgeInsets.zero,
                       children: [
-                        for (final draft in drafts.take(10))
+                        for (final draft in drafts.take(_draftLimit))
                           ListTile(
                             contentPadding: EdgeInsets.zero,
                             title: Text(
-                              draft.text,
+                              draft.text.isEmpty ? 'Voice capture' : draft.text,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             onTap: !_working
                                 ? () => setState(() {
-                                    _draftId = draft.id;
+                                    _selectedDraft = draft;
                                     _controller.text = draft.text;
                                     _error = null;
                                   })
                                 : null,
+                          ),
+                        if (drafts.skip(_draftLimit).isNotEmpty)
+                          TextButton(
+                            onPressed: () => setState(() => _draftLimit += 10),
+                            child: const Text('Show more drafts'),
                           ),
                       ],
                     ),
@@ -238,23 +368,46 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
                   const SizedBox(height: 12),
                   Align(
                     alignment: AlignmentDirectional.centerEnd,
-                    child: FilledButton(
-                      onPressed: _working
-                          ? null
-                          : review == null
-                          ? _reviewText
-                          : _selected.isEmpty
-                          ? null
-                          : _addSelected,
-                      child: Text(
-                        _working
-                            ? 'Saving…'
-                            : review == null
-                            ? 'Review'
-                            : _selected.length == 1
-                            ? 'Add 1 item'
-                            : 'Add ${_selected.length} items',
-                      ),
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (_usingAi && widget.onCancelAi != null)
+                          TextButton(
+                            onPressed: widget.onCancelAi,
+                            child: const Text('Cancel AI'),
+                          )
+                        else if (!_working &&
+                            widget.onAiReview != null &&
+                            _controller.text.trim().isNotEmpty)
+                          OutlinedButton(
+                            onPressed: () => _reviewText(useAi: true),
+                            child: const Text('Review with AI'),
+                          ),
+                        FilledButton(
+                          onPressed: _working
+                              ? null
+                              : review == null
+                              ? _reviewText
+                              : _selected.isEmpty
+                              ? null
+                              : _addSelected,
+                          child: Text(
+                            _usingAi
+                                ? 'Reviewing…'
+                                : _transcribing
+                                ? 'Transcribing…'
+                                : _working
+                                ? 'Saving…'
+                                : review == null
+                                ? 'Review'
+                                : _selected.length == 1
+                                ? 'Add 1 item'
+                                : 'Add ${_selected.length} items',
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

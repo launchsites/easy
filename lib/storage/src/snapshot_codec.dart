@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import '../../capture/capture_archive.dart';
 import '../../workout_plan.dart';
 import 'contracts.dart';
 
@@ -130,6 +131,10 @@ WorkspaceRecordCounts validateSnapshot(WorkspaceSnapshot snapshot) {
     _dateField(capture, 'capturedAt');
     _optionalInt(capture, 'revision');
     if (capture['applied'] != null) _boolField(capture, 'applied');
+    if (capture['audio'] != null) {
+      jsonObject(capture['audio'], 'capture audio');
+      CaptureArchiveEntry.fromJson(capture);
+    }
   }
 
   final sessionStarts = <DateTime>{};
