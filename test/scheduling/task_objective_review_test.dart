@@ -261,6 +261,41 @@ void main() {
     },
   );
 
+  test('an active block outside a changed task bound still occupies time', () {
+    for (final scheduled in [
+      _task('scheduled', minutes: 30, due: 15),
+      _task('scheduled', minutes: 30, earliest: 5),
+    ]) {
+      final independent = _task('independent', minutes: 15);
+      final result = _review(
+        [scheduled, independent],
+        window: TimeSpan(_now, _at(120)),
+        events: [_event('accepted', -5, 25, task: scheduled.id)],
+      );
+      expect(result.ready, isEmpty);
+      expect(result.availableTime, Duration.zero);
+      final changed = result.needsAttention.single;
+      expect(changed.id, scheduled.id);
+      expect(changed.readiness, ObjectiveReadiness.reservationUnavailable);
+      expect(changed.nextReservation, isNull);
+      expect(changed.reservedEffort, Duration.zero);
+      expect(changed.inReservedTime, isFalse);
+      expect(result.later.single.id, independent.id);
+      expect(result.later.single.fit, ObjectiveFit.needsMoreTime);
+    }
+  });
+
+  test('a reservation matching both hard bounds stays actionable', () {
+    final result = _review(
+      [_task('scheduled', minutes: 25, earliest: -5, due: 25)],
+      events: [_event('accepted', -5, 25, task: 'scheduled')],
+    );
+    final current = result.ready.single;
+    expect(current.readiness, ObjectiveReadiness.reservedTime);
+    expect(current.inReservedTime, isTrue);
+    expect(current.reservedEffort, const Duration(minutes: 25));
+  });
+
   test(
     'fit uses verified time and respects hard due times and split minimums',
     () {

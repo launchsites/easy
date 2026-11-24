@@ -2,6 +2,7 @@ import '../calendar_page.dart';
 import '../task_model.dart';
 import 'planner.dart' show TimeSpan;
 import 'task_objective_availability.dart';
+import 'task_reservations.dart' show isOwnedTaskReservation;
 
 enum ObjectiveReadiness {
   ready,
@@ -168,22 +169,22 @@ TaskObjectiveReview reviewTaskObjectives({
     }
   }
   for (final event in events) {
-    final taskId = event.plannedTaskId;
-    if (taskId == null ||
-        !open.containsKey(taskId) ||
+    final node = open[event.plannedTaskId];
+    if (node == null ||
         event.id.trim().isEmpty ||
-        event.isReadOnly ||
-        event.allDay ||
-        event.recurringSeriesId != null ||
+        !isOwnedTaskReservation(event) ||
         !event.end.isAfter(now) ||
         !event.end.isAfter(event.start)) {
       continue;
     }
-    if (duplicateReservations.contains(event.id)) {
-      open[taskId]!.reservationUnavailable = true;
+    final task = node.task;
+    if (duplicateReservations.contains(event.id) ||
+        (task.earliestStart?.isAfter(event.start) ?? false) ||
+        (task.dueAt?.isBefore(event.end) ?? false)) {
+      node.reservationUnavailable = true;
       continue;
     }
-    (reservationSpans[taskId] ??= []).add(TimeSpan(event.start, event.end));
+    (reservationSpans[task.id] ??= []).add(TimeSpan(event.start, event.end));
   }
 
   final ready = <TaskObjective>[];
@@ -294,11 +295,11 @@ final class _ObjectiveNode {
         ObjectiveReadiness.prerequisiteUnavailable,
       _ when prerequisites.isNotEmpty =>
         ObjectiveReadiness.waitingForPrerequisite,
+      _ when reservationUnavailable =>
+        ObjectiveReadiness.reservationUnavailable,
       _ when start != null && start.isAfter(now) =>
         ObjectiveReadiness.startsLater,
       _ when hasSubtasks => ObjectiveReadiness.hasSubtasks,
-      _ when reservationUnavailable =>
-        ObjectiveReadiness.reservationUnavailable,
       _
           when reserved.next != null &&
               (remaining == null ||
