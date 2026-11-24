@@ -325,16 +325,31 @@ class _NutritionPageState extends State<NutritionPage> {
 String _mealSubtitle(BuildContext context, NutritionMeal meal) {
   final time = _timeLabel(context, meal.eatenAt.toLocal());
   if (meal.draft) return '$time · Draft';
-  final energy = nutritionTotals(meal.portions)[Nutrient.energy]!;
+  final energy = nutritionTotals(
+    meal.portions,
+    nutrients: const [Nutrient.energy],
+  )[Nutrient.energy]!;
   final text = _totalText(Nutrient.energy, energy);
   return '$time · $text';
 }
 
 String _totalText(Nutrient nutrient, NutrientTotal total) {
-  if (total.amount == null) return 'Unknown';
-  final decimals = nutrient == Nutrient.energy ? 0 : 1;
-  String formatted(double value) =>
-      formatNutritionNumber(value, decimals: decimals);
+  if (total.amount == null) {
+    if (nutrient.isAdditional && total.reportedPortions > 0) {
+      return 'Unknown · ${total.reportedPortions} of ${total.portionCount} reported';
+    }
+    return 'Unknown';
+  }
+  String formatted(double value) {
+    if (nutrient.isAdditional && value > 0 && value < .01) return '<0.01';
+    final decimals = nutrient.isAdditional
+        ? 2
+        : nutrient == Nutrient.energy
+        ? 0
+        : 1;
+    return formatNutritionNumber(value, decimals: decimals);
+  }
+
   final minimum = total.minimum;
   final maximum = total.maximum;
   final quantity = minimum != null && maximum != null
@@ -361,37 +376,65 @@ class _DailyTotals extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const _Heading('Daily totals'),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final columns = constraints.maxWidth >= 450 ? 4 : 2;
-              final width =
-                  (constraints.maxWidth - (columns - 1) * 8) / columns;
-              return Wrap(
-                spacing: 8,
-                runSpacing: 12,
-                children: [
-                  for (final nutrient in Nutrient.values)
-                    SizedBox(
-                      width: width,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(nutrient.label, style: contentMetadataStyle),
-                          const SizedBox(height: 3),
-                          Text(
-                            _totalText(nutrient, totals[nutrient]!),
-                            style: contentTitleStyle,
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
+          _NutrientReadings(nutrients: Nutrient.primary, totals: totals),
+          if (Nutrient.additional.any(
+            (item) => totals[item]!.reportedPortions > 0,
+          ))
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(top: 4, bottom: 6),
+              title: const Text('More nutrients', style: contentTitleStyle),
+              children: [
+                _NutrientReadings(
+                  nutrients: Nutrient.additional,
+                  totals: totals,
+                ),
+              ],
+            ),
         ],
       ),
     ),
+  );
+}
+
+class _NutrientReadings extends StatelessWidget {
+  const _NutrientReadings({required this.nutrients, required this.totals});
+
+  final List<Nutrient> nutrients;
+  final Map<Nutrient, NutrientTotal> totals;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final largeText = MediaQuery.textScalerOf(context).scale(15) > 22;
+      final columns = constraints.maxWidth >= (largeText ? 590 : 450)
+          ? 4
+          : largeText && constraints.maxWidth < 450
+          ? 1
+          : 2;
+      final width = (constraints.maxWidth - (columns - 1) * 8) / columns;
+      return Wrap(
+        spacing: 8,
+        runSpacing: 12,
+        children: [
+          for (final nutrient in nutrients)
+            SizedBox(
+              width: width,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(nutrient.label, style: contentMetadataStyle),
+                  const SizedBox(height: 3),
+                  Text(
+                    _totalText(nutrient, totals[nutrient]!),
+                    style: contentTitleStyle,
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+    },
   );
 }
 
@@ -491,11 +534,15 @@ class _FoodEditorState extends State<_FoodEditor> {
         referenceUnit: _unit,
         source: source.isEmpty ? null : source,
         estimated: _estimated,
-        values: NutritionValues(
+        values: NutritionValues.detailed(
           energyKcal: value(Nutrient.energy),
           proteinGrams: value(Nutrient.protein),
           carbsGrams: value(Nutrient.carbohydrates),
           fatGrams: value(Nutrient.fat),
+          details: {
+            for (final nutrient in Nutrient.additional)
+              nutrient: ?value(nutrient),
+          },
         ),
       );
       Navigator.pop<_RecordEdit<NutritionFood>>(context, (
@@ -525,6 +572,15 @@ class _FoodEditorState extends State<_FoodEditor> {
     _error = null;
   });
 
+  Widget _nutrientInput(Nutrient nutrient) => Padding(
+    padding: const EdgeInsets.only(bottom: 9),
+    child: _Input(
+      label: '${nutrient.label} (${nutrient.unit})',
+      controller: _values[nutrient]!,
+      numeric: true,
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => _NutritionScreen(
     title: widget.food == null ? 'New food' : 'Edit food',
@@ -542,14 +598,14 @@ class _FoodEditorState extends State<_FoodEditor> {
         onUnitChanged: _changeReferenceUnit,
       ),
       const SizedBox(height: 10),
-      for (final nutrient in Nutrient.values) ...[
-        _Input(
-          label: '${nutrient.label} (${nutrient.unit})',
-          controller: _values[nutrient]!,
-          numeric: true,
-        ),
-        const SizedBox(height: 9),
-      ],
+      for (final nutrient in Nutrient.primary) _nutrientInput(nutrient),
+      ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        title: const Text('More nutrients', style: contentTitleStyle),
+        children: [
+          for (final nutrient in Nutrient.additional) _nutrientInput(nutrient),
+        ],
+      ),
       _Input(label: 'Source (optional)', controller: _source),
       SwitchListTile.adaptive(
         contentPadding: EdgeInsets.zero,

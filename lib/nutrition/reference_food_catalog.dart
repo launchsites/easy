@@ -21,26 +21,27 @@ enum ReferenceFoodGroup {
 }
 
 enum ReferenceNutrient {
-  energy(1008, 'Energy', 'kcal'),
-  protein(1003, 'Protein', 'g'),
-  carbohydrates(1005, 'Carbohydrate by difference', 'g'),
-  fat(1004, 'Total fat', 'g'),
-  fibre(1079, 'Dietary fibre', 'g'),
-  totalSugars(2000, 'Total sugars', 'g'),
-  calcium(1087, 'Calcium', 'mg'),
-  iron(1089, 'Iron', 'mg'),
-  magnesium(1090, 'Magnesium', 'mg'),
-  potassium(1092, 'Potassium', 'mg'),
-  sodium(1093, 'Sodium', 'mg'),
-  vitaminC(1162, 'Vitamin C', 'mg'),
-  vitaminD(1114, 'Vitamin D', 'µg'),
-  folate(1177, 'Total folate', 'µg'),
-  vitaminB12(1178, 'Vitamin B12', 'µg');
+  energy(1008, 'Energy', Nutrient.energy),
+  protein(1003, 'Protein', Nutrient.protein),
+  carbohydrates(1005, 'Carbohydrate by difference', Nutrient.carbohydrates),
+  fat(1004, 'Total fat', Nutrient.fat),
+  fibre(1079, 'Dietary fibre', Nutrient.fibre),
+  totalSugars(2000, 'Total sugars', Nutrient.totalSugars),
+  calcium(1087, 'Calcium', Nutrient.calcium),
+  iron(1089, 'Iron', Nutrient.iron),
+  magnesium(1090, 'Magnesium', Nutrient.magnesium),
+  potassium(1092, 'Potassium', Nutrient.potassium),
+  sodium(1093, 'Sodium', Nutrient.sodium),
+  vitaminC(1162, 'Vitamin C', Nutrient.vitaminC),
+  vitaminD(1114, 'Vitamin D', Nutrient.vitaminD),
+  folate(1177, 'Total folate', Nutrient.folate),
+  vitaminB12(1178, 'Vitamin B12', Nutrient.vitaminB12);
 
-  const ReferenceNutrient(this.fdcNutrientId, this.label, this.unit);
+  const ReferenceNutrient(this.fdcNutrientId, this.label, this.nutrient);
   final int fdcNutrientId;
   final String label;
-  final String unit;
+  final Nutrient nutrient;
+  String get unit => nutrient.unit;
 }
 
 class ReferenceNutrientValue {
@@ -146,11 +147,16 @@ class ReferenceFood {
       name: name,
       referenceAmount: referenceGrams,
       referenceUnit: NutritionUnit.grams,
-      values: NutritionValues(
+      values: NutritionValues.detailed(
         energyKcal: amount(ReferenceNutrient.energy),
         proteinGrams: amount(ReferenceNutrient.protein),
         carbsGrams: amount(ReferenceNutrient.carbohydrates),
         fatGrams: amount(ReferenceNutrient.fat),
+        details: {
+          for (final entry in composition.entries)
+            if (entry.key.nutrient.isAdditional)
+              entry.key.nutrient: entry.value.per100Grams,
+        },
       ),
       source: '$dataset · FDC $fdcId · $sourceUrl',
     );
@@ -188,7 +194,22 @@ class ReferenceFoodCatalog {
     if (!snapshot.id.startsWith(prefix)) return null;
     final id = int.tryParse(snapshot.id.substring(prefix.length));
     final reference = id == null ? null : byFdcId(id);
-    return reference?.toNutritionFood() == snapshot ? reference : null;
+    if (reference == null) return null;
+    final published = reference.toNutritionFood();
+    if (published == snapshot) return reference;
+    // Older catalog meals keep their original recorded fields when using a measure.
+    return snapshot.values.details.isEmpty &&
+            snapshot.id == published.id &&
+            snapshot.name == published.name &&
+            snapshot.source == published.source &&
+            snapshot.referenceUnit == published.referenceUnit &&
+            snapshot.referenceAmount == published.referenceAmount &&
+            snapshot.estimated == published.estimated &&
+            Nutrient.primary.every(
+              (item) => snapshot.values[item] == published.values[item],
+            )
+        ? reference
+        : null;
   }
 
   /// Requires an exact name or alias. A generic label can match several foods.

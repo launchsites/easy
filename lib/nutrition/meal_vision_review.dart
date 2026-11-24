@@ -88,18 +88,13 @@ Map<Nutrient, NutrientTotal> mealVisionNutritionTotals(
   Iterable<MealVisionMatch> matches,
 ) {
   final items = matches.toList();
-  final partial = items.any((item) => item.portion == null);
-  final totals = nutritionTotals([for (final item in items) ?item.portion]);
-  return Map.unmodifiable({
-    for (final item in totals.entries)
-      item.key: NutrientTotal(
-        amount: item.value.amount,
-        minimum: item.value.minimum,
-        maximum: item.value.maximum,
-        partial: partial || item.value.partial,
-        estimated: item.value.estimated,
-      ),
-  });
+  final portions = [for (final item in items) ?item.portion];
+  return Map.unmodifiable(
+    nutritionTotals(
+      portions,
+      unresolvedPortions: items.length - portions.length,
+    ),
+  );
 }
 
 Future<bool> showMealVisionTransmissionDialog(
@@ -236,7 +231,7 @@ class _MealSuggestionDialogState extends State<_MealSuggestionDialog> {
               spacing: 14,
               runSpacing: 8,
               children: [
-                for (final nutrient in Nutrient.values)
+                for (final nutrient in Nutrient.primary)
                   Text(
                     '${nutrient.label} ${_total(totals[nutrient]!, nutrient)}',
                   ),

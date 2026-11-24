@@ -37,12 +37,37 @@ enum Nutrient {
   energy('Energy', 'kcal'),
   protein('Protein', 'g'),
   carbohydrates('Carbs', 'g'),
-  fat('Fat', 'g');
+  fat('Fat', 'g'),
+  fibre('Fibre', 'g'),
+  totalSugars('Total sugars', 'g'),
+  calcium('Calcium', 'mg'),
+  iron('Iron', 'mg'),
+  magnesium('Magnesium', 'mg'),
+  potassium('Potassium', 'mg'),
+  sodium('Sodium', 'mg'),
+  vitaminC('Vitamin C', 'mg'),
+  vitaminD('Vitamin D', 'µg'),
+  folate('Folate', 'µg'),
+  vitaminB12('Vitamin B12', 'µg');
 
   const Nutrient(this.label, this.unit);
 
   final String label;
   final String unit;
+
+  static const primary = [energy, protein, carbohydrates, fat];
+  static final additional = List<Nutrient>.unmodifiable(
+    values.skip(primary.length),
+  );
+
+  bool get isAdditional => index >= primary.length;
+
+  double _massGrams(double amount) => switch (unit) {
+    'g' => amount,
+    'mg' => amount / 1000,
+    'µg' => amount / 1000000,
+    _ => throw StateError('This nutrient is not measured by mass.'),
+  };
 }
 
 class NutritionValues {
@@ -51,26 +76,44 @@ class NutritionValues {
     this.proteinGrams,
     this.carbsGrams,
     this.fatGrams,
-  });
+  }) : details = const {};
+
+  NutritionValues.detailed({
+    this.energyKcal,
+    this.proteinGrams,
+    this.carbsGrams,
+    this.fatGrams,
+    Map<Nutrient, double> details = const {},
+  }) : details = Map.unmodifiable(details) {
+    if (this.details.entries.any(
+      (entry) =>
+          !entry.key.isAdditional || !entry.value.isFinite || entry.value < 0,
+    )) {
+      throw const FormatException('Check the additional nutrient amounts.');
+    }
+  }
 
   factory NutritionValues.fromJson(Map<String, dynamic> json) =>
-      NutritionValues(
+      NutritionValues.detailed(
         energyKcal: _number(json['energyKcal']),
         proteinGrams: _number(json['proteinGrams']),
         carbsGrams: _number(json['carbsGrams']),
         fatGrams: _number(json['fatGrams']),
+        details: _nutritionDetails(json['details']),
       );
 
   final double? energyKcal;
   final double? proteinGrams;
   final double? carbsGrams;
   final double? fatGrams;
+  final Map<Nutrient, double> details;
 
   double? operator [](Nutrient nutrient) => switch (nutrient) {
     Nutrient.energy => energyKcal,
     Nutrient.protein => proteinGrams,
     Nutrient.carbohydrates => carbsGrams,
     Nutrient.fat => fatGrams,
+    _ => details[nutrient],
   };
 
   Map<String, Object?> toJson() => {
@@ -78,6 +121,12 @@ class NutritionValues {
     'proteinGrams': proteinGrams,
     'carbsGrams': carbsGrams,
     'fatGrams': fatGrams,
+    if (details.isNotEmpty)
+      'details': {
+        for (final nutrient in Nutrient.additional)
+          if (details[nutrient] case final amount?)
+            nutrient.name: {'amount': amount, 'unit': nutrient.unit},
+      },
   };
 }
 
@@ -94,7 +143,7 @@ class NutritionFood {
     _requiredText(id, 'Food ID');
     _requiredText(name, 'Food name');
     _checkAmount(referenceAmount, referenceUnit);
-    for (final nutrient in Nutrient.values) {
+    for (final nutrient in Nutrient.primary) {
       final value = values[nutrient];
       if (value != null && (!value.isFinite || value < 0)) {
         throw const FormatException(
@@ -117,6 +166,13 @@ class NutritionFood {
     if (energy > bounds.energy || macros > bounds.macros) {
       throw const FormatException(
         'Check the nutrition values and reference quantity.',
+      );
+    }
+    if (values.details.entries.any(
+      (entry) => entry.key._massGrams(entry.value) > bounds.macros,
+    )) {
+      throw const FormatException(
+        'Check the nutrient units and reference quantity.',
       );
     }
     _checkMealTotals(energy, macros);
@@ -218,6 +274,7 @@ class NutritionPortion {
               (values.fatGrams ?? 0)) *
           scale,
     );
+    _checkDetailPortion(this, scale);
   }
 
   factory NutritionPortion.fromJson(Map<String, dynamic> json) =>
@@ -462,6 +519,8 @@ class NutrientTotal {
     this.maximum,
     this.partial = false,
     this.estimated = false,
+    this.reportedPortions = 0,
+    this.portionCount = 0,
   });
 
   final double? amount;
@@ -469,19 +528,30 @@ class NutrientTotal {
   final double? maximum;
   final bool partial;
   final bool estimated;
+  final int reportedPortions;
+  final int portionCount;
 }
 
 Map<Nutrient, NutrientTotal> nutritionTotals(
-  Iterable<NutritionPortion> portions,
-) {
+  Iterable<NutritionPortion> portions, {
+  Iterable<Nutrient> nutrients = Nutrient.values,
+  int unresolvedPortions = 0,
+}) {
+  if (unresolvedPortions < 0) {
+    throw ArgumentError.value(unresolvedPortions, 'unresolvedPortions');
+  }
   final records = portions.toList();
   return {
-    for (final nutrient in Nutrient.values)
-      nutrient: _sumNutrient(records, nutrient),
+    for (final nutrient in nutrients)
+      nutrient: _sumNutrient(records, nutrient, unresolvedPortions),
   };
 }
 
-NutrientTotal _sumNutrient(List<NutritionPortion> portions, Nutrient nutrient) {
+NutrientTotal _sumNutrient(
+  List<NutritionPortion> portions,
+  Nutrient nutrient,
+  int unresolvedPortions,
+) {
   var known = 0;
   var amount = 0.0;
   var minimum = 0.0;
@@ -502,12 +572,18 @@ NutrientTotal _sumNutrient(List<NutritionPortion> portions, Nutrient nutrient) {
         portion.food.estimated || (portion.estimated && !portionHasRange);
     estimated |= portion.food.estimated || portion.estimated || portionHasRange;
   }
+  final count = portions.length + unresolvedPortions;
+  final partial = known < count;
+  final completeEnough = known > 0 && (!nutrient.isAdditional || !partial);
+  final hasRange = completeEnough && ranged && !unquantified;
   return NutrientTotal(
-    amount: known == 0 ? null : amount,
-    partial: known < portions.length,
+    amount: completeEnough ? amount : null,
+    partial: partial,
     estimated: estimated,
-    minimum: ranged && !unquantified ? minimum : null,
-    maximum: ranged && !unquantified ? maximum : null,
+    minimum: hasRange ? minimum : null,
+    maximum: hasRange ? maximum : null,
+    reportedPortions: known,
+    portionCount: count,
   );
 }
 
@@ -553,6 +629,7 @@ void _checkMealTotals(double energy, double macros) {
 void _checkPortionTotals(Iterable<NutritionPortion> portions) {
   var maxEnergy = 0.0;
   var maxMacros = 0.0;
+  final detailedGrams = <Nutrient, double>{};
   for (final portion in portions) {
     final factor = portion._scale(portion.maximumAmount ?? portion.amount);
     final values = portion.food.values;
@@ -562,12 +639,61 @@ void _checkPortionTotals(Iterable<NutritionPortion> portions) {
             (values.carbsGrams ?? 0) +
             (values.fatGrams ?? 0)) *
         factor;
+    for (final entry in values.details.entries) {
+      final grams = entry.key._massGrams(entry.value) * factor;
+      detailedGrams.update(
+        entry.key,
+        (total) => total + grams,
+        ifAbsent: () => grams,
+      );
+    }
   }
   _checkMealTotals(maxEnergy, maxMacros);
+  if (detailedGrams.values.any((grams) => !_plausiblePortionGrams(grams))) {
+    throw const FormatException('Check the portion size and nutrient units.');
+  }
 }
 
-double? _number(Object? value) =>
-    value == null ? null : (value as num).toDouble();
+void _checkDetailPortion(NutritionPortion portion, double scale) {
+  if (portion.food.values.details.entries.any(
+    (entry) =>
+        !_plausiblePortionGrams(entry.key._massGrams(entry.value) * scale),
+  )) {
+    throw const FormatException('Check the portion size and nutrient units.');
+  }
+}
+
+bool _plausiblePortionGrams(double grams) => grams.isFinite && grams <= 20000;
+
+Map<Nutrient, double> _nutritionDetails(Object? raw) {
+  if (raw == null) return const {};
+  if (raw is! Map<String, dynamic> || raw.length > Nutrient.additional.length) {
+    throw const FormatException('Invalid additional nutrient records.');
+  }
+  final result = <Nutrient, double>{};
+  for (final entry in raw.entries) {
+    final nutrient = Nutrient.values.asNameMap()[entry.key];
+    final record = entry.value;
+    if (nutrient == null ||
+        !nutrient.isAdditional ||
+        record is! Map<String, dynamic> ||
+        record.length != 2 ||
+        record['unit'] != nutrient.unit ||
+        record['amount'] == null) {
+      throw const FormatException('Invalid nutrient amount or unit.');
+    }
+    result[nutrient] = _number(record['amount'])!;
+  }
+  return result;
+}
+
+double? _number(Object? value) {
+  if (value == null) return null;
+  if (value is! num || !value.isFinite) {
+    throw const FormatException('Nutrition quantities must be finite numbers.');
+  }
+  return value.toDouble();
+}
 
 Iterable<Map<String, dynamic>> _objects(Object? list) =>
     (list as List<dynamic>).cast<Map<String, dynamic>>();
