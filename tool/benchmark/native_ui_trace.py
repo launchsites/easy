@@ -11,9 +11,6 @@ import subprocess
 import time
 from urllib.parse import urlsplit
 
-from websockets.sync.client import connect
-
-
 FRAME_NAMES = ("Frame", "Rasterizer::DoDraw")
 
 
@@ -166,6 +163,8 @@ def process_rss(pid):
 
 
 def main():
+    from websockets.sync.client import connect
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--machine-log", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)

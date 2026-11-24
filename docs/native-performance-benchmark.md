@@ -89,3 +89,17 @@ dart compile exe tool/benchmark/calendar_index_bench.dart -o /tmp/easy-calendar-
 taskset -c 0 /tmp/easy-calendar-index "$easy_ui_dir/data/app.launchsites.easy/shared_preferences.json"
 taskset -c 0,1,2,3 /tmp/easy-calendar-index "$easy_ui_dir/data/app.launchsites.easy/shared_preferences.json"
 ```
+
+## Native offline navigation audit
+
+The Linux release at `8670be647657925862931c2b3b58683656ca2ef7` opened an isolated synthetic workspace while a test-only seccomp filter denied IPv4 and IPv6 socket creation. A separate guard probe verified that both IP families failed with `EAFNOSUPPORT` and that a UNIX socket still opened. X11 and D-Bus used local UNIX sockets.
+
+The one-CPU audit ran four cycles in 39.79 seconds, with 16 matching desktop checks and three successful mobile hold-and-drag switches to Calendar. The syscall trace recorded 77 network-related calls from the app and its descendants, including zero IPv4 or IPv6 calls. Read-only SQLite checks reported the same workspace digest and revision at both ends, with 7,320 events, 3,100 tasks and 1,301 notes. This verifies the observed default navigation and storage paths. [Raw offline audit](benchmark-results/native-offline-audit-epyc-20261124.json)
+
+To repeat the guard on Linux x86-64, launch a built release bundle with an isolated X11 display and a disposable profile. Use the checked synthetic fixture and record only syscall counts in any published report.
+
+```sh
+cc -std=c17 -O2 -Wall -Wextra -Werror tool/benchmark/deny_ip_sockets.c -o /tmp/easy-deny-ip-sockets
+strace -ff -qq -e trace=socket,connect,sendto,sendmsg,sendmmsg \
+  -o "$easy_ui_dir/network.trace" /tmp/easy-deny-ip-sockets "$easy_bundle/easy"
+```

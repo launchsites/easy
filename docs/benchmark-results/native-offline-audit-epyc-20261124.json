@@ -1,0 +1,213 @@
+{
+  "run_at_utc": "2026-11-24T02:40:12.290374+00:00",
+  "app_revision": "8670be647657925862931c2b3b58683656ca2ef7",
+  "executable_sha256": "17ea2f4d7ec1eac78813e45047a26ed157eb2bb37191eb3c493e282ad4ec5d59",
+  "aot_library_sha256": "9dd33c7c56043d49d244f8b9ead29cdf5a500f844f17a2eeccb595ca04d8d11f",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "host_memory_kib": 18440100,
+    "cgroup_cpu_max": "400000 100000",
+    "cgroup_memory_max": "17179869184",
+    "cgroup_memory_events_before": "low 0\nhigh 0\nmax 43325\noom 0\noom_kill 0\noom_group_kill 0",
+    "cgroup_memory_events_after": "low 0\nhigh 0\nmax 43325\noom 0\noom_kill 0\noom_group_kill 0"
+  },
+  "viewports": [
+    [
+      390,
+      844
+    ],
+    [
+      320,
+      568
+    ],
+    [
+      719,
+      860
+    ],
+    [
+      760,
+      860
+    ],
+    [
+      1280,
+      900
+    ]
+  ],
+  "target_seconds": 30,
+  "minimum_cycles": 3,
+  "affinity": [
+    0
+  ],
+  "cycles": 4,
+  "observations": [
+    {
+      "cycle": 1,
+      "elapsed_seconds": 10.49,
+      "memory_kib": {
+        "VmHWM": 433132,
+        "VmRSS": 347112
+      },
+      "desktop_headings": {
+        "Today": {
+          "matched": true,
+          "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+        },
+        "Calendar": {
+          "matched": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac"
+        },
+        "Tasks": {
+          "matched": true,
+          "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61"
+        },
+        "Notes": {
+          "matched": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6"
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "68242061d8456a456d8c264a8da701be1c436c02663990389efc558028531f73"
+      }
+    },
+    {
+      "cycle": 2,
+      "elapsed_seconds": 18.75,
+      "memory_kib": {
+        "VmHWM": 433764,
+        "VmRSS": 389760
+      },
+      "desktop_headings": {
+        "Today": {
+          "matched": true,
+          "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+        },
+        "Calendar": {
+          "matched": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac"
+        },
+        "Tasks": {
+          "matched": true,
+          "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61"
+        },
+        "Notes": {
+          "matched": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6"
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "7c7b606783ac340d3a8cd1602ab44bac5a0d351de26e1dc1bc9dd8868fb19a9a"
+      }
+    },
+    {
+      "cycle": 3,
+      "elapsed_seconds": 29.18,
+      "memory_kib": {
+        "VmHWM": 446180,
+        "VmRSS": 414876
+      },
+      "desktop_headings": {
+        "Today": {
+          "matched": true,
+          "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+        },
+        "Calendar": {
+          "matched": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac"
+        },
+        "Tasks": {
+          "matched": true,
+          "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61"
+        },
+        "Notes": {
+          "matched": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6"
+        }
+      },
+      "mobile_orbit_calendar": {
+        "matched": true,
+        "screenshot_sha256": "b207d50a8d232d8d5d09df996b44a00269012e75e46739698759535df18127ce"
+      }
+    },
+    {
+      "cycle": 4,
+      "elapsed_seconds": 39.54,
+      "memory_kib": {
+        "VmHWM": 475656,
+        "VmRSS": 456168
+      },
+      "desktop_headings": {
+        "Today": {
+          "matched": true,
+          "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+        },
+        "Calendar": {
+          "matched": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac"
+        },
+        "Tasks": {
+          "matched": true,
+          "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61"
+        },
+        "Notes": {
+          "matched": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6"
+        }
+      },
+      "mobile_orbit_calendar": null
+    }
+  ],
+  "start_memory_kib": {
+    "VmHWM": 315972,
+    "VmRSS": 306064
+  },
+  "workspace_before": {
+    "revision": 1,
+    "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+    "counts": {
+      "events": 7320,
+      "tasks": 3100,
+      "notes": 1301
+    },
+    "quick_check": "ok"
+  },
+  "status": "complete",
+  "elapsed_seconds": 39.79,
+  "final_memory_kib": {
+    "VmHWM": 475656,
+    "VmRSS": 456168
+  },
+  "heading_checks": 16,
+  "heading_mismatches": 0,
+  "orbit_checks": 3,
+  "orbit_mismatches": 0,
+  "workspace_after": {
+    "revision": 1,
+    "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+    "counts": {
+      "events": 7320,
+      "tasks": 3100,
+      "notes": 1301
+    },
+    "quick_check": "ok"
+  },
+  "workspace_verified": true,
+  "network_audit": {
+    "scope": "IP socket allocations and network calls in the frozen app process and descendants",
+    "trace_files": 47,
+    "network_syscalls_recorded": 77,
+    "ipv4_socket_attempts": 0,
+    "ipv6_socket_attempts": 0,
+    "ipv4_ipv6_calls": 0,
+    "socket_filter": "seccomp: AF_INET and AF_INET6 socket creation yields EAFNOSUPPORT"
+  }
+}
