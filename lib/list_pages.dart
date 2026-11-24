@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 
 import 'categories/category_palette.dart';
 import 'notes/note_model.dart';
@@ -544,6 +545,7 @@ class NotesPage extends StatefulWidget {
 class _NotesPageState extends State<NotesPage> {
   final _search = TextEditingController();
   final _searchFocus = FocusNode();
+  final _searchButtonFocus = FocusNode();
   bool _searchOpen = false;
   _NoteFilters _filters = const _NoteFilters();
   late List<NoteItem> _ordered;
@@ -570,6 +572,7 @@ class _NotesPageState extends State<NotesPage> {
   void dispose() {
     _search.dispose();
     _searchFocus.dispose();
+    _searchButtonFocus.dispose();
     super.dispose();
   }
 
@@ -584,7 +587,7 @@ class _NotesPageState extends State<NotesPage> {
     if (_searchOpen) {
       _searchFocus.requestFocus();
     } else {
-      _searchFocus.unfocus();
+      _searchButtonFocus.requestFocus();
     }
   }
 
@@ -692,6 +695,7 @@ class _NotesPageState extends State<NotesPage> {
           ],
           IconButton.outlined(
             tooltip: _searchOpen ? 'Close note search' : 'Search notes',
+            focusNode: _searchButtonFocus,
             onPressed: _toggleSearch,
             style: IconButton.styleFrom(
               foregroundColor: ink,
@@ -710,23 +714,29 @@ class _NotesPageState extends State<NotesPage> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 20),
-              child: TextField(
-                controller: _search,
-                focusNode: _searchFocus,
-                onChanged: (_) => setState(_refreshMatches),
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: 'Search notes',
-                  prefixIcon: const Icon(Icons.search_rounded, size: 19),
-                  fillColor: raisedPaper,
-                  filled: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: line),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: line),
+              child: CallbackShortcuts(
+                bindings: {
+                  const SingleActivator(LogicalKeyboardKey.escape):
+                      _toggleSearch,
+                },
+                child: TextField(
+                  controller: _search,
+                  focusNode: _searchFocus,
+                  onChanged: (_) => setState(_refreshMatches),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: 'Search notes',
+                    prefixIcon: const Icon(Icons.search_rounded, size: 19),
+                    fillColor: raisedPaper,
+                    filled: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: line),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: line),
+                    ),
                   ),
                 ),
               ),
@@ -760,6 +770,12 @@ class _NoteRow extends StatelessWidget {
   const _NoteRow({required this.note, required this.onTap, super.key});
 
   static const _previewLength = 384;
+  static final _lineBreak = RegExp(r'[\r\n\u0085\u2028\u2029]');
+  static const _metadataStyle = TextStyle(
+    color: muted,
+    fontSize: 13,
+    height: 1.3,
+  );
 
   final NoteItem note;
   final VoidCallback onTap;
@@ -769,15 +785,11 @@ class _NoteRow extends StatelessWidget {
     final updated = MaterialLocalizations.of(context)
         .formatShortDate(note.updated.toLocal());
     final body = note.body.trimLeft();
-    final firstBreak = body.indexOf('\n');
-    final preview = (firstBreak == -1 ? body : body.substring(0, firstBreak))
-        .trimRight();
-    final shortened = preview.length > _previewLength;
-    final snippet = shortened
-        ? '${preview.characters.take(_previewLength)}…'
-        : preview;
+    final firstBreak = _lineBreak.firstMatch(body)?.start ?? body.length;
+    final preview = body.substring(0, firstBreak).trimRight();
+    final excerpt = preview.characters.take(_previewLength).string;
+    final snippet = excerpt.length < preview.length ? '$excerpt…' : excerpt;
     final title = note.title.trim();
-    const metadata = TextStyle(color: muted, fontSize: 13, height: 1.3);
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
@@ -814,29 +826,7 @@ class _NoteRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: updated,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          if (note.folder case final folder?
-                              when folder.isNotEmpty)
-                            TextSpan(text: '  ·  $folder'),
-                          if (preview.isNotEmpty)
-                            TextSpan(
-                              text: '  ·  $snippet',
-                              semanticsLabel: shortened
-                                  ? '  ·  $preview'
-                                  : null,
-                            ),
-                        ],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: metadata,
-                    ),
+                    _details(context, updated, snippet),
                   ],
                 ),
               ),
@@ -844,6 +834,43 @@ class _NoteRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _details(BuildContext context, String updated, String snippet) {
+    final date = Text(
+      updated,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: _metadataStyle.copyWith(fontWeight: FontWeight.w500),
+    );
+    if (snippet.isEmpty) return date;
+    final preview = Text(
+      snippet,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: _metadataStyle,
+    );
+    final scaler = MediaQuery.textScalerOf(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (scaler.scale(13) > 19 && constraints.maxWidth < scaler.scale(195)) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [preview, date],
+          );
+        }
+        return Row(
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth * .6),
+              child: date,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: preview),
+          ],
+        );
+      },
     );
   }
 }
@@ -1004,12 +1031,28 @@ class _ListPageLayout extends StatelessWidget {
           header: true,
           child: Text(
             title,
+            maxLines: inlineActions ? 1 : null,
+            overflow: inlineActions ? TextOverflow.ellipsis : null,
             style: shortLandscape
                 ? titleStyle.copyWith(fontSize: 36, letterSpacing: -1.8)
                 : titleStyle,
           ),
         );
-        final head = wide || inlineActions || shortLandscape
+        // Allow space for both Notes action buttons before choosing a row.
+        final notesActionsFit =
+            inlineActions &&
+            TextPainter.computeWidth(
+                      text: TextSpan(
+                        text: title,
+                        style: DefaultTextStyle.of(context).style
+                            .merge(titleStyle),
+                      ),
+                      textDirection: Directionality.of(context),
+                      textScaler: MediaQuery.textScalerOf(context),
+                    ) +
+                    117 <=
+                availableWidth;
+        final head = wide || notesActionsFit || shortLandscape
             ? Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
