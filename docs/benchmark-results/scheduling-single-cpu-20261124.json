@@ -1,0 +1,261 @@
+{
+  "finishedAtUtc": "2026-11-24T03:52:03+00:00",
+  "hardware": {
+    "hostCpu": "AMD EPYC 9V74 80-Core Processor",
+    "cpuAffinity": [
+      4
+    ],
+    "memoryCeiling": null
+  },
+  "method": "Cold Linux Dart AOT process per run. The planner stopwatch excludes fixture construction. Five alternating trials per variant and scenario.",
+  "sourceHashes": {
+    "baselinePlannerSha256": "5f9b1301d2530a8eeacc0c491c659d5c1fa0d1a69cd8e765ddbac6974ca3e4ec",
+    "optimizedPlannerSha256": "e427605987d64812ff11c2172190789ab558403799363a353016744fbac010be",
+    "scenarioRunnerSha256": "ae226130c13c58cd489df3b0aa368a5c2551a48cc97ff8a17c779848400326fd"
+  },
+  "differential": {
+    "seed": 271828,
+    "iterations": 12000,
+    "decisions": 110769,
+    "blocks": 8633,
+    "splits": 581
+  },
+  "frozenProfiles": [
+    {
+      "profile": "ordinary",
+      "days": 7,
+      "commitments": 175,
+      "tasks": 850,
+      "scheduled": 117,
+      "unscheduled": 733,
+      "placementProof": 798179074,
+      "variants": {
+        "baseline": {
+          "plannerElapsedMs": [
+            41,
+            18,
+            7,
+            10,
+            3
+          ],
+          "medianPlannerElapsedMs": 10,
+          "processWallMilliseconds": [
+            102,
+            29,
+            22,
+            17,
+            9
+          ],
+          "maxRssKiB": [
+            8576,
+            8576,
+            8576,
+            8576,
+            8576
+          ]
+        },
+        "optimized": {
+          "plannerElapsedMs": [
+            2,
+            2,
+            5,
+            2,
+            2
+          ],
+          "medianPlannerElapsedMs": 2,
+          "processWallMilliseconds": [
+            8,
+            12,
+            17,
+            8,
+            10
+          ],
+          "maxRssKiB": [
+            8576,
+            8448,
+            8576,
+            8576,
+            8576
+          ]
+        }
+      }
+    },
+    {
+      "profile": "wide",
+      "days": 31,
+      "commitments": 0,
+      "tasks": 15000,
+      "scheduled": 967,
+      "unscheduled": 14033,
+      "placementProof": 1435447162,
+      "variants": {
+        "baseline": {
+          "plannerElapsedMs": [
+            105,
+            78,
+            67,
+            85,
+            49
+          ],
+          "medianPlannerElapsedMs": 78,
+          "processWallMilliseconds": [
+            138,
+            90,
+            79,
+            98,
+            64
+          ],
+          "maxRssKiB": [
+            44620,
+            44564,
+            44776,
+            44504,
+            44684
+          ]
+        },
+        "optimized": {
+          "plannerElapsedMs": [
+            19,
+            16,
+            18,
+            18,
+            27
+          ],
+          "medianPlannerElapsedMs": 18,
+          "processWallMilliseconds": [
+            31,
+            27,
+            31,
+            48,
+            58
+          ],
+          "maxRssKiB": [
+            26392,
+            26520,
+            26348,
+            26460,
+            26468
+          ]
+        }
+      }
+    },
+    {
+      "profile": "packed",
+      "days": 21,
+      "commitments": 3780,
+      "tasks": 18000,
+      "scheduled": 12600,
+      "unscheduled": 5400,
+      "placementProof": 638726599,
+      "variants": {
+        "baseline": {
+          "plannerElapsedMs": [
+            5009,
+            3376,
+            6149,
+            6699,
+            4472
+          ],
+          "medianPlannerElapsedMs": 5009,
+          "processWallMilliseconds": [
+            5039,
+            3396,
+            6171,
+            6750,
+            4511
+          ],
+          "maxRssKiB": [
+            51848,
+            51988,
+            52168,
+            51952,
+            52080
+          ]
+        },
+        "optimized": {
+          "plannerElapsedMs": [
+            51,
+            54,
+            204,
+            484,
+            77
+          ],
+          "medianPlannerElapsedMs": 77,
+          "processWallMilliseconds": [
+            70,
+            72,
+            245,
+            710,
+            95
+          ],
+          "maxRssKiB": [
+            46696,
+            46640,
+            46612,
+            46476,
+            46568
+          ]
+        }
+      }
+    },
+    {
+      "profile": "blocked",
+      "days": 31,
+      "commitments": 5580,
+      "tasks": 18000,
+      "scheduled": 124,
+      "unscheduled": 17876,
+      "placementProof": 1072729530,
+      "variants": {
+        "baseline": {
+          "plannerElapsedMs": [
+            5709,
+            5895,
+            5657,
+            5676,
+            8361
+          ],
+          "medianPlannerElapsedMs": 5709,
+          "processWallMilliseconds": [
+            5727,
+            5914,
+            5681,
+            5696,
+            8386
+          ],
+          "maxRssKiB": [
+            50788,
+            51008,
+            51228,
+            51080,
+            51292
+          ]
+        },
+        "optimized": {
+          "plannerElapsedMs": [
+            21,
+            20,
+            27,
+            21,
+            55
+          ],
+          "medianPlannerElapsedMs": 21,
+          "processWallMilliseconds": [
+            37,
+            36,
+            48,
+            37,
+            75
+          ],
+          "maxRssKiB": [
+            35440,
+            35452,
+            35244,
+            35432,
+            35432
+          ]
+        }
+      }
+    }
+  ]
+}

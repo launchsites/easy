@@ -1,6 +1,8 @@
 import 'dart:collection';
 import 'dart:math' as math;
 
+const _maxCachedPlacementFailures = 4096;
+
 enum PlannerPriority { low, normal, high }
 
 enum PlannerProblem {
@@ -187,11 +189,13 @@ ScheduleProposal proposeSchedule({
 
   final categoryWindows = <String, List<TimeSpan>>{};
   final windows = availability.toList();
-  var occupied = _merge([
+  final occupied = _merge([
     for (final commitment in commitments) ?_blockedSpan(commitment, horizon),
   ]);
   final scheduled = <ScheduledTask>[];
   final unscheduled = <UnscheduledTask>[];
+  // Equivalent failed searches can share a result until occupancy changes.
+  final unavailableWindows = <_PlacementKey>{};
 
   while (ready.isNotEmpty) {
     final task = ready.first;
@@ -205,12 +209,22 @@ ScheduleProposal proposeSchedule({
           if (window.allows(task.category)) ?window.span.intersection(horizon),
       ]),
     );
-    final outcome = _place(task, horizon, knownWindows, occupied, finishedAt);
+    final outcome = _place(
+      task,
+      horizon,
+      knownWindows,
+      occupied,
+      finishedAt,
+      unavailableWindows,
+    );
     switch (outcome) {
       case ScheduledTask():
         scheduled.add(outcome);
         finishedAt[task.id] = outcome.end;
-        occupied = _merge([...occupied, ...outcome.blocks]);
+        for (final block in outcome.blocks) {
+          _addOccupied(occupied, block);
+        }
+        unavailableWindows.clear();
       case UnscheduledTask():
         unscheduled.add(outcome);
     }
@@ -257,6 +271,7 @@ PlanningDecision _place(
   List<TimeSpan> availability,
   List<TimeSpan> occupied,
   Map<String, DateTime> finishedAt,
+  Set<_PlacementKey> unavailableWindows,
 ) {
   if (task.needsDetails) {
     return UnscheduledTask(task, PlannerProblem.needsDetails);
@@ -289,13 +304,24 @@ PlanningDecision _place(
     return UnscheduledTask(task, PlannerProblem.noFeasibleTime);
   }
 
-  final usable = TimeSpan(release, deadline);
-  final candidates = _subtract([
-    for (final span in availability) ?span.intersection(usable),
-  ], occupied);
-
+  final splitMinimum = task.allowSplit ? task.minimumChunkMinutes : 0;
+  final key = (task.category, release, deadline, minutes, splitMinimum);
+  if (unavailableWindows.contains(key)) {
+    return UnscheduledTask(task, PlannerProblem.noFeasibleTime);
+  }
+  final minimum = splitMinimum == 0 ? minutes : math.min(minutes, splitMinimum);
+  final candidates = _freeWindows(
+    availability,
+    occupied,
+    release,
+    deadline,
+    Duration(minutes: minimum),
+  );
   final chunks = _takeBlocks(task, minutes, candidates);
   if (chunks.isEmpty) {
+    if (unavailableWindows.length < _maxCachedPlacementFailures) {
+      unavailableWindows.add(key);
+    }
     return UnscheduledTask(task, PlannerProblem.noFeasibleTime);
   }
   return ScheduledTask(
@@ -307,26 +333,31 @@ PlanningDecision _place(
   );
 }
 
+typedef _PlacementKey = (String, DateTime, DateTime, int, int);
+
 List<TimeSpan> _takeBlocks(
   PlanningTask task,
   int minutes,
-  List<TimeSpan> candidates,
+  Iterable<TimeSpan> candidates,
 ) {
+  final split = <TimeSpan>[];
+  // Prefer an uninterrupted block even when earlier fragments are available.
   for (final span in candidates) {
     if (span.length.inMinutes >= minutes) {
       return [TimeSpan(span.start, span.start.add(Duration(minutes: minutes)))];
     }
+    if (task.allowSplit) split.add(span);
   }
   if (!task.allowSplit) return const [];
 
   final minimum = task.minimumChunkMinutes;
-  final chronological = _allocateChunks(candidates, minutes, minimum);
+  final chronological = _allocateChunks(split, minutes, minimum);
   if (chronological.isNotEmpty) return chronological;
 
   // An early short gap can consume one of the admissible chunks. The largest
   // gaps determine whether a split is possible at all.
   final largest =
-      candidates.where((span) => span.length.inMinutes >= minimum).toList()
+      split.where((span) => span.length.inMinutes >= minimum).toList()
         ..sort((a, b) {
           final size = b.length.compareTo(a.length);
           return size == 0 ? a.start.compareTo(b.start) : size;
@@ -406,25 +437,66 @@ List<TimeSpan> _merge(List<TimeSpan> spans) {
   return result;
 }
 
-List<TimeSpan> _subtract(List<TimeSpan> windows, List<TimeSpan> occupied) {
-  final result = <TimeSpan>[];
-  var nextBlock = 0;
-  for (final window in windows) {
-    var cursor = window.start;
-    while (nextBlock < occupied.length &&
-        !occupied[nextBlock].end.isAfter(cursor)) {
-      nextBlock++;
-    }
-    for (var index = nextBlock; index < occupied.length; index++) {
-      final span = occupied[index];
-      if (!span.start.isBefore(window.end)) break;
-      if (span.start.isAfter(cursor)) result.add(TimeSpan(cursor, span.start));
-      cursor = _later(cursor, span.end);
-      if (!cursor.isBefore(window.end)) break;
-    }
-    if (cursor.isBefore(window.end)) result.add(TimeSpan(cursor, window.end));
+void _addOccupied(List<TimeSpan> occupied, TimeSpan block) {
+  // A block only replaces the adjacent occupied ranges it touches.
+  final first = _firstEndingAfter(occupied, block.start, includeTouching: true);
+  var start = block.start;
+  var end = block.end;
+  var last = first;
+  while (last < occupied.length && !occupied[last].start.isAfter(end)) {
+    final existing = occupied[last++];
+    start = _earlier(start, existing.start);
+    end = _later(end, existing.end);
   }
-  return result;
+  occupied.replaceRange(first, last, [TimeSpan(start, end)]);
+}
+
+int _firstEndingAfter(
+  List<TimeSpan> occupied,
+  DateTime start, {
+  bool includeTouching = false,
+}) {
+  var low = 0;
+  var high = occupied.length;
+  while (low < high) {
+    final mid = (low + high) ~/ 2;
+    final end = occupied[mid].end.compareTo(start);
+    if (end < 0 || (end == 0 && !includeTouching)) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return low;
+}
+
+Iterable<TimeSpan> _freeWindows(
+  List<TimeSpan> windows,
+  List<TimeSpan> occupied,
+  DateTime release,
+  DateTime deadline,
+  Duration minimum,
+) sync* {
+  for (final window in windows) {
+    if (!window.start.isBefore(deadline)) break;
+    var cursor = _later(window.start, release);
+    final end = _earlier(window.end, deadline);
+    if (end.difference(cursor) < minimum) continue;
+    for (
+      var index = _firstEndingAfter(occupied, cursor);
+      index < occupied.length;
+      index++
+    ) {
+      final span = occupied[index];
+      if (!span.start.isBefore(end)) break;
+      if (span.start.difference(cursor) >= minimum) {
+        yield TimeSpan(cursor, span.start);
+      }
+      cursor = _later(cursor, span.end);
+      if (end.difference(cursor) < minimum) break;
+    }
+    if (end.difference(cursor) >= minimum) yield TimeSpan(cursor, end);
+  }
 }
 
 DateTime _earlier(DateTime a, DateTime b) => a.isBefore(b) ? a : b;
