@@ -15,5 +15,8 @@ import UIKit
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "EasyEventKitCalendar") {
       EventKitCalendarBridge.register(with: registrar)
     }
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "EasyLocalReminders") {
+      LocalReminderBridge.register(with: registrar)
+    }
   }
 }
