@@ -1,0 +1,23 @@
+{
+  "run_at_utc": "2026-11-24T02:20:44.618512Z",
+  "seed": 261124,
+  "rounds": 10000,
+  "valid_batches": 10000,
+  "withheld_mutated_batches": 10000,
+  "mutation_counts": {
+    "wrongCapture": 771,
+    "staleSource": 718,
+    "staleContext": 794,
+    "unknownVersion": 746,
+    "mixedProposalBatch": 815,
+    "wrongKind": 779,
+    "wrongSpanStart": 742,
+    "wrongSpanEnd": 776,
+    "wrongTitle": 742,
+    "wrongCategory": 789,
+    "inventedDeadline": 785,
+    "unknownField": 783,
+    "wrongFieldType": 760
+  },
+  "wall_ms": 6452.595
+}
