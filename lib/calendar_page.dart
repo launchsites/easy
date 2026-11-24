@@ -4,6 +4,7 @@ import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'calendar_event_index.dart';
 import 'ui_theme.dart' as palette;
 import 'workspace_data.dart' show spaceColor;
 
@@ -17,6 +18,9 @@ class CalendarEvent {
     this.allDay = false,
     this.location,
     this.plannedTaskId,
+    this.sourceLabel,
+    this.description,
+    this.color,
   });
 
   final String id;
@@ -27,6 +31,10 @@ class CalendarEvent {
   final bool allDay;
   final String? location;
   final String? plannedTaskId;
+  final String? sourceLabel;
+  final String? description;
+  final Color? color;
+  bool get isReadOnly => sourceLabel != null;
 }
 
 class CalendarPage extends StatefulWidget {
@@ -35,6 +43,7 @@ class CalendarPage extends StatefulWidget {
     required this.onDateChanged,
     required this.events,
     required this.onEventTap,
+    this.eventsRevision,
     super.key,
   });
 
@@ -43,22 +52,46 @@ class CalendarPage extends StatefulWidget {
   final List<CalendarEvent> events;
   final ValueChanged<CalendarEvent> onEventTap;
 
+  /// Change this when the event snapshot changes. When omitted, a new list
+  /// instance is treated as a new snapshot.
+  final Object? eventsRevision;
+
   @override
   State<CalendarPage> createState() => _CalendarPageState();
 }
 
 class _CalendarPageState extends State<CalendarPage> {
+  late CalendarEventIndex<CalendarEvent> _eventIndex;
+  late int _indexedEventCount;
+
   DateTime get _date => DateUtils.dateOnly(widget.date);
 
-  List<CalendarEvent> _eventsOn(DateTime day) {
-    final nextDay = DateUtils.addDaysToDate(day, 1);
-    return widget.events.where((event) {
-      if (!event.end.isAfter(event.start)) {
-        return DateUtils.isSameDay(event.start.toLocal(), day);
-      }
-      return event.start.isBefore(nextDay) && event.end.isAfter(day);
-    }).toList()..sort((first, second) => first.start.compareTo(second.start));
+  @override
+  void initState() {
+    super.initState();
+    _indexEvents();
   }
+
+  @override
+  void didUpdateWidget(CalendarPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if ((oldWidget.eventsRevision ?? oldWidget.events) !=
+            (widget.eventsRevision ?? widget.events) ||
+        widget.events.length != _indexedEventCount) {
+      _indexEvents();
+    }
+  }
+
+  void _indexEvents() {
+    _indexedEventCount = widget.events.length;
+    _eventIndex = CalendarEventIndex(
+      widget.events,
+      startOf: (event) => event.start,
+      endOf: (event) => event.end,
+    );
+  }
+
+  List<CalendarEvent> _eventsOn(DateTime day) => _eventIndex.onDay(day);
 
   void _step(int days) =>
       widget.onDateChanged(DateUtils.addDaysToDate(_date, days));
@@ -505,7 +538,7 @@ class _CalendarPageState extends State<CalendarPage> {
     CalendarEvent event, {
     required bool compact,
   }) {
-    final tone = colors.event(event.category);
+    final tone = colors.event(event);
     final time = _eventTime(context, event);
     final radius = BorderRadius.circular(7);
     final textScaler = MediaQuery.textScalerOf(context);
@@ -566,7 +599,7 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Widget _eventChip(_CalendarColors colors, CalendarEvent event) {
-    final tone = colors.event(event.category);
+    final tone = colors.event(event);
     final radius = BorderRadius.circular(6);
     return Material(
       color: tone.fill,
@@ -957,15 +990,23 @@ class _CalendarColors {
   Color get accent => dark ? const Color(0xFFA4C3A9) : palette.accent;
   Color get accentFill => dark ? const Color(0xFF303F33) : palette.softAccent;
 
-  ({Color ink, Color fill, Color edge}) event(String category) {
-    final hue = spaceColor(category);
+  ({Color ink, Color fill, Color edge}) event(CalendarEvent event) {
+    final hue = event.color ?? spaceColor(event.category);
+    final fill = Color.alphaBlend(
+      hue.withValues(alpha: dark ? .24 : .09),
+      dark ? surface : palette.paper,
+    );
+    final label = Color.lerp(ink, hue, dark ? .36 : .68)!;
     return (
-      ink: Color.lerp(ink, hue, dark ? .36 : .68)!,
-      fill: Color.alphaBlend(
-        hue.withValues(alpha: dark ? .24 : .09),
-        dark ? surface : palette.paper,
-      ),
+      ink: event.color != null && _contrast(label, fill) < 4.5 ? ink : label,
+      fill: fill,
       edge: dark ? Color.lerp(ink, hue, .66)! : hue,
     );
+  }
+
+  double _contrast(Color foreground, Color background) {
+    final first = Color.alphaBlend(foreground, background).computeLuminance();
+    final second = background.computeLuminance();
+    return (math.max(first, second) + .05) / (math.min(first, second) + .05);
   }
 }
