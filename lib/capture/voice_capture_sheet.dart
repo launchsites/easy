@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../ui_theme.dart';
@@ -13,12 +13,16 @@ class VoiceCaptureSheet extends StatefulWidget {
   const VoiceCaptureSheet({
     required this.onSave,
     this.heldAction,
+    this.onClose,
+    this.cancelRequests,
     this.openRecorder = PlatformVoiceRecorder.new,
     super.key,
   });
 
   final Future<CaptureArchiveEntry> Function(Uint8List, DateTime) onSave;
   final ValueNotifier<HeldVoiceAction>? heldAction;
+  final ValueChanged<CaptureArchiveEntry?>? onClose;
+  final ValueListenable<int>? cancelRequests;
   final VoiceRecorder Function() openRecorder;
 
   @override
@@ -35,6 +39,7 @@ class _VoiceCaptureSheetState extends State<VoiceCaptureSheet>
   _Phase _phase = _Phase.starting;
   StreamSubscription<Uint8List>? _sampleSubscription;
   Timer? _elapsedUpdates;
+  Timer? _recordingLimit;
   String? _problem;
   Duration _elapsed = Duration.zero;
   bool _locked = false;
@@ -42,22 +47,30 @@ class _VoiceCaptureSheetState extends State<VoiceCaptureSheet>
   bool _finishRequested = false;
   bool _cancelRequested = false;
   bool _streamOpen = false;
+  bool _closed = false;
+
+  static const _teardownTimeout = Duration(seconds: 3);
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     widget.heldAction?.addListener(_heldActionChanged);
+    widget.cancelRequests?.addListener(_cancelRequestedExternally);
     if (widget.heldAction != null) _heldActionChanged();
     unawaited(_start());
   }
 
   Future<void> _start() async {
     try {
-      final allowed = await _recorder.requestPermission();
-      if (!mounted) return;
       if (_cancelRequested || _finishRequested) {
-        Navigator.pop(context);
+        scheduleMicrotask(_close);
+        return;
+      }
+      final allowed = await _recorder.requestPermission();
+      if (!mounted || _closed) return;
+      if (_cancelRequested || _finishRequested) {
+        _close();
         return;
       }
       if (!allowed) {
@@ -65,7 +78,7 @@ class _VoiceCaptureSheetState extends State<VoiceCaptureSheet>
         return;
       }
       final audio = await _recorder.start();
-      if (!mounted) return;
+      if (!mounted || _closed) return;
       _streamOpen = true;
       setState(() => _phase = _Phase.recording);
       _sampleSubscription = audio.listen(
@@ -82,6 +95,10 @@ class _VoiceCaptureSheetState extends State<VoiceCaptureSheet>
           setState(() => _elapsed = elapsed);
         }
       });
+      _recordingLimit = Timer(
+        VoiceSamples.maximumDuration,
+        () => unawaited(_finish()),
+      );
       if (_cancelRequested) {
         await _cancel();
       } else if (_finishRequested) {
@@ -126,15 +143,16 @@ class _VoiceCaptureSheetState extends State<VoiceCaptureSheet>
   }
 
   Future<void> _finish() async {
+    if (_closed) return;
     if (_phase == _Phase.starting) {
       _finishRequested = true;
       return;
     }
     if (_phase != _Phase.recording) return;
     setState(() => _phase = _Phase.saving);
-    _elapsedUpdates?.cancel();
+    _stopTimers();
     try {
-      await _recorder.stop().timeout(const Duration(seconds: 3));
+      await _recorder.stop().timeout(_teardownTimeout);
     } catch (_) {
       // Samples already received remain recoverable when the input closes.
     } finally {
@@ -157,32 +175,48 @@ class _VoiceCaptureSheetState extends State<VoiceCaptureSheet>
     });
     try {
       final saved = await widget.onSave(_samples.toWav(), _recordedAt);
-      if (mounted) Navigator.pop(context, saved);
+      _close(saved);
     } catch (_) {
       _fail('The recording is ready. Try saving it again.');
     }
   }
 
   Future<void> _cancel() async {
+    if (_closed) return;
     if (_phase == _Phase.starting) {
       _cancelRequested = true;
+      scheduleMicrotask(_close);
       return;
     }
     if (_phase == _Phase.saving) return;
     if (_streamOpen) {
       _streamOpen = false;
       setState(() => _phase = _Phase.saving);
+      _stopTimers();
       try {
-        await _recorder.cancel();
+        await _recorder.cancel().timeout(_teardownTimeout);
       } catch (_) {
-        // The route cleans up the closed recorder and discards its samples.
+        // Recorder disposal still runs and discards its samples.
       }
     }
-    if (mounted) Navigator.pop(context);
+    _close();
+  }
+
+  void _cancelRequestedExternally() => unawaited(_cancel());
+
+  void _close([CaptureArchiveEntry? draft]) {
+    if (!mounted || _closed) return;
+    _closed = true;
+    final onClose = widget.onClose;
+    if (onClose == null) {
+      Navigator.pop(context, draft);
+    } else {
+      onClose(draft);
+    }
   }
 
   void _fail(String message) {
-    if (!mounted) return;
+    if (!mounted || _closed) return;
     setState(() {
       _phase = _Phase.failed;
       _problem = message;
@@ -192,10 +226,16 @@ class _VoiceCaptureSheetState extends State<VoiceCaptureSheet>
   @override
   void dispose() {
     widget.heldAction?.removeListener(_heldActionChanged);
+    widget.cancelRequests?.removeListener(_cancelRequestedExternally);
     WidgetsBinding.instance.removeObserver(this);
-    _elapsedUpdates?.cancel();
+    _stopTimers();
     unawaited(_disposeRecorder());
     super.dispose();
+  }
+
+  void _stopTimers() {
+    _elapsedUpdates?.cancel();
+    _recordingLimit?.cancel();
   }
 
   Future<void> _releaseSamples(StreamSubscription<Uint8List>? samples) async {
@@ -208,11 +248,16 @@ class _VoiceCaptureSheetState extends State<VoiceCaptureSheet>
 
   Future<void> _disposeRecorder() async {
     try {
-      await _sampleSubscription?.cancel();
-      if (_streamOpen) await _recorder.cancel();
-      await _recorder.dispose();
+      await _sampleSubscription?.cancel().timeout(_teardownTimeout);
+      if (_streamOpen) await _recorder.cancel().timeout(_teardownTimeout);
     } catch (_) {
-      // Platform teardown cannot change the already saved draft.
+      // Disposal is still needed after a broken input stream.
+    } finally {
+      try {
+        await _recorder.dispose().timeout(_teardownTimeout);
+      } catch (_) {
+        // Platform teardown cannot change the already saved draft.
+      }
     }
   }
 

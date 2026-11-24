@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:easy/capture/capture_archive.dart';
+import 'package:easy/capture/held_voice_capture.dart';
 import 'package:easy/capture/hold_capture_button.dart';
 import 'package:easy/capture/voice_capture_sheet.dart';
 import 'package:easy/capture/voice_recording.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   test('bounded voice samples produce a standard mono PCM wave', () {
@@ -169,6 +171,213 @@ void main() {
     await tester.tapAt(center);
     expect(taps, 1);
   });
+
+  testWidgets('held capture retains the pointer through overlay insertion', (
+    tester,
+  ) async {
+    final capture = await _HeldCapture.mount(tester);
+    final pointer = await capture.hold();
+    expect(find.text('Release to save · slide up to lock'), findsOneWidget);
+    expect(capture.recorder.starts, 1);
+    expect(capture.result.isCompleted, isFalse);
+    await capture.feedAudio();
+    await pointer.up();
+    await tester.pumpAndSettle();
+    expect(capture.savedBytes, [8044]);
+    expect((await capture.result.future)?.id, 'held');
+    expect(capture.recorder.stops, 1);
+    expect(capture.recorder.cancels, 0);
+    expect(capture.recorder.disposals, 1);
+    expect(find.text('Voice capture'), findsNothing);
+    expect(find.text('Workspace'), findsOneWidget);
+  });
+
+  testWidgets('held capture discards when released in the cancel area', (
+    tester,
+  ) async {
+    final capture = await _HeldCapture.mount(tester);
+    final pointer = await capture.hold();
+    await capture.feedAudio();
+    await pointer.moveBy(const Offset(-90, 0));
+    await tester.pump();
+    expect(find.text('Release to cancel'), findsOneWidget);
+    await pointer.up();
+    await tester.pumpAndSettle();
+    expect(await capture.result.future, isNull);
+    expect(capture.savedBytes, isEmpty);
+    expect(capture.recorder.cancels, 1);
+    expect(capture.recorder.disposals, 1);
+  });
+
+  testWidgets(
+    'locked capture ignores outside taps and supports explicit stop',
+    (tester) async {
+      final capture = await _HeldCapture.mount(tester);
+      final pointer = await capture.hold();
+      await pointer.moveBy(const Offset(0, -85));
+      await pointer.up();
+      await tester.pumpAndSettle();
+      expect(find.text('Recording'), findsOneWidget);
+      await tester.tapAt(tester.getCenter(find.text('Workspace')));
+      await tester.pumpAndSettle();
+      expect(capture.workspaceTaps, 0);
+      expect(capture.result.isCompleted, isFalse);
+      await capture.feedAudio();
+      await tester.tap(find.text('Stop and save'));
+      await tester.pumpAndSettle();
+      expect(capture.savedBytes, [8044]);
+      expect(capture.recorder.stops, 1);
+    },
+  );
+
+  for (final systemBack in [false, true]) {
+    testWidgets(
+      'locked capture responds to ${systemBack ? 'Back' : 'Escape'}',
+      (tester) async {
+        final capture = await _HeldCapture.mount(tester);
+        final pointer = await capture.hold();
+        await pointer.moveBy(const Offset(0, -85));
+        await pointer.up();
+        await tester.pumpAndSettle();
+        await capture.feedAudio();
+        Iterable<String> visibleLabels() => tester.semantics
+            .simulatedAccessibilityTraversal()
+            .map((node) => node.label);
+        expect(visibleLabels(), isNot(contains('Workspace')));
+        expect(visibleLabels(), contains('Cancel'));
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pumpAndSettle();
+        expect(
+          FocusManager.instance.primaryFocus!.context!
+              .findAncestorWidgetOfExactType<VoiceCaptureSheet>(),
+          isNotNull,
+        );
+        if (systemBack) {
+          await tester.binding.handlePopRoute();
+        } else {
+          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        }
+        await tester.pumpAndSettle();
+        expect(await capture.result.future, isNull);
+        expect(capture.savedBytes, isEmpty);
+        expect(capture.recorder.cancels, 1);
+        expect(find.text('Voice capture'), findsNothing);
+        expect(visibleLabels(), contains('Workspace'));
+      },
+    );
+  }
+
+  testWidgets('interruption while held saves once before pointer release', (
+    tester,
+  ) async {
+    final capture = await _HeldCapture.mount(tester);
+    final pointer = await capture.hold();
+    await capture.feedAudio();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pumpAndSettle();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await pointer.up();
+    await tester.pumpAndSettle();
+    expect(capture.savedBytes, [8044]);
+    expect(capture.recorder.stops, 1);
+    expect((await capture.result.future)?.id, 'held');
+  });
+
+  testWidgets('cancel closes during permission without opening a stream', (
+    tester,
+  ) async {
+    final capture = await _HeldCapture.mount(tester);
+    final permission = capture.recorder.permission = Completer<bool>();
+    final pointer = await capture.hold();
+    expect(capture.recorder.permissionRequests, 1);
+    await pointer.moveBy(const Offset(-85, 0));
+    await pointer.up();
+    await tester.pumpAndSettle();
+    expect(await capture.result.future, isNull);
+    expect(find.text('Voice capture'), findsNothing);
+    permission.complete(true);
+    await tester.pumpAndSettle();
+    expect(capture.recorder.starts, 0);
+    expect(capture.recorder.disposals, 1);
+  });
+
+  testWidgets('a stalled recording reaches the five-minute limit', (
+    tester,
+  ) async {
+    final capture = await _HeldCapture.mount(tester);
+    final pointer = await capture.hold();
+    await capture.feedAudio();
+    await tester.pump(VoiceSamples.maximumDuration);
+    await tester.pumpAndSettle();
+    await pointer.up();
+    expect(capture.savedBytes, [8044]);
+    expect(capture.recorder.stops, 1);
+    expect((await capture.result.future)?.id, 'held');
+  });
+}
+
+class _HeldCapture {
+  _HeldCapture(this.tester);
+
+  final WidgetTester tester;
+  final recorder = _FakeRecorder();
+  final result = Completer<CaptureArchiveEntry?>();
+  final savedBytes = <int>[];
+  final overlay = HeldVoiceCaptureOverlay();
+  var workspaceTaps = 0;
+
+  static Future<_HeldCapture> mount(WidgetTester tester) async {
+    final capture = _HeldCapture(tester);
+    addTearDown(capture.overlay.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => capture.workspaceTaps++,
+                child: const Text('Workspace'),
+              ),
+            ),
+            floatingActionButton: HoldCaptureButton(
+              onTap: () => fail('the held gesture must not tap'),
+              onHeldRecord: (action) async => capture.result.complete(
+                await capture.overlay.show(
+                  context,
+                  action: action,
+                  openRecorder: () => capture.recorder,
+                  onSave: (bytes, time) async {
+                    capture.savedBytes.add(bytes.length);
+                    return CaptureArchiveEntry(
+                      id: 'held',
+                      text: '',
+                      capturedAt: time,
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    return capture;
+  }
+
+  Future<TestGesture> hold() async {
+    final pointer = await tester.startGesture(
+      tester.getCenter(find.byTooltip('Add item')),
+    );
+    await tester.pump(const Duration(milliseconds: 650));
+    await tester.pumpAndSettle();
+    return pointer;
+  }
+
+  Future<void> feedAudio() async {
+    recorder.audio.add(Uint8List(8000));
+    await tester.pump();
+  }
 }
 
 Future<void> _mount(
@@ -211,6 +420,8 @@ class _FakeRecorder implements VoiceRecorder {
   var permissionRequests = 0;
   var starts = 0;
   var stops = 0;
+  var cancels = 0;
+  var disposals = 0;
 
   @override
   Future<bool> requestPermission() async {
@@ -232,11 +443,13 @@ class _FakeRecorder implements VoiceRecorder {
 
   @override
   Future<void> cancel() async {
+    cancels++;
     unawaited(audio.close());
   }
 
   @override
   Future<void> dispose() async {
+    disposals++;
     if (!audio.isClosed) unawaited(audio.close());
   }
 }

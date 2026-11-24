@@ -41,6 +41,7 @@ import 'calendar_sources/internal_workspace_feed.dart';
 import 'capture/capture_archive.dart';
 import 'capture/capture_interpreter.dart';
 import 'capture/capture_review_sheet.dart';
+import 'capture/held_voice_capture.dart';
 import 'capture/hold_capture_button.dart';
 import 'capture/local_transcriber.dart';
 import 'capture/task_category_hint.dart';
@@ -256,6 +257,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   var _reviewSaving = false;
   var _planningDay = false;
   var _recordingVoice = false;
+  final _heldVoiceOverlay = HeldVoiceCaptureOverlay();
   var _openingGym = false;
   var _mealReviewGeneration = 0;
   var _reviewingMealPhoto = false;
@@ -365,6 +367,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     _estimateTimer?.cancel();
     _reminderDebounce?.cancel();
     _voiceTranscriber.cancel();
+    _heldVoiceOverlay.dispose();
     _ai?.dispose();
     final aiState = _aiState;
     if (aiState != null) {
@@ -3099,13 +3102,18 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }
     _recordingVoice = true;
     try {
-      final sheet = VoiceCaptureSheet(
-        heldAction: heldAction,
-        onSave: (bytes, recordedAt) =>
-            _saveVoiceDraft(bytes, recordedAt, initialText),
-      );
+      Future<CaptureArchiveEntry> persist(
+        Uint8List bytes,
+        DateTime recordedAt,
+      ) => _saveVoiceDraft(bytes, recordedAt, initialText);
       final CaptureArchiveEntry? draft;
-      if (MediaQuery.sizeOf(context).width < 720) {
+      if (heldAction != null) {
+        draft = await _heldVoiceOverlay.show(
+          context,
+          action: heldAction,
+          onSave: persist,
+        );
+      } else if (MediaQuery.sizeOf(context).width < 720) {
         draft = await showModalBottomSheet<CaptureArchiveEntry>(
           context: context,
           isScrollControlled: true,
@@ -3113,13 +3121,16 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           isDismissible: false,
           enableDrag: false,
           backgroundColor: paper,
-          builder: (_) => sheet,
+          builder: (_) => VoiceCaptureSheet(onSave: persist),
         );
       } else {
         draft = await showDialog<CaptureArchiveEntry>(
           context: context,
           barrierDismissible: false,
-          builder: (_) => Dialog(backgroundColor: paper, child: sheet),
+          builder: (_) => Dialog(
+            backgroundColor: paper,
+            child: VoiceCaptureSheet(onSave: persist),
+          ),
         );
       }
       if (!mounted || draft == null) return;

@@ -54,7 +54,9 @@ class VoiceSamples {
   static const sampleRate = 16000;
   static const bytesPerSecond = sampleRate * 2;
   static const minimumBytes = bytesPerSecond ~/ 5;
-  static const maximumBytes = bytesPerSecond * 60 * 5;
+  static const _maximumSeconds = 60 * 5;
+  static const maximumDuration = Duration(seconds: _maximumSeconds);
+  static const maximumBytes = bytesPerSecond * _maximumSeconds;
 
   final int _limit;
   final _pcm = BytesBuilder();
