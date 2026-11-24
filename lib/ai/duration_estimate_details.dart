@@ -37,9 +37,9 @@ class AiEstimateDetails {
   String get reviewDescription {
     final context = switch (disclosedDurations) {
       0 => 'Model received the task title only.',
-      1 => 'Model received the task title and one recorded duration.',
+      1 => 'Model received the task title and timing evidence from one recorded duration.',
       _ =>
-        'Model received the task title and $disclosedDurations recorded durations.',
+        'Model received the task title and timing evidence from $disclosedDurations recorded durations.',
     };
     final bounds = range;
     if (bounds == null) return context;

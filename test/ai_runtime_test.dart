@@ -197,12 +197,13 @@ void main() {
       );
       Map<String, Object?>? disclosed;
       var useHistory = false;
+      var sendSampleList = false;
       final runtime = _Store().runtime(
         send: (request) async {
           final payload = _userPayload(request);
           expect(payload, disclosed);
           expect(payload.containsKey('durationHistory'), useHistory);
-          expect(payload.containsKey('sampleDurationsMinutes'), useHistory);
+          expect(payload.containsKey('sampleDurationsMinutes'), sendSampleList);
           if (useHistory) {
             final fields = payload['durationHistory'] as Map;
             expect(fields['cohort'], 'titleAndCategory');
@@ -216,8 +217,13 @@ void main() {
         },
       );
       addTearDown(runtime.dispose);
-      for (final share in [false, true]) {
+      for (final (share, includeSamples) in [
+        (false, true),
+        (true, true),
+        (true, false),
+      ]) {
         useHistory = share;
+        sendSampleList = share && includeSamples;
         await runtime.saveSettings(
           AiRuntimeSettings(
             route: AiRoute.local,
@@ -230,7 +236,9 @@ void main() {
           source: source,
           input: AiEstimateInput(
             title: source.text,
-            sampleDurationsMinutes: history.compatibleMinutes,
+            sampleDurationsMinutes: includeSamples
+                ? history.compatibleMinutes
+                : const [],
             durationHistory: history,
           ),
           currentRevision: (id) => id == source.id
@@ -246,6 +254,12 @@ void main() {
         );
         expect(result.status, AiRunStatus.ready);
         expect(result.value?.duration, const Duration(minutes: 35));
+        expect(
+          result.value?.uncertainty,
+          share
+              ? 'Model received the task title and timing evidence from 2 recorded durations.'
+              : 'Model received the task title only.',
+        );
       }
     },
   );
@@ -855,7 +869,7 @@ void main() {
           .single;
       expect(
         pending.details!.reviewDescription,
-        'Model range 20–55 min\nModel received the task title and 2 recorded durations.',
+        'Model range 20–55 min\nModel received the task title and timing evidence from 2 recorded durations.',
       );
       expect(restored.currentPendingEstimates((_) => null), isEmpty);
 
