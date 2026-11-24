@@ -68,8 +68,10 @@ class _WorkspaceSearchDialogState extends State<WorkspaceSearchDialog> {
     if (!identical(oldWidget.preferences, widget.preferences)) {
       _preferences = widget.preferences;
     }
-    if (!setEquals(oldWidget.allowedCategories, widget.allowedCategories)) {
+    if (oldWidget.index != widget.index ||
+        !setEquals(oldWidget.allowedCategories, widget.allowedCategories)) {
       _memo = null;
+      _hits = const [];
     }
   }
 

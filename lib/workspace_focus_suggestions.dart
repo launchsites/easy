@@ -124,7 +124,8 @@ extension _WorkspaceFocusSuggestions on _WorkspaceState {
 
   List<FocusSuggestionEvent> _focusSuggestionEvents(DateTime now) {
     final day = dateOnly(now);
-    final appleAllowed = _allows(EasyFeature.externalCalendars);
+    final appleAllowed =
+        _allows(EasyFeature.externalCalendars) && _appleFeed.hasVerifiedAccess;
     final revision = (
       day,
       _data.events,

@@ -132,6 +132,7 @@ part 'workspace_manual_sync_actions.dart';
 part 'workspace_workout_capture.dart';
 part 'workspace_task_objectives.dart';
 part 'workspace_automation.dart';
+part 'workspace_apple_access.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -877,7 +878,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   void _calendarViewsChanged() {
     if (!_loading) {
-      _changeWorkspaceView();
+      _changeWorkspaceView(() {
+        final selected = _inspected;
+        if (_isAppleProjection(selected)) {
+          _inspected = _currentAppleProjection(selected! as CalendarEvent);
+        }
+      });
       _queueAutomationCalendarCheck();
     }
   }
@@ -2124,7 +2130,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       events: [
         for (final event in [
           ..._standaloneEvents(_data.events),
-          ..._appleFeed.events.map(_fromApple),
+          if (_allows(EasyFeature.externalCalendars) &&
+              _appleFeed.hasVerifiedAccess)
+            ..._appleFeed.events.map(_fromApple),
           ..._icsFeed.events.map((row) => row.event),
           ..._internalFeed.events.map((row) => row.event),
         ])
@@ -3855,8 +3863,15 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   Future<void> _openRecord(Object record) async {
+    final current = _isAppleProjection(record)
+        ? _currentAppleProjection(record as CalendarEvent)
+        : record;
+    if (current == null) {
+      _inform('This Apple Calendar event is unavailable.');
+      return;
+    }
     if (MediaQuery.sizeOf(context).width >= 1000) {
-      setState(() => _inspected = record);
+      setState(() => _inspected = current);
       return;
     }
     final appleAction = _appleActionFor(record);
@@ -3866,56 +3881,59 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       useSafeArea: true,
       backgroundColor: paper,
       showDragHandle: true,
-      builder: (context) => ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * .68,
-        ),
-        child: _categoryScope(
-          _RecordDetails(
-            record: record,
-            onEdit: () => Navigator.pop(context, 'edit'),
-            onToggleDone: record is TaskItem
-                ? () => Navigator.pop(context, 'toggle-done')
-                : null,
-            onDelete: () => Navigator.pop(context, 'delete'),
-            noteTargets: record is NoteItem ? _noteTargets() : const [],
-            onOpenNoteLink: (link) => Navigator.pop(context, link),
-            onEstimate: _canEstimate(record)
-                ? () => Navigator.pop(context, 'estimate')
-                : null,
-            appleActionLabel: appleAction?.label,
-            onAppleCopy: appleAction != null
-                ? () => Navigator.pop(context, appleAction)
-                : null,
-            repeatingTask: _repeatingTask(record) != null,
-            onRepeat: _canRepeatEvent(record) || _canRepeatTask(record)
-                ? () => Navigator.pop(context, 'repeat')
-                : null,
-            onAssignPlace: _canAssignPlace(record)
-                ? () => Navigator.pop(context, 'place')
-                : null,
-            onAddSubtask: _canAddSubtask(record)
-                ? () => Navigator.pop(context, 'child')
-                : null,
-            onBreakdown: _canAddSubtask(record)
-                ? () => Navigator.pop(context, 'breakdown')
-                : null,
-            reminderSet: _hasRecordReminder(record),
-            onReminder: _recordReminderTarget(record) != null
-                ? () => Navigator.pop(context, 'reminder')
-                : null,
-            onSchedule: _canScheduleTask(record)
-                ? () => Navigator.pop(context, 'schedule')
-                : null,
-            onTimingHistory: _canSeeTaskTiming(record)
-                ? () => Navigator.pop(context, 'timing')
-                : null,
-            onTrackActivity: _canTrackActivity(record)
-                ? () => Navigator.pop(context, 'track-time')
-                : null,
-            onRemoveFutureBlocks: _canRemoveFutureBlocks(record)
-                ? () => Navigator.pop(context, 'future-blocks')
-                : null,
+      builder: (context) => _appleDetailsWhileAllowed(
+        record,
+        (visibleRecord) => ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .68,
+          ),
+          child: _categoryScope(
+            _RecordDetails(
+              record: visibleRecord,
+              onEdit: () => Navigator.pop(context, 'edit'),
+              onToggleDone: record is TaskItem
+                  ? () => Navigator.pop(context, 'toggle-done')
+                  : null,
+              onDelete: () => Navigator.pop(context, 'delete'),
+              noteTargets: record is NoteItem ? _noteTargets() : const [],
+              onOpenNoteLink: (link) => Navigator.pop(context, link),
+              onEstimate: _canEstimate(record)
+                  ? () => Navigator.pop(context, 'estimate')
+                  : null,
+              appleActionLabel: appleAction?.label,
+              onAppleCopy: appleAction != null
+                  ? () => Navigator.pop(context, appleAction)
+                  : null,
+              repeatingTask: _repeatingTask(record) != null,
+              onRepeat: _canRepeatEvent(record) || _canRepeatTask(record)
+                  ? () => Navigator.pop(context, 'repeat')
+                  : null,
+              onAssignPlace: _canAssignPlace(record)
+                  ? () => Navigator.pop(context, 'place')
+                  : null,
+              onAddSubtask: _canAddSubtask(record)
+                  ? () => Navigator.pop(context, 'child')
+                  : null,
+              onBreakdown: _canAddSubtask(record)
+                  ? () => Navigator.pop(context, 'breakdown')
+                  : null,
+              reminderSet: _hasRecordReminder(record),
+              onReminder: _recordReminderTarget(record) != null
+                  ? () => Navigator.pop(context, 'reminder')
+                  : null,
+              onSchedule: _canScheduleTask(record)
+                  ? () => Navigator.pop(context, 'schedule')
+                  : null,
+              onTimingHistory: _canSeeTaskTiming(record)
+                  ? () => Navigator.pop(context, 'timing')
+                  : null,
+              onTrackActivity: _canTrackActivity(record)
+                  ? () => Navigator.pop(context, 'track-time')
+                  : null,
+              onRemoveFutureBlocks: _canRemoveFutureBlocks(record)
+                  ? () => Navigator.pop(context, 'future-blocks')
+                  : null,
+            ),
           ),
         ),
       ),
@@ -4292,7 +4310,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final preferences = _calendarPreferences;
     final revision = (
       _data.events,
-      _appleFeed.events,
+      _allows(EasyFeature.externalCalendars) && _appleFeed.hasVerifiedAccess
+          ? _appleFeed.events
+          : const <SourcedCalendarEvent<ExternalCalendarEvent>>[],
       _icsFeed.events,
       preferences,
       mode,

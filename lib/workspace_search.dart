@@ -38,7 +38,8 @@ extension _WorkspaceSearch on _WorkspaceState {
     for (final row in _icsFeed.events) {
       if (permitted.contains(row.calendar)) yield row.event;
     }
-    if (_allows(EasyFeature.externalCalendars)) {
+    if (_allows(EasyFeature.externalCalendars) &&
+        _appleFeed.hasVerifiedAccess) {
       for (final entry in _appleFeed.events) {
         if (permitted.contains(entry.id.calendar)) yield _fromApple(entry);
       }
@@ -68,6 +69,7 @@ extension _WorkspaceSearch on _WorkspaceState {
       _data.notes,
       _features.value,
       _calendarPreferences,
+      _appleFeed.hasVerifiedAccess,
       _appleFeed.events,
       _icsFeed.events,
       _internalFeed.events,
@@ -136,10 +138,13 @@ extension _WorkspaceSearch on _WorkspaceState {
       if (!mounted || _reviewSaving) return;
       final found = await showDialog<SearchDocument>(
         context: context,
-        builder: (_) => WorkspaceSearchDialog(
-          index: _workspaceSearchIndex(),
-          preferences: preferences,
-          onPreferencesChanged: _saveSearchPreferences,
+        builder: (_) => ListenableBuilder(
+          listenable: _appleFeed,
+          builder: (context, _) => WorkspaceSearchDialog(
+            index: _workspaceSearchIndex(),
+            preferences: preferences,
+            onPreferencesChanged: _saveSearchPreferences,
+          ),
         ),
       );
       if (found == null || !mounted || _reviewSaving) return;
