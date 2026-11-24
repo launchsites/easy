@@ -149,11 +149,18 @@ class NutritionFood {
       referenceUnit == other.referenceUnit &&
       source == other.source &&
       estimated == other.estimated &&
-      Nutrient.values.every((nutrient) => values[nutrient] == other.values[nutrient]);
+      Nutrient.values.every(
+        (nutrient) => values[nutrient] == other.values[nutrient],
+      );
 
   @override
   int get hashCode => Object.hash(
-    id, name, referenceAmount, referenceUnit, source, estimated,
+    id,
+    name,
+    referenceAmount,
+    referenceUnit,
+    source,
+    estimated,
     Object.hashAll(Nutrient.values.map((nutrient) => values[nutrient])),
   );
 

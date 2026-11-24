@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'calendar_page.dart';
 import 'capture/capture_review_sheet.dart' show CaptureReviewRequest;
+import 'capture/task_category_hint.dart';
 import 'capture_text.dart';
 import 'list_pages.dart';
 import 'record_editor.dart' show RecordKind;
@@ -66,7 +67,15 @@ class _QuickCaptureState extends State<QuickCapture> {
 
   String? get _noteCategory =>
       _categoryChosen ? _selectedCategory : widget.initialCategory;
-  String get _category => _noteCategory ?? 'personal';
+  String get _category =>
+      (!_categoryChosen && _kind == RecordKind.task
+          ? taskCategoryHint(_text.text, {
+              ...spaceColors.keys,
+              ...widget.categories.keys,
+            })
+          : null) ??
+      _noteCategory ??
+      'personal';
 
   EventCaptureText _parseEvent(String input) =>
       parseEventCapture(input, date: widget.date, now: _openedAt);

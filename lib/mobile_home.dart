@@ -19,6 +19,10 @@ class MobileHome extends StatelessWidget {
     required this.onCalendarTap,
     this.focusedContent,
     this.onPlanDay,
+    this.modeName,
+    this.notesAlreadyFiltered = false,
+    this.showTasks,
+    this.showSchedule,
     required this.onEventTap,
     required this.onTaskTap,
     required this.onTaskToggle,
@@ -27,9 +31,13 @@ class MobileHome extends StatelessWidget {
 
   final DateTime date;
   final String? mode;
+  final String? modeName;
   final Widget modeControl;
   final Widget? focusedContent;
   final VoidCallback? onPlanDay;
+  final bool notesAlreadyFiltered;
+  final bool? showTasks;
+  final bool? showSchedule;
   final NoteItem? note;
   final List<CalendarEvent> events;
   final List<TaskItem> tasks;
@@ -78,7 +86,8 @@ class MobileHome extends StatelessWidget {
     final dayLabel = localizations.formatMediumDate(day);
     final fullDate = localizations.formatFullDate(day);
     final note =
-        activeMode == null ||
+        notesAlreadyFiltered ||
+            activeMode == null ||
             this.note?.category?.toLowerCase() == activeMode.toLowerCase()
         ? this.note
         : null;
@@ -86,6 +95,8 @@ class MobileHome extends StatelessWidget {
     const eventLimit = 3;
     final remainingEvents = dayEvents.length - eventLimit;
     final objectives = _objectives(day);
+    final showTaskSection = showTasks ?? focusedContent == null;
+    final showScheduleSection = showSchedule ?? focusedContent == null;
     final schedule = _HomeSection(
       title: isToday ? 'Upcoming today' : 'Schedule',
       children: [
@@ -167,11 +178,12 @@ class MobileHome extends StatelessWidget {
             _HomeHeading(
               compact: compact,
               mode: activeMode,
+              modeName: modeName,
               modeControl: modeControl,
               dayLabel: dayLabel,
               fullDate: fullDate,
             ),
-            SizedBox(height: compact ? 22 : 32),
+            SizedBox(height: compact ? 16 : 32),
             if (note != null || activeMode == null) ...[
               _HomeSection(
                 title: 'Note to self',
@@ -179,21 +191,19 @@ class MobileHome extends StatelessWidget {
                   _HomeNote(note: note, onTap: onNoteTap, compact: compact),
                 ],
               ),
-              SizedBox(height: compact ? 20 : 28),
+              SizedBox(height: compact ? 12 : 28),
             ],
-            if (focusedContent case final content?)
-              content
-            else if (activeMode == null) ...[
-              schedule,
-              const SizedBox(height: 27),
-              taskList,
-            ] else ...[
-              taskList,
-              if (dayEvents.isNotEmpty) ...[
-                const SizedBox(height: 27),
+            ...[
+              ?focusedContent,
+              if (activeMode == null && showScheduleSection) schedule,
+              if (showTaskSection) taskList,
+              if (activeMode != null &&
+                  showScheduleSection &&
+                  (dayEvents.isNotEmpty || !showTaskSection))
                 schedule,
-              ],
-            ],
+            ].expand(
+              (section) => [section, SizedBox(height: compact ? 15 : 27)],
+            ),
           ],
         );
       },
@@ -205,6 +215,7 @@ class _HomeHeading extends StatelessWidget {
   const _HomeHeading({
     required this.compact,
     required this.mode,
+    required this.modeName,
     required this.modeControl,
     required this.dayLabel,
     required this.fullDate,
@@ -212,6 +223,7 @@ class _HomeHeading extends StatelessWidget {
 
   final bool compact;
   final String? mode;
+  final String? modeName;
   final Widget modeControl;
   final String dayLabel;
   final String fullDate;
@@ -231,7 +243,9 @@ class _HomeHeading extends StatelessWidget {
         Semantics(
           header: true,
           child: Text(
-            selectedMode == null ? dayLabel : spaceName(selectedMode),
+            selectedMode == null
+                ? dayLabel
+                : modeName ?? spaceName(selectedMode),
             semanticsLabel: selectedMode == null ? fullDate : null,
             style: workspaceHeadingStyle(true)
                 .copyWith(fontSize: fontSize, letterSpacing: -fontSize * .051),
@@ -303,7 +317,7 @@ class _HomeSection extends StatelessWidget {
               TextButton(onPressed: onPlanDay, child: const Text('Plan day')),
             ],
           ),
-        const SizedBox(height: 12),
+        SizedBox(height: MediaQuery.sizeOf(context).width < 360 ? 10 : 12),
         ...children,
       ],
     );
@@ -431,7 +445,8 @@ class _HomeEvent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final format = MaterialLocalizations.of(context);
-    final tone = spaceColor(event.category);
+    final tone = event.color ?? spaceColor(event.category);
+    final compact = MediaQuery.sizeOf(context).width < 360;
     final time = event.allDay
         ? 'All day'
         : event.start.isBefore(day)
@@ -450,9 +465,9 @@ class _HomeEvent extends StatelessWidget {
             onTap: onTap,
             customBorder: contentControlShape,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 55),
+              constraints: BoxConstraints(minHeight: compact ? 51 : 55),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: EdgeInsets.symmetric(vertical: compact ? 6 : 8),
                 child: Row(
                   children: [
                     SizedBox(

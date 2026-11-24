@@ -67,6 +67,17 @@ class GymSession {
     structuredExercises: plan?.exercises ?? const [],
   );
 
+  factory GymSession.loggedCapture({
+    required DateTime at,
+    required GymLogEntry entry,
+  }) => GymSession._(
+    planned: false,
+    startedAt: at,
+    finishedAt: at,
+    entries: [entry],
+    structuredExercises: const [],
+  );
+
   final bool planned;
   final DateTime startedAt;
   final DateTime? finishedAt;
@@ -168,6 +179,9 @@ class GymSession {
   );
 
   GymSession _withEntries(List<GymLogEntry> entries) => _copy(entries: entries);
+
+  GymSession withCapturedEntry(GymLogEntry entry) =>
+      _withEntries([...entries, entry]);
 
   GymSession _finish(DateTime date) => _copy(finishedAt: date);
 

@@ -40,24 +40,31 @@ class WorkspaceData {
     required this.tasks,
     required this.notes,
     this.captures = const [],
-  });
+    Map<String, Object?> sections = const {},
+  }) : sections = Map.unmodifiable(sections);
 
   final List<CalendarEvent> events;
   final List<TaskItem> tasks;
   final List<NoteItem> notes;
   final List<CaptureArchiveEntry> captures;
+  final Map<String, Object?> sections;
 
   WorkspaceData copyWith({
     List<CalendarEvent>? events,
     List<TaskItem>? tasks,
     List<NoteItem>? notes,
     List<CaptureArchiveEntry>? captures,
+    Map<String, Object?>? sections,
   }) => WorkspaceData(
     events: events ?? this.events,
     tasks: tasks ?? this.tasks,
     notes: notes ?? this.notes,
     captures: captures ?? this.captures,
+    sections: sections ?? this.sections,
   );
+
+  WorkspaceData withSection(String key, Object? value) =>
+      copyWith(sections: {...sections, key: value});
 
   factory WorkspaceData.samples(DateTime today) {
     DateTime at(int hour, [int minute = 0, int days = 0]) =>
@@ -213,6 +220,16 @@ class WorkspaceData {
   factory WorkspaceData.decode(String raw) {
     final data = jsonDecode(raw) as Map<String, dynamic>;
     return WorkspaceData(
+      sections: {
+        for (final entry in data.entries)
+          if (!const {
+            'events',
+            'tasks',
+            'notes',
+            'captures',
+          }.contains(entry.key))
+            entry.key: entry.value,
+      },
       events: [
         for (final event in data['events'] as List<dynamic>)
           CalendarEvent(
@@ -256,14 +273,7 @@ class WorkspaceData {
       ],
       notes: [
         for (final note in data['notes'] as List<dynamic>)
-          NoteItem(
-            id: note['id'] as String,
-            title: note['title'] as String,
-            body: note['body'] as String,
-            updated: DateTime.parse(note['updated'] as String),
-            category: note['category'] as String?,
-            noteToSelf: note['noteToSelf'] as bool? ?? false,
-          ),
+          NoteItem.fromJson(note as Map<String, dynamic>),
       ],
       captures: [
         for (final capture in (data['captures'] as List<dynamic>? ?? const []))
@@ -273,6 +283,7 @@ class WorkspaceData {
   }
 
   String encode() => jsonEncode({
+    ...sections,
     if (captures.isNotEmpty)
       'captures': captures.map((entry) => entry.toJson()).toList(),
     'events': [
@@ -312,16 +323,6 @@ class WorkspaceData {
             'minimumChunkMinutes': task.minimumChunkMinutes,
         },
     ],
-    'notes': [
-      for (final note in notes)
-        {
-          'id': note.id,
-          'title': note.title,
-          'body': note.body,
-          'updated': note.updated.toIso8601String(),
-          if (note.category != null) 'category': note.category,
-          if (note.noteToSelf) 'noteToSelf': true,
-        },
-    ],
+    'notes': [for (final note in notes) note.toJson()],
   });
 }

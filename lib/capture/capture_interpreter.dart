@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../capture_text.dart';
 import 'capture_models.dart';
+import 'task_category_hint.dart';
 
 export 'capture_models.dart';
 
@@ -44,7 +45,7 @@ final _taskPhrase = RegExp(
 );
 final _taskVerb = RegExp(
   r'^(?:buy|call|check|choose|draft|email|finish|follow\s+up|order|pick\s+up|'
-  r'prepare|read|research|return|review|send|submit|take|update|write)\b',
+  r'find|go\s+for\s+(?:a\s+)?(?:run|jog)|make|prepare|read|research|return|review|send|submit|take|update|write)\b',
   caseSensitive: false,
 );
 final _eventPhrase = RegExp(
@@ -57,6 +58,14 @@ final _meetingPhrase = RegExp(
 );
 final _notePhrase = RegExp(
   r'^(?:write\s+(?:a\s+)?note|note\s+that)\s*:?[ \t]*',
+  caseSensitive: false,
+);
+final _loggedExercise = RegExp(
+  r'^(?:(?:after|following)\s+.{1,100}?[ ,]+)?(?:(?:i\s+)?did\s+(?:the\s+)?|(?:i\s+)?logged\s+(?:the\s+)?)(?!not\b).{0,45}?\b(?:treadmill|bench press|pull[- ]?ups?|squats?|cable row|dips|deadlifts?)\b',
+  caseSensitive: false,
+);
+final _loggedStretch = RegExp(
+  r'^(?:(?:after|following)\s+.{1,100}?[ ,]+)?i\s+stretched[.!]?$',
   caseSensitive: false,
 );
 final _mealPhrase = RegExp(r'^i\s+ate\s+', caseSensitive: false);
@@ -353,10 +362,16 @@ _Lead? _readLead(_Slice body, {String? forced, bool impliedEvent = true}) {
   if (_mealPhrase.firstMatch(text) case final match?) {
     return _Lead(CaptureIntentKind.meal, body.skip(match.end));
   }
+  if (_loggedExercise.hasMatch(text) || _loggedStretch.hasMatch(text)) {
+    return _Lead(CaptureIntentKind.workout, body);
+  }
   if (_taskPhrase.firstMatch(text) case final match?) {
     return _Lead(CaptureIntentKind.task, body.skip(match.end));
   }
-  if (_taskVerb.hasMatch(text)) return _Lead(CaptureIntentKind.task, body);
+  if (_taskVerb.hasMatch(text) ||
+      taskCategoryHint(text, const {'gym', 'study', 'work'}) != null) {
+    return _Lead(CaptureIntentKind.task, body);
+  }
   if (_meetingPhrase.hasMatch(text) ||
       (impliedEvent && _clockCue.hasMatch(text))) {
     return _Lead(CaptureIntentKind.event, body);
@@ -494,14 +509,19 @@ Object _makeProposal(
   final anchor = _wallClock(context.anchor);
   final body = lead.body;
   final text = body.text;
-  final category = scope.category;
+  final knownCategory =
+      lead.kind == CaptureIntentKind.task && scope.categorySpan == null
+      ? taskCategoryHint(text, context.categories.keys)
+      : null;
+  final category = scope.category ?? knownCategory;
   final issues = [...scope.issues];
   final missing = <String>[];
   final evidence = <String, CaptureEvidence>{};
   final focus = context.focusCategory == null
       ? const <String>{}
       : names.resolve(context.focusCategory!);
-  final suggested = scope.categorySpan == null && focus.length == 1
+  final suggested =
+      category == null && scope.categorySpan == null && focus.length == 1
       ? focus.single
       : null;
 
@@ -522,8 +542,10 @@ Object _makeProposal(
 
   if (category != null) {
     evidence['category'] = CaptureEvidence(
-      provenance: CaptureProvenance.explicit,
-      span: scope.categorySpan,
+      provenance: knownCategory == null
+          ? CaptureProvenance.explicit
+          : CaptureProvenance.derived,
+      span: scope.categorySpan ?? body.span,
     );
   } else if (suggested != null) {
     evidence['suggestedCategory'] = const CaptureEvidence(

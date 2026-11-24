@@ -37,6 +37,7 @@ class CaptureReviewSheet extends StatefulWidget {
     this.onCancelAi,
     this.onTranscribe,
     this.onCancelTranscription,
+    this.disabledKinds = const {},
     super.key,
   });
 
@@ -50,6 +51,7 @@ class CaptureReviewSheet extends StatefulWidget {
   final VoidCallback? onCancelAi;
   final Future<CaptureArchiveEntry> Function(CaptureArchiveEntry)? onTranscribe;
   final VoidCallback? onCancelTranscription;
+  final Set<CaptureIntentKind> disabledKinds;
 
   @override
   State<CaptureReviewSheet> createState() => _CaptureReviewSheetState();
@@ -120,7 +122,13 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
         _review = review;
         _selected
           ..clear()
-          ..addAll(review.proposals.where((proposal) => proposal.isReady));
+          ..addAll(
+            review.proposals.where(
+              (proposal) =>
+                  proposal.isReady &&
+                  !widget.disabledKinds.contains(proposal.draft.kind),
+            ),
+          );
       });
     } catch (_) {
       if (mounted) setState(() => _error = 'This capture could not be saved.');
@@ -333,8 +341,16 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
                       _ProposalTile(
                         proposal: proposal,
                         anchor: review.input.context.anchor,
+                        featureDisabled: widget.disabledKinds.contains(
+                          proposal.draft.kind,
+                        ),
                         selected: _selected.contains(proposal),
-                        toggle: _working || !proposal.isReady
+                        toggle:
+                            _working ||
+                                !proposal.isReady ||
+                                widget.disabledKinds.contains(
+                                  proposal.draft.kind,
+                                )
                             ? null
                             : (value) => setState(() {
                                 if (value == true) {
@@ -426,12 +442,14 @@ class _ProposalTile extends StatelessWidget {
     required this.anchor,
     required this.selected,
     required this.toggle,
+    required this.featureDisabled,
   });
 
   final CaptureProposal proposal;
   final DateTime anchor;
   final bool selected;
   final ValueChanged<bool?>? toggle;
+  final bool featureDisabled;
 
   @override
   Widget build(BuildContext context) {
@@ -446,8 +464,8 @@ class _ProposalTile extends StatelessWidget {
       CaptureIntentKind.task => 'Task',
       CaptureIntentKind.event => 'Event',
       CaptureIntentKind.note => 'Note',
-      CaptureIntentKind.workout => 'Workout note',
-      CaptureIntentKind.meal => 'Meal note',
+      CaptureIntentKind.workout => 'Workout entry',
+      CaptureIntentKind.meal => 'Meal draft',
       CaptureIntentKind.completeTask => 'Complete task',
     };
     final category =
@@ -483,6 +501,7 @@ class _ProposalTile extends StatelessWidget {
             [
               label,
               if (category != null) spaceName(category),
+              if (featureDisabled) 'Feature turned off',
               ?detail,
               if (proposal.missingRequired.isNotEmpty)
                 'Needs ${proposal.missingRequired.join(', ')}',

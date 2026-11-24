@@ -54,17 +54,21 @@ class TaskItem {
     prerequisites: List.unmodifiable(ids),
   );
 
+  TaskItem withEstimate(int minutes) =>
+      _with(done: done, parentId: parentId, estimate: minutes);
+
   TaskItem _with({
     required bool done,
     required String? parentId,
     List<String>? prerequisites,
+    int? estimate,
   }) => TaskItem(
     id: id,
     title: title,
     category: category,
     date: date,
     done: done,
-    estimatedMinutes: estimatedMinutes,
+    estimatedMinutes: estimate ?? estimatedMinutes,
     priority: priority,
     parentId: parentId,
     notes: notes,

@@ -13,6 +13,10 @@ class TodayPage extends StatelessWidget {
     required this.onTaskTap,
     required this.onTaskToggle,
     this.onPlanDay,
+    this.title = 'Today',
+    this.showSchedule = true,
+    this.showTasks = true,
+    this.focusedContent,
     super.key,
   });
 
@@ -23,6 +27,10 @@ class TodayPage extends StatelessWidget {
   final ValueChanged<TaskItem> onTaskTap;
   final ValueChanged<TaskItem> onTaskToggle;
   final VoidCallback? onPlanDay;
+  final String title;
+  final bool showSchedule;
+  final bool showTasks;
+  final Widget? focusedContent;
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +69,7 @@ class TodayPage extends StatelessWidget {
               children: [
                 Semantics(
                   header: true,
-                  child: Text('Today', style: workspaceHeadingStyle(mobile)),
+                  child: Text(title, style: workspaceHeadingStyle(mobile)),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -73,43 +81,51 @@ class TodayPage extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: mobile ? 32 : 45),
-                const _SectionHeading('Schedule'),
-                const SizedBox(height: 14),
-                if (dayEvents.isEmpty)
-                  const _EmptyMessage('Nothing scheduled for today.'),
-                for (final event in dayEvents)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _ScheduleItem(
-                      event: event,
-                      date: date,
-                      narrow: mobile,
-                      onTap: () => onEventTap(event),
-                    ),
-                  ),
-                SizedBox(height: mobile ? 23 : 33),
-                Row(
-                  children: [
-                    const Expanded(child: _SectionHeading('Tasks')),
-                    if (onPlanDay != null)
-                      TextButton(
-                        onPressed: onPlanDay,
-                        child: const Text('Plan day'),
+                if (focusedContent case final content?) ...[
+                  content,
+                  if (showTasks || showSchedule) const SizedBox(height: 33),
+                ],
+                if (showSchedule) ...[
+                  const _SectionHeading('Schedule'),
+                  const SizedBox(height: 14),
+                  if (dayEvents.isEmpty)
+                    const _EmptyMessage('Nothing scheduled for today.'),
+                  for (final event in dayEvents)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _ScheduleItem(
+                        event: event,
+                        date: date,
+                        narrow: mobile,
+                        onTap: () => onEventTap(event),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                if (dayTasks.isEmpty)
-                  const _EmptyMessage('No tasks due today.'),
-                for (final task in [
-                  ...dayTasks.where((task) => !task.done),
-                  ...dayTasks.where((task) => task.done),
-                ])
-                  _TodayTask(
-                    task: task,
-                    onToggle: () => onTaskToggle(task),
-                    onTap: () => onTaskTap(task),
+                    ),
+                  if (showTasks) SizedBox(height: mobile ? 23 : 33),
+                ],
+                if (showTasks) ...[
+                  Row(
+                    children: [
+                      const Expanded(child: _SectionHeading('Tasks')),
+                      if (onPlanDay != null)
+                        TextButton(
+                          onPressed: onPlanDay,
+                          child: const Text('Plan day'),
+                        ),
+                    ],
                   ),
+                  const SizedBox(height: 10),
+                  if (dayTasks.isEmpty)
+                    const _EmptyMessage('No tasks due today.'),
+                  for (final task in [
+                    ...dayTasks.where((task) => !task.done),
+                    ...dayTasks.where((task) => task.done),
+                  ])
+                    _TodayTask(
+                      task: task,
+                      onToggle: () => onTaskToggle(task),
+                      onTap: () => onTaskTap(task),
+                    ),
+                ],
               ],
             ),
           ),

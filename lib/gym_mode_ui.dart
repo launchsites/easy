@@ -4,10 +4,16 @@ import 'ui_theme.dart';
 import 'workspace_data.dart' show spaceColor;
 
 class MobileModeFrame extends StatelessWidget {
-  const MobileModeFrame({required this.mode, required this.child, super.key});
+  const MobileModeFrame({
+    required this.mode,
+    required this.child,
+    this.modeColor,
+    super.key,
+  });
 
   final String? mode;
   final Widget child;
+  final Color? modeColor;
 
   static const _gymStroke = Color(0xffb24f43);
 
@@ -16,9 +22,8 @@ class MobileModeFrame extends StatelessWidget {
     final activeMode = mode?.toLowerCase();
     final stroke = activeMode == null || MediaQuery.sizeOf(context).width >= 720
         ? null
-        : activeMode == 'gym'
-        ? _gymStroke
-        : spaceColor(activeMode);
+        : modeColor ??
+              (activeMode == 'gym' ? _gymStroke : spaceColor(activeMode));
 
     return Stack(
       fit: StackFit.passthrough,
@@ -56,6 +61,7 @@ class GymWorkoutOverview extends StatelessWidget {
     required this.onWorkout,
     required this.onPlans,
     required this.onFreestyle,
+    this.onHistory,
     super.key,
   });
 
@@ -67,6 +73,7 @@ class GymWorkoutOverview extends StatelessWidget {
   final VoidCallback onWorkout;
   final VoidCallback onPlans;
   final VoidCallback onFreestyle;
+  final VoidCallback? onHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -173,6 +180,11 @@ class GymWorkoutOverview extends StatelessWidget {
                           'Freestyle',
                           semanticsLabel: 'Start a freestyle workout',
                         ),
+                      ),
+                    if (onHistory != null)
+                      TextButton(
+                        onPressed: onHistory,
+                        child: const Text('History'),
                       ),
                   ],
                 ),

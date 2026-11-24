@@ -4,11 +4,13 @@ import 'package:easy/gym_session.dart';
 import 'package:easy/list_pages.dart';
 import 'package:easy/main.dart';
 import 'package:easy/mobile_home.dart';
+import 'package:easy/nutrition/nutrition.dart';
 import 'package:easy/orbit_navigation.dart';
 import 'package:easy/quick_capture.dart';
 import 'package:easy/record_editor.dart';
 import 'package:easy/storage/workspace_store.dart';
 import 'package:easy/workout_plan.dart';
+import 'package:easy/workspace_data.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -131,6 +133,49 @@ void main() {
     await _pickMode(tester, 'Health');
     expect(find.text('Packed lunch ready'), findsOneWidget);
   });
+
+  testWidgets(
+    'A reviewed activity and meal survive together across focus and restart',
+    (tester) async {
+      _setViewport(tester, const Size(390, 844));
+      const app = EasyApp(openStore: openPreferenceWorkspaceStore);
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await _pickMode(tester, 'Work');
+      await tester.tap(find.byTooltip('Add item'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Open capture review'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField),
+        'Gym: workout: Pull-ups x8,8; Health: meal: Chicken and rice',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Review'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Workout entry'), findsOneWidget);
+      expect(find.textContaining('Meal draft'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Add 2 items'));
+      await tester.pumpAndSettle();
+      expect(find.text('Work'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await _pickMode(tester, 'Gym');
+      await tester.ensureVisible(find.text('History'));
+      await tester.tap(find.text('History'));
+      await tester.pumpAndSettle();
+      expect(find.text('Pull-ups x8,8'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await _pickMode(tester, 'Health');
+      await tester.tap(find.text('Meal log'));
+      await tester.pumpAndSettle();
+      expect(find.text('Chicken and rice'), findsOneWidget);
+      expect(find.textContaining('· Draft'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'Gym shows the workout while No mode restores the daily overview',
@@ -289,6 +334,60 @@ void main() {
     await tester.tap(find.text('Resume'));
     await tester.pumpAndSettle();
     expect(find.text('Stretch'), findsOneWidget);
+  });
+
+  testWidgets('Turning Nutrition off hides the tool and retains its records', (
+    tester,
+  ) async {
+    _setViewport(tester, const Size(390, 844));
+    final now = DateTime.now();
+    final snapshot = WorkspaceData.samples(now).withSection(
+      'nutrition',
+      NutritionData(
+        meals: [
+          NutritionMeal(
+            id: 'meal',
+            name: 'Packed lunch',
+            eatenAt: now,
+            draft: true,
+          ),
+        ],
+      ).toJson(),
+    );
+    await SharedPreferencesAsync().setString(
+      'easy.workspace.v1',
+      snapshot.encode(),
+    );
+    const app = EasyApp(openStore: openPreferenceWorkspaceStore);
+    await tester.pumpWidget(app);
+    await tester.pumpAndSettle();
+    await _pickMode(tester, 'Health');
+    expect(find.text('Meal log'), findsOneWidget);
+
+    Future<void> toggleNutrition() async {
+      await _pickMode(tester, 'Settings');
+      await tester.tap(find.text('Features'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Nutrition'));
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+    }
+
+    await toggleNutrition();
+    expect(find.text('Meal log'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(app);
+    await tester.pumpAndSettle();
+    await _pickMode(tester, 'Health');
+    expect(find.text('Meal log'), findsNothing);
+    await toggleNutrition();
+    await tester.tap(find.text('Meal log'));
+    await tester.pumpAndSettle();
+    expect(find.text('Packed lunch'), findsOneWidget);
   });
 
   testWidgets('Desktop sidebar opens workspaces and contextual details', (

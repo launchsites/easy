@@ -886,7 +886,13 @@ class _QuantityEditor extends StatelessWidget {
     if (MediaQuery.textScalerOf(context).scale(14) > 19) {
       return Column(children: [amount, const SizedBox(height: 9), selectUnit]);
     }
-    return Row(children: [Expanded(child: amount), const SizedBox(width: 9), Expanded(child: selectUnit)]);
+    return Row(
+      children: [
+        Expanded(child: amount),
+        const SizedBox(width: 9),
+        Expanded(child: selectUnit),
+      ],
+    );
   }
 }
 
@@ -992,17 +998,25 @@ class _NutritionScreen extends StatelessWidget {
                   if (error case final message?) ...[
                     Semantics(
                       liveRegion: true,
-                      child: Text(message, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                      child: Text(
+                        message,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 6),
                   ],
                   footer,
                 ],
               );
-              final short = constraints.maxHeight < MediaQuery.textScalerOf(context).scale(155);
+              final short =
+                  constraints.maxHeight <
+                  MediaQuery.textScalerOf(context).scale(155);
               final list = ListView(
                 padding: const EdgeInsets.fromLTRB(20, 13, 20, 18),
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 children: [
                   ...children,
                   if (short) ...[const SizedBox(height: 13), controls],
@@ -1014,7 +1028,10 @@ class _NutritionScreen extends StatelessWidget {
                 children: [
                   Expanded(child: list),
                   const Divider(),
-                  Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 13), child: controls),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 13),
+                    child: controls,
+                  ),
                 ],
               );
             },
