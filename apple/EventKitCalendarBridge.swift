@@ -1,6 +1,7 @@
 import EventKit
 import Foundation
 import CoreGraphics
+import CryptoKit
 #if os(iOS)
 import Flutter
 #elseif os(macOS)
@@ -95,6 +96,38 @@ final class EventKitCalendarBridge: NSObject, FlutterPlugin, FlutterStreamHandle
           result(CalendarWriteError.saveFailed.flutterError)
         }
       }
+    case "prepareUpdate":
+      guard let request = CalendarUpdateRequest(call.arguments) else {
+        result(CalendarWriteError.invalidDraft.flutterError)
+        return
+      }
+      Task { @MainActor in
+        do {
+          let review = try await store.prepareUpdate(request)
+          result(review.payload)
+        } catch let error as CalendarWriteError {
+          result(error.flutterError)
+        } catch {
+          result(CalendarWriteError.copyChanged.flutterError)
+        }
+      }
+    case "updateReviewedEvent":
+      guard let arguments = call.arguments as? [String: Any],
+            let token = arguments["reviewToken"] as? String, !token.isEmpty,
+            arguments["confirmed"] as? Bool == true else {
+        result(CalendarWriteError.reviewRequired.flutterError)
+        return
+      }
+      Task { @MainActor in
+        do {
+          let updated = try await store.updateReviewedEvent(token: token)
+          result(updated.payload)
+        } catch let error as CalendarWriteError {
+          result(error.flutterError)
+        } catch {
+          result(CalendarWriteError.saveFailed.flutterError)
+        }
+      }
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -130,6 +163,8 @@ private actor EventKitCalendarStore {
   private var accessRequestInProgress = false
   private var pendingCreates: [CalendarCreateReview] = []
   private var completedCreates: [CreatedCalendarEvent] = []
+  private var pendingUpdates: [CalendarUpdateReview] = []
+  private var completedUpdates: [CreatedCalendarEvent] = []
 
   static func accessStatus() -> String {
     let authorization = EKEventStore.authorizationStatus(for: .event)
@@ -243,12 +278,113 @@ private actor EventKitCalendarStore {
     let created = CreatedCalendarEvent(
       token: token,
       key: review.destination.key,
-      eventID: event.eventIdentifier ?? event.calendarItemIdentifier
+      eventID: event.eventIdentifier ?? event.calendarItemIdentifier,
+      revision: copyRevisionAfterSave(event)
     )
     pendingCreates.remove(at: index)
     completedCreates.append(created)
     if completedCreates.count > 64 { completedCreates.removeFirst() }
     return created
+  }
+
+  func prepareUpdate(_ request: CalendarUpdateRequest) throws -> CalendarUpdateReview {
+    let (event, before, destination) = try writableCopy(request.target)
+    guard try before.revision(for: event) == request.expectedRevision else {
+      throw CalendarWriteError.copyChanged
+    }
+    let draft = try request.draft.resolve()
+    let timeZone: TimeZone?
+    if draft.allDay {
+      timeZone = nil
+    } else if request.draft.timeZoneID != nil || before.allDay {
+      timeZone = draft.timeZone
+    } else {
+      timeZone = event.timeZone
+    }
+    guard before.title != draft.title || before.start != draft.start || before.end != draft.end ||
+          before.allDay != draft.allDay || event.timeZone != timeZone ||
+          (request.scope.location && before.location != draft.location) ||
+          (request.scope.notes && before.notes != draft.notes) else {
+      throw CalendarWriteError.noChanges
+    }
+    let review = CalendarUpdateReview(
+      token: UUID().uuidString,
+      target: request.target,
+      destination: destination,
+      before: before,
+      expectedRevision: request.expectedRevision,
+      draft: draft,
+      timeZone: timeZone,
+      scope: request.scope
+    )
+    pendingUpdates.append(review)
+    if pendingUpdates.count > 32 { pendingUpdates.removeFirst() }
+    return review
+  }
+
+  func updateReviewedEvent(token: String) throws -> CreatedCalendarEvent {
+    if let completed = completedUpdates.first(where: { $0.token == token }) {
+      return completed
+    }
+    guard let index = pendingUpdates.firstIndex(where: { $0.token == token }) else {
+      throw CalendarWriteError.reviewRequired
+    }
+    let review = pendingUpdates.remove(at: index)
+    let (event, current, destination) = try writableCopy(review.target)
+    guard destination == review.destination else { throw CalendarWriteError.changedDestination }
+    guard try current.revision(for: event) == review.expectedRevision else {
+      throw CalendarWriteError.copyChanged
+    }
+    if review.draft.usesDeviceZone && review.draft.timeZone != TimeZone.current {
+      throw CalendarWriteError.changedTimeZone
+    }
+    event.title = review.draft.title
+    event.isAllDay = review.draft.allDay
+    event.timeZone = review.timeZone
+    event.startDate = review.draft.start
+    event.endDate = review.draft.end
+    if review.scope.location { event.location = review.draft.location }
+    if review.scope.notes { event.notes = review.draft.notes }
+    do {
+      try store.save(event, span: .thisEvent, commit: true)
+    } catch {
+      throw CalendarWriteError.saveFailed
+    }
+    let completed = CreatedCalendarEvent(
+      token: token,
+      key: review.target.key,
+      eventID: review.target.eventID,
+      revision: event.eventIdentifier == review.target.eventID
+        ? copyRevisionAfterSave(event) : nil
+    )
+    completedUpdates.append(completed)
+    if completedUpdates.count > 64 { completedUpdates.removeFirst() }
+    return completed
+  }
+
+  private func writableCopy(_ target: LinkedCalendarEvent) throws -> (EKEvent, CalendarEventSnapshot, CalendarSourceSnapshot) {
+    guard Self.accessStatus() == "full" else { throw CalendarWriteError.accessRequired }
+    guard let calendar = store.calendar(withIdentifier: target.key.calendarID),
+          CalendarKey(calendar) == target.key else { throw CalendarWriteError.changedDestination }
+    let destination = CalendarSourceSnapshot(calendar)
+    guard destination.canWrite else { throw CalendarWriteError.readOnly }
+    guard let event = store.event(withIdentifier: target.eventID),
+          let start = event.startDate, let end = event.endDate,
+          let snapshot = CalendarEventSnapshot(event, start: start, end: end),
+          snapshot.key == target.key, snapshot.eventID == target.eventID else {
+      throw CalendarWriteError.copyMissing
+    }
+    guard !snapshot.recurring else { throw CalendarWriteError.copyChanged }
+    return (event, snapshot, destination)
+  }
+
+  private func copyRevisionAfterSave(_ event: EKEvent) -> String? {
+    guard let identifier = event.eventIdentifier,
+          let saved = store.event(withIdentifier: identifier),
+          let start = saved.startDate, let end = saved.endDate,
+          let snapshot = CalendarEventSnapshot(saved, start: start, end: end),
+          !snapshot.recurring else { return nil }
+    return try? snapshot.revision(for: saved)
   }
 
   private func writableCalendar(_ expected: CalendarDestination) throws -> (EKCalendar, CalendarSourceSnapshot) {
@@ -400,6 +536,25 @@ private struct CalendarEventSnapshot: Sendable {
     return value
   }
 
+  func revision(for event: EKEvent) throws -> String {
+    // Persist only the digest in Easy. The source fields stay in EventKit,
+    // and a native modification date also fences changes outside this scope.
+    var value = payload
+    value["revisionSchema"] = 1
+    value.removeValue(forKey: "startDate")
+    value.removeValue(forKey: "endDate")
+    value["startMilliseconds"] = Self.milliseconds(start)
+    value["endMilliseconds"] = Self.milliseconds(end)
+    value["lastModifiedMilliseconds"] = event.lastModifiedDate.map(Self.milliseconds)
+    value["creationMilliseconds"] = event.creationDate.map(Self.milliseconds)
+    value["availability"] = event.availability.rawValue
+    value["status"] = event.status.rawValue
+    value["url"] = event.url?.absoluteString
+    value["alarmCount"] = event.alarms?.count ?? 0
+    let bytes = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
+    return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+  }
+
   private static func civilDate(_ date: Date, calendar: Calendar) -> String? {
     let parts = calendar.dateComponents([.year, .month, .day], from: date)
     guard let year = parts.year, let month = parts.month, let day = parts.day else { return nil }
@@ -420,6 +575,9 @@ private enum CalendarWriteError: Error {
   case ambiguousLocalTime
   case changedTimeZone
   case reviewRequired
+  case copyChanged
+  case copyMissing
+  case noChanges
   case saveFailed
 
   var flutterError: FlutterError {
@@ -450,6 +608,15 @@ private enum CalendarWriteError: Error {
     case .reviewRequired:
       code = "calendar_review_required"
       message = "Review the proposed event and its calendar before saving."
+    case .copyChanged:
+      code = "calendar_copy_changed"
+      message = "The linked Apple Calendar event changed. Open it in Apple Calendar to review its current details."
+    case .copyMissing:
+      code = "calendar_copy_missing"
+      message = "The linked event is unavailable in its original Apple calendar."
+    case .noChanges:
+      code = "calendar_no_changes"
+      message = "The reviewed fields already match the linked Apple Calendar event."
     case .saveFailed:
       code = "calendar_save_failed"
       message = "The selected calendar could not save this event."
@@ -490,6 +657,58 @@ private struct CalendarCreateRequest: Sendable {
           let draft = CalendarCreateDraft(draftInput) else { return nil }
     self.destination = destination
     self.draft = draft
+  }
+}
+
+private struct LinkedCalendarEvent: Sendable {
+  let key: CalendarKey
+  let eventID: String
+
+  init?(_ input: [String: Any]) {
+    guard let key = CalendarKey(input),
+          let eventID = input["eventId"] as? String, !eventID.isEmpty,
+          input["recurrenceId"] == nil else { return nil }
+    self.key = key
+    self.eventID = eventID
+  }
+}
+
+private struct CalendarUpdateScope: Sendable {
+  let location: Bool
+  let notes: Bool
+
+  init?(_ input: [String: Any]) {
+    guard input.count == 2,
+          let location = input["location"] as? Bool,
+          let notes = input["notes"] as? Bool else { return nil }
+    self.location = location
+    self.notes = notes
+  }
+}
+
+private struct CalendarUpdateRequest: Sendable {
+  let target: LinkedCalendarEvent
+  let expectedRevision: String
+  let draft: CalendarCreateDraft
+  let scope: CalendarUpdateScope
+
+  init?(_ arguments: Any?) {
+    guard let payload = arguments as? [String: Any],
+          let targetInput = payload["target"] as? [String: Any],
+          let target = LinkedCalendarEvent(targetInput),
+          let expectedRevision = payload["expectedRevision"] as? String,
+          expectedRevision.utf8.count == 64,
+          expectedRevision.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }),
+          let scopeInput = payload["scope"] as? [String: Any],
+          let scope = CalendarUpdateScope(scopeInput),
+          let draftInput = payload["draft"] as? [String: Any],
+          scope.location || draftInput["location"] == nil,
+          scope.notes || draftInput["notes"] == nil,
+          let draft = CalendarCreateDraft(draftInput) else { return nil }
+    self.target = target
+    self.expectedRevision = expectedRevision
+    self.draft = draft
+    self.scope = scope
   }
 }
 
@@ -678,14 +897,46 @@ private struct CalendarCreateReview: Sendable {
   }
 }
 
+private struct CalendarUpdateReview: Sendable {
+  let token: String
+  let target: LinkedCalendarEvent
+  let destination: CalendarSourceSnapshot
+  let before: CalendarEventSnapshot
+  let expectedRevision: String
+  let draft: ResolvedCalendarDraft
+  let timeZone: TimeZone?
+  let scope: CalendarUpdateScope
+
+  var payload: [String: Any] {
+    var value = destination.payload
+    value["reviewToken"] = token
+    value["revision"] = expectedRevision
+    var previous = before.payload
+    if !scope.location { previous.removeValue(forKey: "location") }
+    if !scope.notes { previous.removeValue(forKey: "notes") }
+    value["before"] = previous
+    if let dates = draft.dates {
+      value["startDate"] = dates.start
+      value["endDate"] = dates.end
+    } else {
+      value["startMilliseconds"] = Int64((draft.start.timeIntervalSince1970 * 1000).rounded())
+      value["endMilliseconds"] = Int64((draft.end.timeIntervalSince1970 * 1000).rounded())
+      value["timeZoneId"] = timeZone?.identifier
+    }
+    return value
+  }
+}
+
 private struct CreatedCalendarEvent: Sendable {
   let token: String
   let key: CalendarKey
   let eventID: String
+  let revision: String?
 
   var payload: [String: Any] {
     var value = key.payload
     value["eventId"] = eventID
+    value["revision"] = revision
     return value
   }
 }

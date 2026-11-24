@@ -67,6 +67,26 @@ class EventKitEventDraft {
   final String? timeZoneId;
   final bool _wallTime;
 
+  EventKitEventDraft _scoped({required bool location, required bool notes}) =>
+      _wallTime
+      ? EventKitEventDraft.wallTimes(
+          title: title,
+          start: start,
+          end: end,
+          location: location ? this.location : null,
+          notes: notes ? this.notes : null,
+          timeZoneId: timeZoneId,
+        )
+      : EventKitEventDraft(
+          title: title,
+          start: start,
+          end: end,
+          allDay: allDay,
+          location: location ? this.location : null,
+          notes: notes ? this.notes : null,
+          timeZoneId: timeZoneId,
+        );
+
   Map<String, Object?> _payload() {
     if (title.trim().isEmpty) throw ArgumentError('Enter an event title.');
     final startDate = _wallTime ? _civilTime(start) : _civilDate(start);
@@ -129,6 +149,40 @@ class EventKitCreateReview {
   final DateTime start;
   final DateTime end;
   final String? timeZoneId;
+}
+
+/// The originating native event and its opaque version at the confirmed save.
+class EventKitCopyReceipt {
+  const EventKitCopyReceipt._(this.id, this.revision);
+
+  final CalendarOccurrenceIdentity id;
+  final String? revision;
+}
+
+class EventKitUpdateReview {
+  const EventKitUpdateReview._({
+    required this._token,
+    required this.target,
+    required this.destination,
+    required this.before,
+    required this.draft,
+    required this.start,
+    required this.end,
+    required this.updateLocation,
+    required this.updateNotes,
+    this.timeZoneId,
+  });
+
+  final String _token;
+  final CalendarOccurrenceIdentity target;
+  final CalendarSource destination;
+  final ExternalCalendarEvent before;
+  final EventKitEventDraft draft;
+  final DateTime start;
+  final DateTime end;
+  final String? timeZoneId;
+  final bool updateLocation;
+  final bool updateNotes;
 }
 
 /// Apple calendar access. Only requestReadAccess can present an OS prompt.
@@ -226,6 +280,12 @@ class EventKitCalendarAdapter {
   Future<CalendarOccurrenceIdentity> createReviewedEvent(
     EventKitCreateReview review, {
     required bool confirmed,
+  }) async =>
+      (await createReviewedEventWithReceipt(review, confirmed: confirmed)).id;
+
+  Future<EventKitCopyReceipt> createReviewedEventWithReceipt(
+    EventKitCreateReview review, {
+    required bool confirmed,
   }) async {
     if (!confirmed) throw StateError('Confirm the event review before saving.');
     if (!isAvailable) throw UnsupportedError('Apple Calendar is unavailable.');
@@ -235,14 +295,97 @@ class EventKitCalendarAdapter {
         'confirmed': true,
       }),
     );
-    final source = CalendarIdentity.fromJson(response);
-    final id = _string(response, 'eventId');
-    if (source != review.destination.id || id.isEmpty) {
+    final receipt = _readReceipt(response);
+    if (receipt.id.calendar != review.destination.id) {
       throw const FormatException(
         'The calendar returned an invalid event identity.',
       );
     }
-    return CalendarOccurrenceIdentity(calendar: source, eventId: id);
+    return receipt;
+  }
+
+  Future<EventKitUpdateReview> prepareUpdate({
+    required CalendarOccurrenceIdentity target,
+    required String expectedRevision,
+    required EventKitEventDraft draft,
+    bool updateLocation = false,
+    bool updateNotes = false,
+  }) async {
+    if (!isAvailable) throw UnsupportedError('Apple Calendar is unavailable.');
+    if (target.eventId.isEmpty ||
+        target.recurrenceId != null ||
+        !_validCopyRevision(expectedRevision)) {
+      throw ArgumentError('Choose a verified standalone Apple Calendar copy.');
+    }
+    final scoped = draft._scoped(location: updateLocation, notes: updateNotes);
+    final response = _object(
+      await _methods.invokeMethod<Object?>('prepareUpdate', {
+        'target': {...target.calendar.toJson(), 'eventId': target.eventId},
+        'expectedRevision': expectedRevision,
+        'draft': scoped._payload(),
+        'scope': {'location': updateLocation, 'notes': updateNotes},
+      }),
+    );
+    final destination = _readSource(response);
+    final token = _string(response, 'reviewToken');
+    final prior = _object(response['before']);
+    if (!updateLocation) prior.remove('location');
+    if (!updateNotes) prior.remove('notes');
+    final before = _readEvent(prior);
+    if (!destination.canWrite ||
+        destination.id != target.calendar ||
+        token.isEmpty ||
+        before.id != target ||
+        before.event.recurring ||
+        response['revision'] != expectedRevision) {
+      throw const FormatException(
+        'The Apple Calendar copy changed. Review the current link again.',
+      );
+    }
+    final start = scoped.allDay
+        ? _calendarDate(response, 'startDate')
+        : _instant(response, 'startMilliseconds');
+    final end = scoped.allDay
+        ? _calendarDate(response, 'endDate')
+        : _instant(response, 'endMilliseconds');
+    if (!end.isAfter(start)) {
+      throw const FormatException(
+        'The calendar returned an invalid update time.',
+      );
+    }
+    return EventKitUpdateReview._(
+      token: token,
+      target: target,
+      destination: destination,
+      before: before.event,
+      draft: scoped,
+      start: start,
+      end: end,
+      timeZoneId: _optionalString(response, 'timeZoneId'),
+      updateLocation: updateLocation,
+      updateNotes: updateNotes,
+    );
+  }
+
+  Future<EventKitCopyReceipt> updateReviewedEvent(
+    EventKitUpdateReview review, {
+    required bool confirmed,
+  }) async {
+    if (!confirmed) throw StateError('Confirm the event update before saving.');
+    if (!isAvailable) throw UnsupportedError('Apple Calendar is unavailable.');
+    final response = _object(
+      await _methods.invokeMethod<Object?>('updateReviewedEvent', {
+        'reviewToken': review._token,
+        'confirmed': true,
+      }),
+    );
+    final receipt = _readReceipt(response);
+    if (receipt.id != review.target) {
+      throw const FormatException(
+        'The calendar returned a different event identity.',
+      );
+    }
+    return receipt;
   }
 
   Future<List<SourcedCalendarEvent<ExternalCalendarEvent>>> events({
@@ -273,6 +416,27 @@ class EventKitCalendarAdapter {
   Stream<void> get changes => isAvailable
       ? _events.receiveBroadcastStream().map<void>((_) {})
       : const Stream.empty();
+}
+
+final _copyRevision = RegExp(r'^[a-f0-9]{64}$');
+bool _validCopyRevision(String value) =>
+    value.length == 64 && _copyRevision.hasMatch(value);
+
+EventKitCopyReceipt _readReceipt(Map<String, Object?> response) {
+  final source = CalendarIdentity.fromJson(response);
+  final id = _string(response, 'eventId');
+  final revision = _optionalString(response, 'revision');
+  if (id.isEmpty ||
+      response['recurrenceId'] != null ||
+      (revision != null && !_validCopyRevision(revision))) {
+    throw const FormatException(
+      'The calendar returned an invalid event receipt.',
+    );
+  }
+  return EventKitCopyReceipt._(
+    CalendarOccurrenceIdentity(calendar: source, eventId: id),
+    revision,
+  );
 }
 
 CalendarSource _readSource(Map<String, Object?> source) => CalendarSource(
