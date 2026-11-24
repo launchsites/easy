@@ -13,6 +13,7 @@ class ActivitiesPage extends StatefulWidget {
     required this.onChanged,
     this.targets = const [],
     this.clock,
+    this.initialRecordId,
     super.key,
   });
 
@@ -20,6 +21,7 @@ class ActivitiesPage extends StatefulWidget {
   final Future<void> Function(ActivityData) onChanged;
   final List<ActivityTarget> targets;
   final DateTime Function()? clock;
+  final String? initialRecordId;
 
   @override
   State<ActivitiesPage> createState() => _ActivitiesPageState();
@@ -32,6 +34,25 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
   late ActivityData _data = widget.data;
   late final _activeClock = _ActivityClock(_wallNow());
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.initialRecordId;
+    if (id == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final record = _data.records.where((item) => item.id == id).firstOrNull;
+      switch (record?.status) {
+        case ActivityStatus.planned:
+          _edit(_EditorKind.plan, record);
+        case ActivityStatus.finished:
+          _edit(_EditorKind.actual, record);
+        default:
+          break;
+      }
+    });
+  }
 
   DateTime _wallNow() => (widget.clock ?? DateTime.now)().toLocal();
 

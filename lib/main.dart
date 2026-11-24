@@ -69,11 +69,16 @@ import 'scheduling/availability_settings.dart';
 import 'scheduling/availability_settings_page.dart';
 import 'scheduling/plan_day_sheet.dart';
 import 'scheduling/planner.dart';
+import 'search/search.dart';
 import 'settings_page.dart';
 import 'storage/attachment_store.dart';
 import 'storage/workspace_backup_page.dart';
 import 'storage/workspace_store.dart';
 import 'tasks/recurring_task.dart';
+import 'tasks/task_breakdown.dart';
+import 'tasks/task_breakdown_review.dart';
+import 'tasks/task_capture_defaults.dart';
+import 'tasks/task_capture_defaults_editor.dart';
 import 'tasks/task_repeat_editor.dart';
 import 'tasks/task_workspace_feed.dart';
 import 'today_page.dart';
@@ -84,6 +89,8 @@ import 'workspace_data.dart';
 part 'workspace_chrome.dart';
 part 'workspace_repeating_tasks.dart';
 part 'workspace_category_views.dart';
+part 'workspace_search.dart';
+part 'workspace_task_actions.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -252,6 +259,13 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   List<TaskItem> _focusedTasks = const [];
   Object? _focusedNotesRevision;
   List<NoteItem> _focusedNotes = const [];
+  Future<SearchPreferences>? _searchPreferences;
+  Future<void> _searchPreferenceWrites = Future.value();
+  Future<SearchIndex>? _searchIndex;
+  Object? _searchIndexRevision;
+  Object? _searchActivitySource;
+  List<ActivityRecord> _searchActivities = const [];
+  var _searchOpen = false;
   var _taskFeed = TaskWorkspaceFeed();
   var _taskSeriesUnreadable = false;
   Future<AttachmentStore?>? _attachmentStore;
@@ -778,6 +792,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                     title: 'Features',
                     onTap: _openFeatureSettings,
                   ),
+                  if (MediaQuery.sizeOf(context).width < 720)
+                    SettingsItem(
+                      icon: Icons.search_rounded,
+                      title: 'Search workspace',
+                      onTap: _search,
+                    ),
                   SettingsItem(
                     icon: Icons.adjust_rounded,
                     title: 'Focus modes',
@@ -789,6 +809,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                     title: 'Categories',
                     subtitle: 'Names, colours and subcategories',
                     onTap: _openCategories,
+                  ),
+                  SettingsItem(
+                    icon: Icons.add_task_rounded,
+                    title: 'Task capture defaults',
+                    subtitle: 'Preferred date and category for new tasks',
+                    onTap: _openTaskDefaults,
                   ),
                   SettingsItem(
                     icon: Icons.calendar_today_outlined,
@@ -1917,7 +1943,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     await _commitReviewedData(previous, previous.copyWith(tasks: tasks));
   }
 
-  void _openActivities() {
+  void _openActivities({String? initialRecordId}) {
     if (!_allows(EasyFeature.activity)) return;
     final ActivityData data;
     try {
@@ -1930,6 +1956,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       MaterialPageRoute(
         builder: (_) => ActivitiesPage(
           data: data,
+          initialRecordId: initialRecordId,
           onChanged: (value) => _commitReviewedData(
             _data,
             _data.withSection(_activitiesKey, value.toJson()),
@@ -2161,6 +2188,14 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (!identical(data.tasks, _data.tasks) ||
         !identical(data.events, _data.events) ||
         !identical(data.notes, _data.notes) ||
+        !identical(
+          data.sections[_taskCaptureDefaultsKey],
+          _data.sections[_taskCaptureDefaultsKey],
+        ) ||
+        !identical(
+          data.sections[_categorySettingsKey],
+          _data.sections[_categorySettingsKey],
+        ) ||
         taskSeriesChanged) {
       _contentRevision++;
     }
@@ -2656,10 +2691,11 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         ? saved
         : saved.withParent(null);
     final candidates = [..._data.tasks, restored];
+    final hierarchy = TaskHierarchy(candidates);
     final tasks = [
       for (final task in candidates)
         if (identical(detached[task.id], task) &&
-            taskParentIssue(candidates, task.id, restored.id) == null)
+            hierarchy.parentIssue(task.id, restored.id) == null)
           task.withParent(restored.id)
         else
           task,
@@ -2710,15 +2746,19 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           _ => RecordKind.task,
         };
     final calendar = _calendarPreferences?.defaultWriteCalendar;
+    final defaults = _captureDefaults;
     final result = await _showEditor(
       QuickCapture(
         date: destination == _Destination.calendar ? _calendarDate : _today,
         kind: captureKind,
-        initialTaskDate: _today,
+        initialTaskDate: destination == _Destination.calendar
+            ? _calendarDate
+            : defaults.dateFor(_today),
+        initialTaskCategory: _defaultTaskCategory(defaults),
         initialCategory:
             captureKind == RecordKind.event &&
                 calendar?.accountId == _localCalendarAccount
-            ? calendar!.calendarId
+            ? (calendar!.calendarId == 'general' ? '' : calendar.calendarId)
             : _preferredFocusCategory,
         categories: _categories(),
         noteToSelf: noteToSelf,
@@ -3013,6 +3053,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       drafts: _data.captures,
       onReview: _reviewCaptureText,
       onApply: _applyCaptureReview,
+      defaultTaskDate: _captureDefaults.dateFor,
+      defaultCategory: _reviewDefaultCategory,
       initialDraft: draft,
       onPlayDraft: mediaAvailable ? _playVoiceDraft : null,
       onAiReview: aiAvailable ? _reviewCaptureWithAi : null,
@@ -3219,8 +3261,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             TaskItem(
               id: id,
               title: draft.title,
-              category: draft.category ?? 'personal',
-              date: draft.dueDate ?? dateOnly(source.capturedAt),
+              category:
+                  draft.category ?? _reviewDefaultCategory(proposal) ?? '',
+              date:
+                  draft.dueDate ?? _captureDefaults.dateFor(source.capturedAt),
             ),
           );
         case CaptureEventDraft():
@@ -3233,7 +3277,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             CalendarEvent(
               id: id,
               title: draft.title,
-              category: draft.category ?? 'personal',
+              category:
+                  draft.category ?? _reviewDefaultCategory(proposal) ?? '',
               start: start,
               end: end,
               allDay: draft.allDay,
@@ -3247,7 +3292,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
               title: draft.title,
               body: draft.body,
               updated: source.capturedAt,
-              category: draft.category,
+              category: draft.category ?? _reviewDefaultCategory(proposal),
               noteToSelf: draft.noteToSelf,
             ),
           );
@@ -3477,6 +3522,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             onAssignPlace: _canAssignPlace(record)
                 ? () => Navigator.pop(context, 'place')
                 : null,
+            onAddSubtask: _canAddSubtask(record)
+                ? () => Navigator.pop(context, 'child')
+                : null,
+            onBreakdown: _canAddSubtask(record)
+                ? () => Navigator.pop(context, 'breakdown')
+                : null,
           ),
         ),
       ),
@@ -3499,6 +3550,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }
     if (action == 'place' && record is CalendarEvent) {
       await _assignPlace(record);
+    }
+    if (action == 'child' && record is TaskItem) await _addSubtask(record);
+    if (action == 'breakdown' && record is TaskItem) {
+      await _breakDownTask(record);
     }
   }
 
@@ -3786,35 +3841,6 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             when minutes >= 1 && minutes <= 1440)
           minutes,
     ];
-  }
-
-  Future<void> _search() async {
-    if (_reviewSaving) return;
-    final result = await showDialog<Object>(
-      context: context,
-      builder: (_) => _SearchDialog(
-        records: [
-          ..._standaloneEvents(_data.events),
-          ..._appleFeed.events.map(_fromApple),
-          for (final row in _icsFeed.events) row.event,
-          for (final event in {
-            for (final row in _internalFeed.events.reversed)
-              row.series.id: row.event,
-          }.values)
-            event,
-          ..._data.tasks,
-          ..._data.notes,
-        ],
-      ),
-    );
-    if (result == null || !mounted) return;
-    _navigate(switch (result) {
-      CalendarEvent() => _Destination.calendar,
-      TaskItem() => _Destination.tasks,
-      _ => _Destination.notes,
-    });
-    if (result is CalendarEvent) _changeDate(result.start);
-    await _openRecord(result);
   }
 
   Widget? _focusedContent(BuildContext context, FocusMode? mode) {
@@ -4211,6 +4237,18 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                                                 ? () => _assignPlace(
                                                     _inspected!
                                                         as CalendarEvent,
+                                                  )
+                                                : null,
+                                            onAddSubtask:
+                                                _canAddSubtask(_inspected)
+                                                ? () => _addSubtask(
+                                                    _inspected! as TaskItem,
+                                                  )
+                                                : null,
+                                            onBreakdown:
+                                                _canAddSubtask(_inspected)
+                                                ? () => _breakDownTask(
+                                                    _inspected! as TaskItem,
                                                   )
                                                 : null,
                                           ),

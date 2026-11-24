@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'appearance/appearance.dart' show readableTint;
 import 'calendar_page.dart';
 import 'capture/capture_review_sheet.dart' show CaptureReviewRequest;
 import 'capture/task_category_hint.dart';
@@ -17,6 +18,7 @@ class QuickCapture extends StatefulWidget {
     required this.date,
     required this.kind,
     this.initialCategory,
+    this.initialTaskCategory,
     this.initialTaskDate,
     this.noteToSelf = false,
     this.allowReview = false,
@@ -28,6 +30,7 @@ class QuickCapture extends StatefulWidget {
   final DateTime date;
   final RecordKind kind;
   final String? initialCategory;
+  final String? initialTaskCategory;
   final DateTime? initialTaskDate;
   final bool noteToSelf;
   final bool allowReview;
@@ -79,6 +82,7 @@ class _QuickCaptureState extends State<QuickCapture> {
       : (_kind == RecordKind.task
                 ? taskCategoryHint(_text.text, {..._categoryIds})
                 : null) ??
+            (_kind == RecordKind.task ? widget.initialTaskCategory : null) ??
             _noteCategory ??
             (_categoryIds.contains('personal') ? 'personal' : '');
 
@@ -346,7 +350,7 @@ class _QuickCaptureState extends State<QuickCapture> {
     final current = _kind == RecordKind.note ? _noteCategory : _category;
     final catalog = WorkspaceCategoryPalette.of(context);
     final activeIds = _categoryIds;
-    final label = catalog.labelFor(current);
+    final label = widget.categories[current] ?? catalog.labelFor(current);
     final tint = current == null || current.isEmpty
         ? muted
         : WorkspaceCategoryPalette.colorFor(context, current);
@@ -358,7 +362,7 @@ class _QuickCaptureState extends State<QuickCapture> {
         iconAlignment: IconAlignment.end,
         label: Text(label, overflow: TextOverflow.ellipsis),
         style: TextButton.styleFrom(
-          foregroundColor: tint,
+          foregroundColor: readableTint(tint, surface: paper, foreground: ink),
           padding: const EdgeInsets.symmetric(horizontal: 10),
         ),
       ),

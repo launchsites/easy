@@ -6,6 +6,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
+  test('civil date and interval queries use exact boundaries', () {
+    final index = SearchIndex.build([
+      for (final day in [27, 28, 29])
+        SearchDocument(
+          key: SearchKey(SearchRecordKind.task, '$day'),
+          title: 'Meeting $day',
+          date: DateTime(2024, 2, day, 23, 40),
+        ),
+      const SearchDocument(
+        key: SearchKey(SearchRecordKind.task, 'undated'),
+        title: 'Undated meeting',
+      ),
+    ]);
+    Iterable<String> ids(String query) => index
+        .search(WorkspaceSearchQuery(query))
+        .map((hit) => hit.document.key.id);
+    expect(ids('on:2024-02-29'), ['29']);
+    expect(ids('meeting after:2024-02-27 before:2024-03-01'), ['29', '28']);
+    expect(ids('date:2024-02-28 before:2024-02-28'), isEmpty);
+    expect(ids('on:2025-02-29'), isEmpty);
+    expect(ids('on:2024-2-29'), isEmpty);
+    expect(ids('meeting before:2024-02-28'), ['27']);
+  });
+
   const noteKey = SearchKey(SearchRecordKind.note, 'n');
   const taskKey = SearchKey(SearchRecordKind.task, 't');
   const eventKey = SearchKey(SearchRecordKind.event, 'e');

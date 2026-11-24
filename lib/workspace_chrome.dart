@@ -484,6 +484,8 @@ class _RecordDetails extends StatelessWidget {
     this.onRepeat,
     this.repeatingTask = false,
     this.onAssignPlace,
+    this.onAddSubtask,
+    this.onBreakdown,
   });
 
   final Object record;
@@ -497,6 +499,8 @@ class _RecordDetails extends StatelessWidget {
   final VoidCallback? onRepeat;
   final bool repeatingTask;
   final VoidCallback? onAssignPlace;
+  final VoidCallback? onAddSubtask;
+  final VoidCallback? onBreakdown;
 
   @override
   Widget build(BuildContext context) {
@@ -655,88 +659,19 @@ class _RecordDetails extends StatelessWidget {
                       onPressed: onAssignPlace,
                       child: const Text('Travel place'),
                     ),
+                  if (onAddSubtask != null)
+                    TextButton(
+                      onPressed: onAddSubtask,
+                      child: const Text('Add subtask'),
+                    ),
+                  if (onBreakdown != null)
+                    TextButton(
+                      onPressed: onBreakdown,
+                      child: const Text('Break down'),
+                    ),
                 ],
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SearchDialog extends StatefulWidget {
-  const _SearchDialog({required this.records});
-
-  final List<Object> records;
-
-  @override
-  State<_SearchDialog> createState() => _SearchDialogState();
-}
-
-class _SearchDialogState extends State<_SearchDialog> {
-  var _query = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final results = widget.records
-        .where(
-          (record) =>
-              _recordTitle(record)
-                  .toLowerCase()
-                  .contains(_query.trim().toLowerCase()),
-        )
-        .take(30)
-        .toList();
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 480),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                autofocus: true,
-                onChanged: (value) => setState(() => _query = value),
-                onSubmitted: (_) {
-                  if (results.isNotEmpty) Navigator.pop(context, results.first);
-                },
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  hintText: 'Search workspace',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            Flexible(
-              child: results.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Text('No matching items.'),
-                    )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.only(bottom: 12),
-                      itemCount: results.length,
-                      itemBuilder: (context, index) {
-                        final result = results[index];
-                        final kind = _recordKind(result);
-                        return ListTile(
-                          leading: Icon(switch (kind) {
-                            RecordKind.event => Icons.calendar_today_outlined,
-                            RecordKind.task => Icons.check_box_outlined,
-                            RecordKind.note => Icons.notes_rounded,
-                          }),
-                          title: Text(_recordTitle(result)),
-                          subtitle: Text(spaceName(kind.name)),
-                          onTap: () => Navigator.pop(context, result),
-                        );
-                      },
-                    ),
-            ),
           ],
         ),
       ),

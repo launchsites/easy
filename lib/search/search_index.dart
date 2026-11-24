@@ -19,10 +19,12 @@ typedef _Query = ({
   List<_Term> terms,
   Set<SearchRecordKind> kinds,
   bool impossible,
+  int? firstDay,
+  int? lastDay,
 });
 
 final _querySyntax = RegExp(
-  r'(?:(title|body|category|type):)?(?:"([^"]*)"|([^\s"]+))',
+  r'(?:(title|body|category|type|date|on|before|after):)?(?:"([^"]*)"|([^\s"]+))',
   caseSensitive: false,
 );
 
@@ -30,6 +32,8 @@ _Query _parse(String input) {
   final terms = <_Term>{};
   final kinds = <SearchRecordKind>{};
   var impossible = false;
+  int? firstDay;
+  int? lastDay;
   final source = input.length <= 4000 ? input : input.substring(0, 4000);
   for (final match in _querySyntax.allMatches(source)) {
     final modifier = match.group(1)?.toLowerCase();
@@ -41,6 +45,22 @@ _Query _parse(String input) {
         impossible = true;
       } else {
         kinds.add(kind);
+      }
+      continue;
+    }
+    if (const {'date', 'on', 'before', 'after'}.contains(modifier)) {
+      final day = _parseDay(value.trim());
+      if (day == null) {
+        impossible = true;
+      } else {
+        if (modifier != 'before') {
+          final first = day + (modifier == 'after' ? 1 : 0);
+          firstDay = firstDay == null ? first : math.max(firstDay, first);
+        }
+        if (modifier != 'after') {
+          final last = day - (modifier == 'before' ? 1 : 0);
+          lastDay = lastDay == null ? last : math.min(lastDay, last);
+        }
       }
       continue;
     }
@@ -58,8 +78,33 @@ _Query _parse(String input) {
       if (terms.length >= _queryTermLimit) break;
     }
   }
-  return (terms: terms.toList(), kinds: kinds, impossible: impossible);
+  return (
+    terms: terms.toList(),
+    kinds: kinds,
+    impossible:
+        impossible ||
+        (firstDay != null && lastDay != null && firstDay > lastDay),
+    firstDay: firstDay,
+    lastDay: lastDay,
+  );
 }
+
+final _isoDay = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$');
+
+int? _parseDay(String value) {
+  final match = _isoDay.firstMatch(value);
+  if (match == null) return null;
+  final year = int.parse(match.group(1)!);
+  final month = int.parse(match.group(2)!);
+  final day = int.parse(match.group(3)!);
+  final date = DateTime.utc(year, month, day);
+  return year > 0 && date.year == year && date.month == month && date.day == day
+      ? _dayOrdinal(date)
+      : null;
+}
+
+int _dayOrdinal(DateTime date) =>
+    date.year * 10000 + date.month * 100 + date.day;
 
 class SearchIndex {
   SearchIndex._(
@@ -68,6 +113,8 @@ class SearchIndex {
     this._titlePhrases,
     this._postings,
     this._vocabulary,
+    this._days,
+    this._dated,
     this.kinds,
     this.pinnedKeys,
   );
@@ -79,10 +126,18 @@ class SearchIndex {
     final postings = <String, List<int>>{};
     final kinds = <SearchRecordKind>{};
     final pinned = <SearchKey>[];
+    final dayOrdinals = <int>[];
+    final datedSlots = <int>[];
     for (final document in source) {
       if (positions.containsKey(document.key)) continue;
       final index = documents.length;
       documents.add(document);
+      final date = document.date?.toLocal();
+      final ordinal = date != null && date.year >= 1 && date.year <= 9999
+          ? _dayOrdinal(date)
+          : 0;
+      dayOrdinals.add(ordinal);
+      if (ordinal != 0) datedSlots.add(index);
       positions[document.key] = index;
       kinds.add(document.key.kind);
       if (document.pinned) pinned.add(document.key);
@@ -123,6 +178,10 @@ class SearchIndex {
         ),
       ),
       List.unmodifiable(postings.keys.toList()..sort()),
+      Int32List.fromList(dayOrdinals),
+      Uint32List.fromList(
+        datedSlots..sort((a, b) => dayOrdinals[a].compareTo(dayOrdinals[b])),
+      ),
       Set.unmodifiable(kinds),
       List.unmodifiable(pinned),
     );
@@ -133,6 +192,8 @@ class SearchIndex {
   final List<String> _titlePhrases;
   final Map<String, Uint32List> _postings;
   final List<String> _vocabulary;
+  final Int32List _days;
+  final Uint32List _dated;
   final Set<SearchRecordKind> kinds;
   final List<SearchKey> pinnedKeys;
 
@@ -160,13 +221,24 @@ class SearchIndex {
     if (limit < 1) return const [];
     final maximum = math.min(limit, 100);
     final parsed = _parse(query.text);
+    final firstDay = parsed.firstDay;
+    final lastDay = parsed.lastDay;
+    final hasDateFilter = firstDay != null || lastDay != null;
     if (parsed.impossible ||
         (parsed.terms.isEmpty &&
             parsed.kinds.isEmpty &&
+            !hasDateFilter &&
             query.text.trim().isNotEmpty)) {
       return const [];
     }
     bool allowed(int slot) {
+      final day = _days[slot];
+      if (hasDateFilter &&
+          (day == 0 ||
+              (firstDay != null && day < firstDay) ||
+              (lastDay != null && day > lastDay))) {
+        return false;
+      }
       final document = _documents[slot];
       return (parsed.kinds.isEmpty ||
               parsed.kinds.contains(document.key.kind)) &&
@@ -196,6 +268,15 @@ class SearchIndex {
 
     final ranking = SplayTreeSet<({int slot, int score})>(compare);
     Iterable<int> unranked() sync* {
+      if (hasDateFilter) {
+        final start = firstDay == null ? 0 : _findDay(firstDay);
+        final end = lastDay == null ? _dated.length : _findDay(lastDay + 1);
+        for (var index = start; index < end; index++) {
+          final slot = _dated[index];
+          if (allowed(slot)) yield slot;
+        }
+        return;
+      }
       for (var slot = 0; slot < _documents.length; slot++) {
         if (allowed(slot)) yield slot;
       }
@@ -233,6 +314,20 @@ class SearchIndex {
           snippet: searchSnippet(_documents[ranked.slot].body, match: terms),
         ),
     ];
+  }
+
+  int _findDay(int day) {
+    var low = 0;
+    var high = _dated.length;
+    while (low < high) {
+      final mid = (low + high) ~/ 2;
+      if (_days[_dated[mid]] < day) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return low;
   }
 
   ({List<int> slots, Uint16List scores}) _scoreTerms(

@@ -1,7 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../categories/category_palette.dart';
+
 import '../ui_theme.dart';
-import '../workspace_data.dart' show spaceName;
 import 'capture_archive.dart';
 import 'capture_interpreter.dart';
 
@@ -37,6 +38,8 @@ class CaptureReviewSheet extends StatefulWidget {
     this.onCancelAi,
     this.onTranscribe,
     this.onCancelTranscription,
+    this.defaultTaskDate,
+    this.defaultCategory,
     this.disabledKinds = const {},
     super.key,
   });
@@ -51,6 +54,8 @@ class CaptureReviewSheet extends StatefulWidget {
   final VoidCallback? onCancelAi;
   final Future<CaptureArchiveEntry> Function(CaptureArchiveEntry)? onTranscribe;
   final VoidCallback? onCancelTranscription;
+  final DateTime? Function(DateTime)? defaultTaskDate;
+  final String? Function(CaptureProposal)? defaultCategory;
   final Set<CaptureIntentKind> disabledKinds;
 
   @override
@@ -342,6 +347,8 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
                       _ProposalTile(
                         proposal: proposal,
                         anchor: review.input.context.anchor,
+                        defaultTaskDate: widget.defaultTaskDate,
+                        defaultCategory: widget.defaultCategory,
                         featureDisabled: widget.disabledKinds.contains(
                           proposal.draft.kind,
                         ),
@@ -444,6 +451,8 @@ class _ProposalTile extends StatelessWidget {
     required this.selected,
     required this.toggle,
     required this.featureDisabled,
+    required this.defaultTaskDate,
+    required this.defaultCategory,
   });
 
   final CaptureProposal proposal;
@@ -451,6 +460,8 @@ class _ProposalTile extends StatelessWidget {
   final bool selected;
   final ValueChanged<bool?>? toggle;
   final bool featureDisabled;
+  final DateTime? Function(DateTime)? defaultTaskDate;
+  final String? Function(CaptureProposal)? defaultCategory;
 
   @override
   Widget build(BuildContext context) {
@@ -471,16 +482,21 @@ class _ProposalTile extends StatelessWidget {
     };
     final category =
         draft.category ??
-        switch (draft.kind) {
-          CaptureIntentKind.task || CaptureIntentKind.event => 'personal',
-          CaptureIntentKind.workout => 'gym',
-          CaptureIntentKind.meal => 'health',
-          _ => null,
-        };
+        (defaultCategory != null
+            ? defaultCategory!(proposal)
+            : switch (draft.kind) {
+                CaptureIntentKind.task || CaptureIntentKind.event => 'personal',
+                CaptureIntentKind.workout => 'gym',
+                CaptureIntentKind.meal => 'health',
+                _ => null,
+              });
+    final preferred = defaultTaskDate == null
+        ? anchor
+        : defaultTaskDate!(anchor);
     final detail = switch (draft) {
       CaptureTaskDraft(:final dueDate) =>
         dueDate == null
-            ? 'Due ${date(anchor)} (default)'
+            ? (preferred == null ? 'Inbox' : '${date(preferred)} (default)')
             : 'Due ${date(dueDate)}',
       CaptureEventDraft(:final start?, :final end?, :final allDay) =>
         allDay
@@ -501,7 +517,8 @@ class _ProposalTile extends StatelessWidget {
           subtitle: Text(
             [
               label,
-              if (category != null) spaceName(category),
+              if (category != null)
+                WorkspaceCategoryPalette.labelFor(context, category),
               if (featureDisabled) 'Feature turned off',
               if (proposal.requiresSelection) 'AI suggestion',
               ?detail,
