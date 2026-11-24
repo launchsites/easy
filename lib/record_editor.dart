@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'calendar_page.dart';
 import 'list_pages.dart';
+import 'notes/note_preview.dart';
 import 'ui_theme.dart' show accent, ink, line, muted, paper, raisedPaper;
 import 'workspace_data.dart' show spaceColor, spaceColors, spaceName;
 
@@ -17,6 +18,7 @@ class RecordEditor extends StatefulWidget {
     this.initialTaskDate,
     this.initialCategory,
     this.taskItems = const [],
+    this.noteTargets = const [],
     this.initialTaskParentId,
     super.key,
   });
@@ -29,6 +31,7 @@ class RecordEditor extends StatefulWidget {
   final DateTime? initialTaskDate;
   final String? initialCategory;
   final List<TaskItem> taskItems;
+  final List<NoteTarget> noteTargets;
   final String? initialTaskParentId;
 
   @override
@@ -45,11 +48,17 @@ class _RecordEditorState extends State<RecordEditor> {
   late final TextEditingController _title;
   late final TextEditingController _location;
   late final TextEditingController _body;
+  late final TextEditingController _noteFolder;
+  late final TextEditingController _noteTagText;
   late final TextEditingController _taskNotes;
   late final TextEditingController _estimate;
   late final TextEditingController _minimumChunk;
   late final String _taskId;
   late List<String> _prerequisiteIds;
+  late final List<NoteLink> _noteLinks;
+  late bool _notePinned;
+  bool _previewNote = false;
+  bool _showNoteDetails = false;
   late bool _allowSplit;
   late RecordKind _kind;
   late String _category;
@@ -82,6 +91,10 @@ class _RecordEditorState extends State<RecordEditor> {
     );
     _location = TextEditingController(text: event?.location);
     _body = TextEditingController(text: note?.body);
+    _noteFolder = TextEditingController(text: note?.folder);
+    _noteTagText = TextEditingController(text: note?.tags.join(', '));
+    _noteLinks = [...?note?.links];
+    _notePinned = note?.pinned ?? false;
     _estimate = TextEditingController(text: task?.estimatedMinutes?.toString());
     _minimumChunk = TextEditingController(
       text: (task?.minimumChunkMinutes ?? defaultTaskChunkMinutes).toString(),
@@ -141,6 +154,8 @@ class _RecordEditorState extends State<RecordEditor> {
     _title.dispose();
     _location.dispose();
     _body.dispose();
+    _noteFolder.dispose();
+    _noteTagText.dispose();
     _estimate.dispose();
     _taskNotes.dispose();
     _minimumChunk.dispose();
@@ -425,19 +440,45 @@ class _RecordEditorState extends State<RecordEditor> {
           ),
         );
       case RecordKind.note:
-        Navigator.of(context).pop(
-          NoteItem(
-            id: widget.note?.id ?? newId,
-            title: title,
-            body: _body.text,
-            updated: now,
-            category: widget.note == null
-                ? widget.initialCategory
-                : widget.note!.category,
-            noteToSelf: widget.note?.noteToSelf ?? false,
-          ),
-        );
+        Navigator.of(context).pop(_noteRecord(id: newId, updated: now));
     }
+  }
+
+  NoteItem _noteRecord({required String id, required DateTime updated}) {
+    final existing = widget.note;
+    final folder = _noteFolder.text.trim();
+    return NoteItem(
+      id: existing?.id ?? id,
+      title: _title.text.trim(),
+      body: _body.text,
+      updated: updated,
+      category: existing == null ? widget.initialCategory : existing.category,
+      noteToSelf: existing?.noteToSelf ?? false,
+      pinned: _notePinned,
+      folder: existing != null && _noteFolder.text == (existing.folder ?? '')
+          ? existing.folder
+          : folder.isEmpty
+          ? null
+          : folder,
+      tags: existing != null && _noteTagText.text == existing.tags.join(', ')
+          ? existing.tags
+          : noteTags(_noteTagText.text),
+      links: List.unmodifiable(_noteLinks),
+    );
+  }
+
+  Future<void> _linkNoteTarget() async {
+    final alreadyLinked = _noteLinks.toSet();
+    final choices = [
+      for (final target in widget.noteTargets)
+        if (!alreadyLinked.contains(target.link)) target,
+    ];
+    if (choices.isEmpty) return;
+    final target = await showDialog<NoteTarget>(
+      context: context,
+      builder: (context) => _NoteTargetPicker(targets: choices),
+    );
+    if (mounted && target != null) setState(() => _noteLinks.add(target.link));
   }
 
   String _dateLabel(DateTime date) =>
@@ -954,6 +995,129 @@ class _RecordEditorState extends State<RecordEditor> {
     ];
   }
 
+  List<Widget> _noteFields() => [
+    if (_previewNote)
+      DecoratedBox(
+        decoration: BoxDecoration(
+          color: raisedPaper,
+          border: Border.all(color: line),
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: _body.text.trim().isEmpty
+              ? const Text(
+                  'This note is empty.',
+                  style: TextStyle(color: muted),
+                )
+              : NotePreview(
+                  note: _noteRecord(id: 'preview', updated: widget.date),
+                  targets: widget.noteTargets,
+                ),
+        ),
+      )
+    else
+      TextFormField(
+        key: const ValueKey('note-markdown-source'),
+        controller: _body,
+        decoration: _decoration('Note'),
+        minLines: 4,
+        maxLines: 12,
+        keyboardType: TextInputType.multiline,
+        textCapitalization: TextCapitalization.sentences,
+      ),
+    const SizedBox(height: 5),
+    Wrap(
+      spacing: 4,
+      children: [
+        TextButton.icon(
+          icon: Icon(
+            _previewNote ? Icons.edit_outlined : Icons.visibility_outlined,
+            size: 16,
+          ),
+          label: Text(_previewNote ? 'Edit text' : 'Preview'),
+          onPressed: () {
+            FocusScope.of(context).unfocus();
+            setState(() => _previewNote = !_previewNote);
+          },
+        ),
+        Semantics(
+          expanded: _showNoteDetails,
+          child: TextButton.icon(
+            icon: Icon(
+              _showNoteDetails
+                  ? Icons.expand_less_rounded
+                  : Icons.expand_more_rounded,
+              size: 18,
+            ),
+            iconAlignment: IconAlignment.end,
+            label: const Text('Organise'),
+            onPressed: () =>
+                setState(() => _showNoteDetails = !_showNoteDetails),
+          ),
+        ),
+      ],
+    ),
+    if (_showNoteDetails) ...[
+      _propertyPanel([
+        SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 13),
+          title: const Text('Pin note'),
+          value: _notePinned,
+          onChanged: (pinned) => setState(() => _notePinned = pinned),
+        ),
+      ]),
+      const SizedBox(height: 10),
+      TextFormField(
+        key: const ValueKey('note-folder'),
+        controller: _noteFolder,
+        decoration: _decoration('Folder'),
+        textInputAction: TextInputAction.next,
+        textCapitalization: TextCapitalization.words,
+      ),
+      const SizedBox(height: 10),
+      TextFormField(
+        key: const ValueKey('note-tags'),
+        controller: _noteTagText,
+        decoration: _decoration('Tags')
+            .copyWith(hintText: 'Separate tags with commas'),
+      ),
+      if (_noteLinks.isNotEmpty || widget.noteTargets.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        _propertyPanel([
+          for (final link in _noteLinks)
+            ListTile(
+              title: Text(
+                widget.noteTargets
+                        .where((target) => target.link == link)
+                        .firstOrNull
+                        ?.title ??
+                    link.title ??
+                    link.kind.label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(link.kind.label),
+              trailing: IconButton(
+                tooltip: 'Remove ${link.kind.label.toLowerCase()} link',
+                onPressed: () => setState(() => _noteLinks.remove(link)),
+                icon: const Icon(Icons.close_rounded, size: 19),
+              ),
+            ),
+          if (widget.noteTargets.any(
+            (target) => !_noteLinks.contains(target.link),
+          ))
+            ListTile(
+              leading: const Icon(Icons.link_rounded, color: accent),
+              title: const Text('Link task or event'),
+              trailing: const Icon(Icons.chevron_right_rounded, color: muted),
+              onTap: _linkNoteTarget,
+            ),
+        ]),
+      ],
+    ],
+  ];
+
   Widget _editorFields(double inset) {
     return Padding(
       padding: EdgeInsets.fromLTRB(inset, 2, inset, 14),
@@ -985,16 +1149,7 @@ class _RecordEditorState extends State<RecordEditor> {
             ...switch (_kind) {
               RecordKind.task => _taskFields(),
               RecordKind.event => _eventFields(),
-              RecordKind.note => [
-                TextFormField(
-                  controller: _body,
-                  decoration: _decoration('Note'),
-                  minLines: 4,
-                  maxLines: 12,
-                  keyboardType: TextInputType.multiline,
-                  textCapitalization: TextCapitalization.sentences,
-                ),
-              ],
+              RecordKind.note => _noteFields(),
             },
           ],
         ),
@@ -1116,6 +1271,98 @@ class _RecordEditorState extends State<RecordEditor> {
                 },
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NoteTargetPicker extends StatefulWidget {
+  const _NoteTargetPicker({required this.targets});
+
+  final List<NoteTarget> targets;
+
+  @override
+  State<_NoteTargetPicker> createState() => _NoteTargetPickerState();
+}
+
+class _NoteTargetPickerState extends State<_NoteTargetPicker> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final targets = _query.isEmpty
+        ? widget.targets
+        : widget.targets
+              .where((target) => target.title.toLowerCase().contains(_query))
+              .toList();
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: SizedBox(
+        width: 420,
+        height: 380,
+        child: LayoutBuilder(
+          builder: (context, constraints) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (constraints.maxHeight >= 190)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 12, 9, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Link a record',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close link picker',
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+              if (constraints.maxHeight >= 130)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
+                  child: TextField(
+                    onChanged: (value) =>
+                        setState(() => _query = value.trim().toLowerCase()),
+                    decoration: const InputDecoration(
+                      labelText: 'Find a task or event',
+                      prefixIcon: Icon(Icons.search_rounded),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: targets.isEmpty
+                    ? const Center(child: Text('No matching records.'))
+                    : ListView.builder(
+                        itemCount: targets.length,
+                        itemBuilder: (context, index) {
+                          final target = targets[index];
+                          return ListTile(
+                            leading: Icon(switch (target.kind) {
+                              NoteLinkKind.task => Icons.check_box_outlined,
+                              NoteLinkKind.event =>
+                                Icons.calendar_today_outlined,
+                            }),
+                            title: Text(
+                              target.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(target.kind.label),
+                            onTap: () => Navigator.pop(context, target),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
         ),
       ),

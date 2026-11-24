@@ -176,6 +176,60 @@ void main() {
     expect(grandchildTitle, findsOneWidget);
   });
 
+  testWidgets('the first task clears the dock in short landscape', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(568, 320);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const dock = ValueKey('dock');
+    TaskItem? toggled;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: easyTheme(),
+        home: Scaffold(
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              Column(
+                children: [
+                  const SizedBox(height: 48),
+                  Expanded(
+                    child: TasksPage(
+                      tasks: const [root],
+                      onToggle: (task) => toggled = task,
+                      onTaskTap: (_) {},
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                left: 20,
+                bottom: 20,
+                width: 56,
+                height: 56,
+                child: FloatingActionButton(
+                  key: dock,
+                  onPressed: () {},
+                  child: const Icon(Icons.grid_view_rounded),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final checkbox = find.byType(Checkbox);
+    expect(
+      tester.getRect(checkbox).bottom,
+      lessThan(tester.getRect(find.byKey(dock)).top),
+    );
+    await tester.tap(checkbox);
+    expect(toggled, same(root));
+  });
+
   testWidgets('task editor excludes descendants and saves optional details', (
     tester,
   ) async {

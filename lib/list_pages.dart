@@ -1,31 +1,16 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 
+import 'notes/note_model.dart';
 import 'task_model.dart';
 import 'ui_theme.dart';
 import 'workspace_data.dart' show spaceColor, spaceName;
 
+export 'notes/note_model.dart';
 export 'task_model.dart';
 
 const _softSurface = Color(0xFFF1F0E9);
 const _overdueInk = Color(0xFF954A3D);
-
-class NoteItem {
-  const NoteItem({
-    required this.id,
-    required this.title,
-    required this.body,
-    required this.updated,
-    this.category,
-    this.noteToSelf = false,
-  });
-
-  final String id;
-  final String title;
-  final String body;
-  final DateTime updated;
-  final String? category;
-  final bool noteToSelf;
-}
 
 enum _TaskFilter {
   all('All'),
@@ -489,6 +474,24 @@ class _NotesPageState extends State<NotesPage> {
   final _search = TextEditingController();
   final _searchFocus = FocusNode();
   bool _searchOpen = false;
+  _NoteFilters _filters = const _NoteFilters();
+  late List<NoteItem> _ordered;
+  late List<NoteItem> _matching;
+  late List<String> _folders;
+  late List<String> _tags;
+  late bool _hasPinned;
+
+  @override
+  void initState() {
+    super.initState();
+    _indexNotes();
+  }
+
+  @override
+  void didUpdateWidget(covariant NotesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!listEquals(widget.notes, oldWidget.notes)) _indexNotes();
+  }
 
   @override
   void dispose() {
@@ -498,43 +501,130 @@ class _NotesPageState extends State<NotesPage> {
   }
 
   void _toggleSearch() {
-    setState(() => _searchOpen = !_searchOpen);
+    setState(() {
+      _searchOpen = !_searchOpen;
+      if (!_searchOpen) {
+        _search.clear();
+        _refreshMatches();
+      }
+    });
     if (_searchOpen) {
       _searchFocus.requestFocus();
     } else {
-      _search.clear();
       _searchFocus.unfocus();
+    }
+  }
+
+  void _indexNotes() {
+    _ordered = [...widget.notes]
+      ..sort((first, second) {
+        final pinOrder = (second.pinned ? 1 : 0) - (first.pinned ? 1 : 0);
+        return pinOrder != 0
+            ? pinOrder
+            : second.updated.compareTo(first.updated);
+      });
+    _folders = _filterChoices(_ordered.map((note) => note.folder).nonNulls);
+    _tags = _filterChoices(_ordered.expand((note) => note.tags));
+    _hasPinned = _ordered.any((note) => note.pinned);
+    final current = _filters;
+    _filters = _NoteFilters(
+      pinned: current.pinned && _hasPinned,
+      folder: _folders.contains(current.folder) ? current.folder : null,
+      tag: _tags.contains(current.tag) ? current.tag : null,
+    );
+    _refreshMatches();
+  }
+
+  List<String> _filterChoices(Iterable<String> values) =>
+      [
+        ...{
+          for (final value in values)
+            if (value.trim().isNotEmpty) value.toLowerCase(): value,
+        }.values,
+      ]..sort(
+        (first, second) => first.toLowerCase().compareTo(second.toLowerCase()),
+      );
+
+  void _refreshMatches() {
+    final query = _search.text.trim().toLowerCase();
+    final folder = _filters.folder?.toLowerCase();
+    final tag = _filters.tag?.toLowerCase();
+    if (query.isEmpty && !_filters.active) {
+      _matching = _ordered;
+      return;
+    }
+    _matching = [
+      for (final note in _ordered)
+        if ((!_filters.pinned || note.pinned) &&
+            (folder == null || note.folder?.toLowerCase() == folder) &&
+            (tag == null ||
+                note.tags.any((value) => value.toLowerCase() == tag)) &&
+            (query.isEmpty ||
+                note.title.toLowerCase().contains(query) ||
+                note.body.toLowerCase().contains(query) ||
+                (note.folder?.toLowerCase().contains(query) ?? false) ||
+                note.tags.any((value) => value.toLowerCase().contains(query))))
+          note,
+    ];
+  }
+
+  Future<void> _changeFilters() async {
+    final selected = await showDialog<_NoteFilters>(
+      context: context,
+      builder: (context) => _NoteFilterDialog(
+        initial: _filters,
+        folders: _folders,
+        tags: _tags,
+        hasPinned: _hasPinned,
+      ),
+    );
+    if (mounted && selected != null) {
+      setState(() {
+        _filters = selected;
+        _refreshMatches();
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final query = _search.text.trim().toLowerCase();
-    final notes =
-        widget.notes
-            .where(
-              (note) =>
-                  note.title.toLowerCase().contains(query) ||
-                  note.body.toLowerCase().contains(query),
-            )
-            .toList()
-          ..sort((a, b) => b.updated.compareTo(a.updated));
+    final filtered = _filters.active || _search.text.trim().isNotEmpty;
+    final notes = _matching;
     return _ListPageLayout(
       title: 'Notes',
       scrollKey: const PageStorageKey('notes-scroll'),
       inlineActions: true,
-      actions: IconButton.outlined(
-        tooltip: _searchOpen ? 'Close note search' : 'Search notes',
-        onPressed: _toggleSearch,
-        style: IconButton.styleFrom(
-          foregroundColor: ink,
-          backgroundColor: _searchOpen ? softAccent : raisedPaper,
-          side: const BorderSide(color: line),
-        ),
-        icon: Icon(
-          _searchOpen ? Icons.close_rounded : Icons.search_rounded,
-          size: 20,
-        ),
+      actions: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_folders.isNotEmpty || _tags.isNotEmpty || _hasPinned) ...[
+            IconButton.outlined(
+              tooltip: _filters.active ? 'Filters applied' : 'Filter notes',
+              onPressed: _changeFilters,
+              isSelected: _filters.active,
+              style: IconButton.styleFrom(
+                foregroundColor: ink,
+                backgroundColor: _filters.active ? softAccent : raisedPaper,
+                side: const BorderSide(color: line),
+              ),
+              icon: const Icon(Icons.filter_list_rounded, size: 20),
+            ),
+            const SizedBox(width: 5),
+          ],
+          IconButton.outlined(
+            tooltip: _searchOpen ? 'Close note search' : 'Search notes',
+            onPressed: _toggleSearch,
+            style: IconButton.styleFrom(
+              foregroundColor: ink,
+              backgroundColor: _searchOpen ? softAccent : raisedPaper,
+              side: const BorderSide(color: line),
+            ),
+            icon: Icon(
+              _searchOpen ? Icons.close_rounded : Icons.search_rounded,
+              size: 20,
+            ),
+          ),
+        ],
       ),
       slivers: (_) => [
         if (_searchOpen)
@@ -544,7 +634,7 @@ class _NotesPageState extends State<NotesPage> {
               child: TextField(
                 controller: _search,
                 focusNode: _searchFocus,
-                onChanged: (_) => setState(() {}),
+                onChanged: (_) => setState(_refreshMatches),
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Search notes',
@@ -567,7 +657,7 @@ class _NotesPageState extends State<NotesPage> {
         if (notes.isEmpty)
           SliverToBoxAdapter(
             child: _EmptyList(
-              message: query.isEmpty ? 'No notes yet' : 'No matching notes',
+              message: filtered ? 'No matching notes' : 'No notes yet',
             ),
           ),
         SliverList.separated(
@@ -614,7 +704,14 @@ class _NoteRow extends StatelessWidget {
           padding: const EdgeInsetsDirectional.fromSTEB(5, 10, 7, 10),
           child: Row(
             children: [
-              const Icon(Icons.description_outlined, size: 20, color: accent),
+              Icon(
+                note.pinned
+                    ? Icons.push_pin_outlined
+                    : Icons.description_outlined,
+                size: 20,
+                color: accent,
+                semanticLabel: note.pinned ? 'Pinned' : null,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -639,6 +736,9 @@ class _NoteRow extends StatelessWidget {
                             text: updated,
                             style: const TextStyle(fontWeight: FontWeight.w500),
                           ),
+                          if (note.folder case final folder?
+                              when folder.isNotEmpty)
+                            TextSpan(text: '  ·  $folder'),
                           if (preview.isNotEmpty)
                             TextSpan(text: '  ·  $preview'),
                         ],
@@ -656,6 +756,109 @@ class _NoteRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _NoteFilters {
+  const _NoteFilters({this.pinned = false, this.folder, this.tag});
+
+  final bool pinned;
+  final String? folder;
+  final String? tag;
+
+  bool get active => pinned || folder != null || tag != null;
+}
+
+class _NoteFilterDialog extends StatefulWidget {
+  const _NoteFilterDialog({
+    required this.initial,
+    required this.folders,
+    required this.tags,
+    required this.hasPinned,
+  });
+
+  final _NoteFilters initial;
+  final List<String> folders;
+  final List<String> tags;
+  final bool hasPinned;
+
+  @override
+  State<_NoteFilterDialog> createState() => _NoteFilterDialogState();
+}
+
+class _NoteFilterDialogState extends State<_NoteFilterDialog> {
+  late bool _pinned = widget.initial.pinned;
+  late String? _folder = widget.initial.folder;
+  late String? _tag = widget.initial.tag;
+
+  Widget _selection({
+    required String title,
+    required String allLabel,
+    required String? initial,
+    required List<String> options,
+    required ValueChanged<String?> change,
+  }) => DropdownButtonFormField<String>(
+    initialValue: initial,
+    decoration: InputDecoration(labelText: title),
+    hint: Text(allLabel),
+    isExpanded: true,
+    items: [
+      DropdownMenuItem(child: Text(allLabel)),
+      for (final option in options)
+        DropdownMenuItem(
+          value: option,
+          child: Text(option, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+    ],
+    onChanged: change,
+  );
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
+    title: const Text('Filter notes'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.hasPinned)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Pinned only'),
+            value: _pinned,
+            onChanged: (value) => setState(() => _pinned = value),
+          ),
+        if (widget.folders.isNotEmpty)
+          _selection(
+            title: 'Folder',
+            allLabel: 'All folders',
+            initial: _folder,
+            options: widget.folders,
+            change: (value) => setState(() => _folder = value),
+          ),
+        if (widget.tags.isNotEmpty)
+          _selection(
+            title: 'Tag',
+            allLabel: 'All tags',
+            initial: _tag,
+            options: widget.tags,
+            change: (value) => setState(() => _tag = value),
+          ),
+      ],
+    ),
+    actions: [
+      if (widget.initial.active || _pinned || _folder != null || _tag != null)
+        TextButton(
+          onPressed: () => Navigator.pop(context, const _NoteFilters()),
+          child: const Text('Clear filters'),
+        ),
+      FilledButton(
+        onPressed: () => Navigator.pop(
+          context,
+          _NoteFilters(pinned: _pinned, folder: _folder, tag: _tag),
+        ),
+        child: const Text('Apply'),
+      ),
+    ],
+  );
 }
 
 class _EmptyList extends StatelessWidget {
@@ -700,11 +903,23 @@ class _ListPageLayout extends StatelessWidget {
         final wide =
             availableWidth >= 625 &&
             MediaQuery.textScalerOf(context).scale(16) < 24;
+        final shortLandscape =
+            !inlineActions &&
+            mobile &&
+            constraints.maxHeight < 355 &&
+            availableWidth >= 440 &&
+            MediaQuery.textScalerOf(context).scale(14) <= 18;
+        final titleStyle = workspaceHeadingStyle(mobile);
         final header = Semantics(
           header: true,
-          child: Text(title, style: workspaceHeadingStyle(mobile)),
+          child: Text(
+            title,
+            style: shortLandscape
+                ? titleStyle.copyWith(fontSize: 36, letterSpacing: -1.8)
+                : titleStyle,
+          ),
         );
-        final head = wide || inlineActions
+        final head = wide || inlineActions || shortLandscape
             ? Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -724,9 +939,9 @@ class _ListPageLayout extends StatelessWidget {
             SliverPadding(
               padding: EdgeInsetsDirectional.fromSTEB(
                 horizontal,
-                mobile ? 25 : 42,
+                shortLandscape ? 12 : (mobile ? 25 : 42),
                 endInset,
-                mobile ? 20 : 26,
+                shortLandscape ? 13 : (mobile ? 20 : 26),
               ),
               sliver: SliverToBoxAdapter(child: head),
             ),
