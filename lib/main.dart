@@ -66,6 +66,7 @@ import 'health/health.dart';
 import 'insights/insights.dart';
 import 'list_pages.dart';
 import 'mobile_home.dart';
+import 'nutrition/android_meal_photo_recovery.dart';
 import 'notes/note_preview.dart';
 import 'nutrition/meal_vision_review.dart';
 import 'nutrition/nutrition.dart';
@@ -139,6 +140,7 @@ part 'workspace_task_completion.dart';
 part 'workspace_review_availability.dart';
 part 'workspace_automatic_estimates.dart';
 part 'workspace_today_fit.dart';
+part 'workspace_meal_photo_recovery.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -321,6 +323,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   var _todayFitQueued = false;
   var _planningDay = false;
   var _recordingVoice = false;
+  AndroidMealPhotoRecovery? _mealPhotoRecovery;
+  Future<void>? _mealPhotoRecoveryRun;
   final _heldVoiceOverlay = HeldVoiceCaptureOverlay();
   var _openingGym = false;
   var _mealReviewGeneration = 0;
@@ -552,6 +556,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         !kIsWeb &&
         identical(widget.openStore, openWorkspaceStore)) {
       if (_allows(EasyFeature.ai)) unawaited(_prepareAi());
+      if (_canRecoverMealPhoto && _mealPhotoRecovery == null) {
+        unawaited(_recoverMealPhoto());
+      }
     }
   }
 
@@ -1787,7 +1794,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }
   }
 
-  void _openNutrition() {
+  void _openNutrition({DateTime? day}) {
     if (!_allows(EasyFeature.nutrition)) return;
     final NutritionData nutrition;
     try {
@@ -1799,6 +1806,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (context) => NutritionPage(
+          day: day,
           foods: nutrition.foods,
           meals: nutrition.meals,
           recipes: nutrition.recipes,
@@ -2338,6 +2346,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   Future<AttachmentRef?> _attachMealPhoto() async {
+    if (_mealPhotoRecoveryRun case final pending?) await pending;
     final store = await _openAttachments();
     if (!mounted || store == null) return null;
     final isPhone = const {
