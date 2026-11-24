@@ -1,0 +1,20 @@
+{
+  "source_revision": "2d9696b105b80fa9ccdd2d8f7dd135c9616be8d8",
+  "executable_sha256": "50d25f6e9f8e3e3d95b8b957d1b9f64dbf9e959d225a95acbac8d35758b5264b",
+  "aot_sha256": "9dfe120197bba7bfd4f7f0babafd829bd4b6c17c5d0ca95e398c41e24b47810b",
+  "viewport": [
+    1280,
+    720
+  ],
+  "elapsed_seconds": 225.24,
+  "checks": {
+    "fresh_synthetic_profiles": 2,
+    "matching_comparison_codes": true,
+    "own_approval_rejected": true,
+    "reciprocal_approvals_saved": true,
+    "one_sync_workspace_two_vaults": true,
+    "peer_fingerprints_reopened": true,
+    "workspace_records_unchanged": true,
+    "journal_integrity": "ok"
+  }
+}
