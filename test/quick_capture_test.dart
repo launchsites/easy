@@ -2,6 +2,7 @@ import 'package:easy/calendar_page.dart';
 import 'package:easy/list_pages.dart';
 import 'package:easy/quick_capture.dart';
 import 'package:easy/record_editor.dart' show RecordKind;
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -83,6 +84,74 @@ void main() {
       expect(result.noteToSelf, true);
     },
   );
+
+  for (final (size, scale, keyboardInset) in [
+    (const Size(320, 568), 1.0, 0.0),
+    (const Size(320, 568), 2.0, 260.0),
+    (const Size(568, 320), 2.0, 145.0),
+  ]) {
+    testWidgets(
+      'capture type labels fit ${size.width} px at ${scale}x with every action',
+      (tester) async {
+        final capture = await _setup(
+          tester,
+          RecordKind.note,
+          size: size,
+          textScale: scale,
+          includeTools: true,
+        );
+        for (final label in ['Task', 'Event', 'Note']) {
+          final finder = find.text(label);
+          final text = tester.renderObject<RenderParagraph>(finder);
+          expect(
+            text.getBoxesForSelection(
+              TextSelection(baseOffset: 0, extentOffset: label.length),
+            ),
+            hasLength(1),
+            reason: label,
+          );
+          expect(
+            text.getBoxesForSelection(
+              TextSelection(
+                baseOffset: label.length - 1,
+                extentOffset: label.length,
+              ),
+            ),
+            isNotEmpty,
+            reason: '$label should remain complete',
+          );
+          final button = find.widgetWithText(TextButton, label);
+          expect(button.hitTestable(), findsOneWidget);
+          expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
+        }
+        for (final label in ['Record voice', 'Open capture review', 'Close']) {
+          expect(find.byTooltip(label).hitTestable(), findsOneWidget);
+        }
+
+        await tester.tap(find.text('Event'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Coffee tomorrow'), findsOneWidget);
+        await tester.tap(find.text('Note'));
+        await tester.pumpAndSettle();
+        tester.view.viewInsets = FakeViewPadding(bottom: keyboardInset);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpAndSettle();
+        const title = 'Studio résumé العربية 日本語 👩🏽‍💻';
+        const body = 'One line\nA second line\nAnd a third';
+        await tester.enterText(_field, '$title\n$body');
+        await tester.pumpAndSettle();
+        expect(find.byTooltip('Add note').hitTestable(), findsOneWidget);
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pumpAndSettle();
+        final note = capture.result as NoteItem;
+        expect(note.title, title);
+        expect(note.body, body);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 class _CaptureResult {
@@ -95,11 +164,15 @@ Future<_CaptureResult> _setup(
   String? category,
   bool noteToSelf = false,
   Size size = const Size(390, 844),
+  double textScale = 1,
+  bool includeTools = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  tester.platformDispatcher.textScaleFactorTestValue = textScale;
+  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   final captured = _CaptureResult();
   await tester.pumpWidget(
     MaterialApp(
@@ -118,6 +191,8 @@ Future<_CaptureResult> _setup(
                     kind: kind,
                     initialCategory: category,
                     noteToSelf: noteToSelf,
+                    allowVoice: includeTools,
+                    allowReview: includeTools,
                   ),
                 );
               },

@@ -318,28 +318,28 @@ class _QuickCaptureState extends State<QuickCapture> {
       RecordKind.event: 'Event',
       RecordKind.note: 'Note',
     };
-    return Row(
+    return Wrap(
+      spacing: 2,
       children: [
         for (final option in options.entries)
-          Flexible(
-            child: Semantics(
-              selected: _kind == option.key,
-              child: TextButton(
-                onPressed: () => _changeKind(option.key),
-                style: TextButton.styleFrom(
-                  foregroundColor: _kind == option.key ? accent : muted,
-                  backgroundColor: _kind == option.key ? softAccent : null,
-                  minimumSize: const Size(0, 44),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  textStyle: labelStyle,
+          Semantics(
+            selected: _kind == option.key,
+            child: TextButton(
+              onPressed: () => _changeKind(option.key),
+              style: TextButton.styleFrom(
+                foregroundColor: _kind == option.key ? accent : muted,
+                backgroundColor: _kind == option.key ? softAccent : null,
+                minimumSize: const Size(44, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9),
                 ),
-                child: Text(option.value),
+                textStyle: labelStyle,
+              ),
+              child: Text(
+                option.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
@@ -494,7 +494,9 @@ class _QuickCaptureState extends State<QuickCapture> {
 
   @override
   Widget build(BuildContext context) {
-    final mobile = MediaQuery.sizeOf(context).width < 720;
+    final width = MediaQuery.sizeOf(context).width;
+    final mobile = width < 720;
+    final horizontalPadding = width < 360 ? 14.0 : (mobile ? 18.0 : 21.0);
     final input = _text.text.trim();
     final event =
         _event ??
@@ -529,10 +531,27 @@ class _QuickCaptureState extends State<QuickCapture> {
         ? 'Next'
         : 'Add ${_kind.name}';
     final stepShortcut = _stepShortcut();
-    final close = IconButton(
-      tooltip: 'Close',
-      onPressed: () => Navigator.of(context).pop(),
-      icon: const Icon(Icons.close_rounded, color: muted, size: 19),
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.allowVoice && _step == _CaptureStep.text)
+          IconButton(
+            tooltip: 'Record voice',
+            onPressed: () => _finish(VoiceCaptureRequest(_text.text)),
+            icon: const Icon(Icons.mic_none_rounded, color: muted),
+          ),
+        if (widget.allowReview && _step == _CaptureStep.text)
+          IconButton(
+            tooltip: 'Open capture review',
+            onPressed: () => _finish(CaptureReviewRequest(_text.text)),
+            icon: const Icon(Icons.playlist_add_rounded, color: muted),
+          ),
+        IconButton(
+          tooltip: 'Close',
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.close_rounded, color: muted, size: 19),
+        ),
+      ],
     );
     return AnimatedPadding(
       duration: MediaQuery.disableAnimationsOf(context)
@@ -565,53 +584,39 @@ class _QuickCaptureState extends State<QuickCapture> {
                 },
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
-                    mobile ? 18 : 21,
+                    horizontalPadding,
                     8,
-                    mobile ? 18 : 21,
+                    horizontalPadding,
                     16,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: widget.noteToSelf
-                                ? const Text(
-                                    'Note to self',
-                                    style: TextStyle(
-                                      color: ink,
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -.25,
-                                    ),
-                                  )
-                                : _kindSelector(),
-                          ),
-                          if (widget.allowVoice && _step == _CaptureStep.text)
-                            IconButton(
-                              tooltip: 'Record voice',
-                              onPressed: () =>
-                                  _finish(VoiceCaptureRequest(_text.text)),
-                              icon: const Icon(
-                                Icons.mic_none_rounded,
-                                color: muted,
+                      if (widget.noteToSelf)
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Note to self',
+                                style: TextStyle(
+                                  color: ink,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -.25,
+                                ),
                               ),
                             ),
-                          if (widget.allowReview && _step == _CaptureStep.text)
-                            IconButton(
-                              tooltip: 'Open capture review',
-                              onPressed: () =>
-                                  _finish(CaptureReviewRequest(_text.text)),
-                              icon: const Icon(
-                                Icons.playlist_add_rounded,
-                                color: muted,
-                              ),
-                            ),
-                          close,
-                        ],
-                      ),
+                            actions,
+                          ],
+                        )
+                      else
+                        OverflowBar(
+                          alignment: MainAxisAlignment.spaceBetween,
+                          overflowAlignment: OverflowBarAlignment.end,
+                          overflowSpacing: 3,
+                          children: [_kindSelector(), actions],
+                        ),
                       const SizedBox(height: 9),
                       _bar(action),
                       if (input.isNotEmpty || event != null) ...[
