@@ -1,0 +1,123 @@
+{
+  "run_at_utc": "2026-11-24T04:04:52.276834Z",
+  "source_revision": "e090dcee585bbc4e6890bd6671b89b4bd81ff12c",
+  "profile": "fake HTTP client and revision-checked state store",
+  "paid_network_requests": 0,
+  "elapsed_seconds": 30.389,
+  "results": [
+    {
+      "case": "forty_pounds_one_pound_per_day",
+      "starting_budget": {
+        "charged_micros": 24000000,
+        "reserved_micros": 0,
+        "remaining_micros": 16000000,
+        "projected_micros": 30000000,
+        "discretionary_micros": 8000000,
+        "unknown_usage_calls": 0
+      },
+      "burst_candidates": 32,
+      "burst_dispatches": 1,
+      "same_minute_after_restart_blocked": true,
+      "minimum_gap_minutes": 15,
+      "daily_dispatches": 12,
+      "next_day_dispatches": 1,
+      "after_day_budget": {
+        "charged_micros": 24001476,
+        "reserved_micros": 0,
+        "remaining_micros": 15998524,
+        "projected_micros": 30001845,
+        "discretionary_micros": 7998524,
+        "unknown_usage_calls": 0
+      }
+    },
+    {
+      "case": "headroom_gates",
+      "dispatched": 0,
+      "profiles": [
+        {
+          "reason_fixture": "daily_share",
+          "request_ceiling_micros": 1600000,
+          "charged_micros": 24000000,
+          "reserved_micros": 0,
+          "remaining_micros": 16000000,
+          "projected_micros": 30000000,
+          "discretionary_micros": 8000000,
+          "unknown_usage_calls": 0
+        },
+        {
+          "reason_fixture": "accrued_allowance",
+          "request_ceiling_micros": 50000,
+          "charged_micros": 31999000,
+          "reserved_micros": 0,
+          "remaining_micros": 8001000,
+          "projected_micros": 39998750,
+          "discretionary_micros": 1000,
+          "unknown_usage_calls": 0
+        },
+        {
+          "reason_fixture": "projected_cap",
+          "request_ceiling_micros": 50000,
+          "charged_micros": 32000000,
+          "reserved_micros": 0,
+          "remaining_micros": 8000000,
+          "projected_micros": 40000000,
+          "discretionary_micros": 0,
+          "unknown_usage_calls": 0
+        },
+        {
+          "reason_fixture": "projected_over_cap",
+          "request_ceiling_micros": 50000,
+          "charged_micros": 36000000,
+          "reserved_micros": 0,
+          "remaining_micros": 4000000,
+          "projected_micros": 45000000,
+          "discretionary_micros": 0,
+          "unknown_usage_calls": 0
+        }
+      ]
+    },
+    {
+      "case": "quote_thresholds",
+      "profiles": [
+        {
+          "request_ceiling_micros": 50000,
+          "minimum_gap_minutes": 15
+        },
+        {
+          "request_ceiling_micros": 100000,
+          "minimum_gap_minutes": 30
+        },
+        {
+          "request_ceiling_micros": 200000,
+          "minimum_gap_minutes": 60
+        },
+        {
+          "request_ceiling_micros": 410000,
+          "minimum_gap_minutes": 120
+        }
+      ]
+    },
+    {
+      "case": "disabled_or_background",
+      "dispatched": 0
+    },
+    {
+      "case": "malformedBody",
+      "dispatched": 1,
+      "result": "blocked",
+      "reserved_ceiling_micros": 50000,
+      "settled_micros": 50000,
+      "unknown_usage_calls": 1,
+      "seconds": 0.005
+    },
+    {
+      "case": "noReply",
+      "dispatched": 1,
+      "result": "blocked",
+      "reserved_ceiling_micros": 50000,
+      "settled_micros": 50000,
+      "unknown_usage_calls": 1,
+      "seconds": 30.013
+    }
+  ]
+}

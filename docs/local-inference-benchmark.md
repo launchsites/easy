@@ -83,6 +83,20 @@ dart compile exe tool/benchmark/ai_budget_replay.dart -o /tmp/easy-ai-budget-rep
 taskset -c 2 /tmp/easy-ai-budget-replay /tmp/easy-ai-budget-replay.json
 ```
 
+### Adaptive pacing under a £40 cap
+
+Six scenarios drove the real estimate runtime at `e090dcee585bbc4e6890bd6671b89b4bd81ff12c` with a fake HTTP client, an injected clock and a revision-checked state store. After 24 days at £1 per day, the ledger showed £16 remaining, £30 projected and £8 in accrued discretionary allowance. A 32-candidate burst dispatched one £0.05 request, and a fresh runtime using the same stored state blocked another call in that minute. The fixture reached 12 dispatches that day and allowed one on the following day.
+
+The minimum gaps for £0.05, £0.10, £0.20 and £0.41 request ceilings were 15, 30, 60 and 120 minutes. Separate profiles withheld calls when the request exceeded the daily share or accrued allowance, when projected spending met or exceeded the cap, and when automatic runs were disabled or the app moved to the background. A malformed body and a 30-second timeout each settled one unknown-usage request at its stored £0.05 ceiling and kept that charge across restart. The run sent zero paid network requests. [Adaptive pacing results](benchmark-results/ai-adaptive-scenario-20261124.json)
+
+Copy the [scenario test](../tool/benchmark/ai_adaptive_scenario_test.dart) into an archive of the source revision to repeat the recorded run.
+
+```sh
+EASY_ADAPTIVE_BUDGET_REPORT=/tmp/easy-adaptive-budget.json \
+EASY_ADAPTIVE_BUDGET_REVISION=e090dcee585bbc4e6890bd6671b89b4bd81ff12c \
+TZ=Europe/London flutter test tool/benchmark/ai_adaptive_scenario_test.dart -r expanded
+```
+
 ## Qwen3-4B text sweep
 
 The tested file was Qwen's Apache 2.0 Qwen3-4B Q4_K_M GGUF at revision `bc640142c66e1fdd12af0bd68f40445458f3869b`. The 2,497,280,256-byte file has SHA-256 `7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5`. This sweep reused the same 12 cases and schema with the model's thinking template disabled. [Qwen3-4B GGUF model card](https://huggingface.co/Qwen/Qwen3-4B-GGUF/tree/bc640142c66e1fdd12af0bd68f40445458f3869b)
@@ -191,6 +205,8 @@ The grammar improved structural validity and reduced median request time on thes
 Qwen3-4B produced three exact drafts with the same experimental grammar. Eight of 11 calls timed out at 60 seconds. The accepted responses took 19.75, 31.28 and 54.86 seconds on four virtual CPUs. This run shared the virtual CPU quota with the native agenda comparison and other workspace jobs. Eight deterministic controls made zero requests. A timed-out model call yielded no model proposal, and none of the drafts wrote records. On this shared CPU host the tested 4B profile could offer useful suggestions when it completed, with poor interactive availability. [4B V2 provider results](benchmark-results/provider-metadata-v2-qwen4b-schema-20261124.json)
 
 A second 4B run limited output to 160 tokens and used two virtual CPUs. All 11 calls produced structurally accepted drafts, seven matched the fixture exactly, and median request time was 17.67 seconds. The slowest reply took 32.22 seconds. Three disagreements were category assignments and one changed a note into a task. This test used a different shared-load period and CPU allocation from the first run. It demonstrates that the shorter envelope can carry the tested one- and two-item drafts. [160-token provider results](benchmark-results/provider-metadata-v2-qwen4b-schema-bounded-20261124.json)
+
+A matching two-CPU run with a 640-token ceiling used the same provider revision, model, schema, context and fixture digest. It produced 11 accepted drafts and seven exact matches. The median was 13.95 seconds and the slowest request took 45.38 seconds. The two runs started under different shared-host loads, with model startup taking 18.73 seconds for the 160-token run and 6.98 seconds for the 640-token run. [640-token two-CPU results](benchmark-results/provider-metadata-v2-qwen4b-schema-full-envelope-20261124.json)
 
 Run the benchmark against an explicitly started local llama.cpp endpoint. The optional `--json-object`, `--json-schema` and `--json-schema-meanings` flags reproduce the tested formats.
 
