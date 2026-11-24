@@ -1,0 +1,142 @@
+name: Exact Linux package startup proof
+
+on:
+  push:
+    branches: [codex/final-linux-package-proof]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  downloaded-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 44
+    defaults:
+      run:
+        shell: bash
+    env:
+      SOURCE_REVISION: 'ecdc55a553e83d8b357dc2651011f33f26099677'
+      SOURCE_RUN: '45352683815'
+      TZ: Etc/UTC
+    steps:
+      - name: Check out the package source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ecdc55a553e83d8b357dc2651011f33f26099677
+          persist-credentials: false
+
+      - name: Verify the exact source checkout
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+
+      - name: Install native runtime and X11 smoke dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+            xvfb xfonts-base xdotool imagemagick tesseract-ocr tesseract-ocr-eng \
+            libgtk-3-0t64 libsecret-1-0 libgstreamer1.0-0 \
+            libgstreamer-plugins-base1.0-0 libgles2 libgl1-mesa-dri
+
+      - name: Wait for the same-repository build and download its artifact
+        timeout-minutes: 29
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          end=$((SECONDS + 26 * 60))
+          while (( SECONDS < end )); do
+            run=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN")
+            jq -e --arg sha "$SOURCE_REVISION" --arg repo "$GITHUB_REPOSITORY" '
+              .head_sha == $sha and .head_repository.full_name == $repo and
+              .head_branch == "main" and .event == "push" and
+              .path == ".github/workflows/verification.yml"
+            ' <<< "$run" > /dev/null
+            if [[ $(jq -r .status <<< "$run") == completed ]]; then
+              jq -e '.conclusion == "success"' <<< "$run" > /dev/null
+              break
+            fi
+            sleep 20
+          done
+          jq -e '.status == "completed" and .conclusion == "success"' <<< "$run" > /dev/null
+          mkdir -p "$RUNNER_TEMP/downloaded-linux-package"
+          if ! gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name easy-linux-x64 --dir "$RUNNER_TEMP/downloaded-linux-package" \
+            > "$RUNNER_TEMP/linux-artifact-download.log" 2>&1; then
+            sed -E 's#https://[^" ]+#<redacted download URL>#g' "$RUNNER_TEMP/linux-artifact-download.log" >&2
+            exit 1
+          fi
+
+      - name: Verify the package checksum and source before smoke testing
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path, PurePosixPath
+          import re
+          import tarfile
+
+          stage = Path(os.environ["RUNNER_TEMP"])
+          download = stage / "downloaded-linux-package"
+          archive = download / "easy-linux-x64.tar.gz"
+          sums = (download / "SHA256SUMS").read_text(encoding="ascii")
+          match = re.fullmatch(r"([0-9a-f]{64})  easy-linux-x64\.tar\.gz\n?", sums)
+          with archive.open("rb") as stream:
+              digest = hashlib.file_digest(stream, "sha256").hexdigest()
+          if match is None or digest != match[1]:
+              raise SystemExit("The downloaded archive failed SHA256SUMS verification.")
+
+          revision = os.environ["SOURCE_REVISION"]
+          repository = os.environ["GITHUB_REPOSITORY"]
+          source = f"Source: https://github.com/{repository}/tree/{revision}"
+          extracted = stage / "extracted-linux-package"
+          extracted.mkdir()
+          with tarfile.open(archive, "r:gz") as package:
+              entries = package.getmembers()
+              paths = [PurePosixPath(entry.name) for entry in entries]
+              if any(not path.parts or path.parts[0] != "easy" or ".." in path.parts for path in paths):
+                  raise SystemExit("The archive contains a path outside its Easy bundle.")
+              metadata = package.getmember("easy/BUILD.txt")
+              if not metadata.isfile() or metadata.size > 8192:
+                  raise SystemExit("The archive's BUILD.txt has an unexpected entry type or size.")
+              with package.extractfile(metadata) as record:
+                  if source not in record.read().decode("utf-8").splitlines():
+                      raise SystemExit("The archive's BUILD.txt refers to a different source.")
+              package.extractall(extracted, filter="data")
+          executable = extracted / "easy" / "easy"
+          if not executable.is_file() or not os.access(executable, os.X_OK):
+              raise SystemExit("The verified archive has no runnable Easy executable.")
+
+          evidence = stage / "linux-package-proof"
+          evidence.mkdir()
+          (evidence / "package-provenance.json").write_text(json.dumps({
+              "source_revision": revision,
+              "source_run": int(os.environ["SOURCE_RUN"]),
+              "artifact": "easy-linux-x64",
+              "archive_sha256": digest,
+              "archive_entries": len(entries),
+              "build_source": source,
+          }, indent=2) + "\n")
+          PY
+
+      - name: Run the actual downloadable package with disposable X11 profiles
+        timeout-minutes: 12
+        run: |
+          result="$RUNNER_TEMP/linux-package-proof"
+          python3 tool/benchmark/native_release_smoke.py \
+            --binary "$RUNNER_TEMP/extracted-linux-package/easy/easy" \
+            --app-revision "$SOURCE_REVISION" \
+            --output "$result/native-release-smoke.json" \
+            --screenshots "$result/screenshots" \
+            --timeout 24 --health-scope --onboarding --live-gym-capture
+          jq -e '.status == "passed"' "$result/native-release-smoke.json"
+          jq '{status, app_revision, elapsed_seconds, checks: (.checks | length)}' \
+            "$result/native-release-smoke.json"
+
+      - name: Retain native proof for review
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: easy-linux-package-smoke-ecdc55a
+          path: ${{ runner.temp }}/linux-package-proof
+          if-no-files-found: warn
+          retention-days: 14
