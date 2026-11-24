@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   DateTime at(int hour, [int minute = 0]) =>
-      DateTime(2026, 11, 24, hour, minute);
+      DateTime.utc(2026, 11, 24, hour, minute);
 
   test('a fully accepted prerequisite sets the earliest dependent block', () {
     final plan = planWorkspaceDay(
