@@ -3229,7 +3229,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     bool covered(bool Function(DateTime) covers) =>
         covers(firstDay ?? day) && covers(lastDay ?? day);
     if (apple.isNotEmpty &&
-        (_appleFeed.problem != null || !covered(_appleFeed.covers))) {
+        (_appleFeed.loading ||
+            !_appleFeed.hasVerifiedAccess ||
+            _appleFeed.problem != null ||
+            !covered(_appleFeed.covers))) {
       if (reportProblem) {
         _inform(
           _appleFeed.problem ?? 'Apple calendars could not be refreshed.',
@@ -4209,6 +4212,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Duration estimate'),
+        scrollable: true,
         content: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -4238,12 +4242,30 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       ),
     );
     if (!mounted || approved != true) return;
-    final current = _data.tasks.where((item) => item.id == task.id).firstOrNull;
-    if (!identical(current, task) || historyKey != _taskHistoryKey) {
+    final workspace = _data;
+    final current = workspace.tasks
+        .where((item) => item.id == task.id)
+        .firstOrNull;
+    if (!identical(current, task) ||
+        !_canEstimate(task) ||
+        historyKey != _taskHistoryKey) {
       _inform('This task changed. Review its duration again.');
       return;
     }
-    _saveRecord(task.withEstimate(minutes));
+    try {
+      await _commitReviewedData(
+        workspace,
+        workspace.copyWith(
+          tasks: _upsert(
+            workspace.tasks,
+            task.withEstimate(minutes),
+            (item) => item.id,
+          ),
+        ),
+      );
+    } on Object {
+      if (mounted) _inform('The duration estimate could not be saved.');
+    }
   }
 
   Widget? _focusedContent(BuildContext context, FocusMode? mode) {

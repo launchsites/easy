@@ -24,6 +24,7 @@ class AppleCalendarFeed extends ChangeNotifier {
   var _disposed = false;
   var _loading = false;
   var _verifiedAccess = false;
+  var _watchFailed = false;
   String? _problem;
 
   List<SourcedCalendarEvent<ExternalCalendarEvent>> get events => _events;
@@ -32,6 +33,12 @@ class AppleCalendarFeed extends ChangeNotifier {
   String? get problem => _problem;
   bool get hasChosenCalendars => _selected.isNotEmpty;
   bool get hasVerifiedAccess => _verifiedAccess;
+  bool get hasCurrentCoverage =>
+      _verifiedAccess &&
+      _problem == null &&
+      !_loading &&
+      !_watchFailed &&
+      _refreshTimer?.isActive != true;
 
   bool covers(DateTime day) {
     final start = _start;
@@ -168,15 +175,28 @@ class AppleCalendarFeed extends ChangeNotifier {
   }
 
   void _watch() {
-    _changes ??= _adapter.changes.listen((_) {
-      _refreshTimer?.cancel();
-      _refreshTimer = Timer(const Duration(milliseconds: 350), () {
-        final day = _anchor;
-        if (day != null) {
-          unawaited(refresh(day: day, selected: _selected, force: true));
-        }
-      });
-    }, onError: (Object _) {});
+    if (_changes == null) _watchFailed = false;
+    _changes ??= _adapter.changes.listen(
+      (_) {
+        _refreshTimer?.cancel();
+        _refreshTimer = Timer(const Duration(milliseconds: 350), () {
+          final day = _anchor;
+          if (day != null) {
+            unawaited(refresh(day: day, selected: _selected, force: true));
+          }
+        });
+        notifyListeners();
+      },
+      onError: (Object _) => _watchEnded(),
+      onDone: _watchEnded,
+    );
+  }
+
+  void _watchEnded() {
+    if (_disposed) return;
+    _watchFailed = true;
+    _stopWatching();
+    notifyListeners();
   }
 
   void _stopWatching() {

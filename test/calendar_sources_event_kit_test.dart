@@ -17,6 +17,14 @@ void main() {
 
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
+  test('a missing native event list does not establish an empty calendar', () {
+    messenger.setMockMethodCallHandler(channel, (_) async => null);
+    return expectLater(
+      adapter.events(start: start, end: end, calendars: [source]),
+      throwsFormatException,
+    );
+  });
+
   test(
     'only the explicit permission method requests calendar access',
     () async {

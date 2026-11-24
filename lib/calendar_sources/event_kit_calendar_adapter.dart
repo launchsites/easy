@@ -404,14 +404,17 @@ class EventKitCalendarAdapter {
     }
     final sources = calendars?.toSet();
     if (sources != null && sources.isEmpty) return const [];
-    final events =
-        await _methods.invokeListMethod<Object?>('events', {
-          'startMilliseconds': start.millisecondsSinceEpoch,
-          'endMilliseconds': end.millisecondsSinceEpoch,
-          if (sources != null)
-            'calendars': [for (final source in sources) source.toJson()],
-        }) ??
-        const [];
+    final events = await _methods.invokeListMethod<Object?>('events', {
+      'startMilliseconds': start.millisecondsSinceEpoch,
+      'endMilliseconds': end.millisecondsSinceEpoch,
+      if (sources != null)
+        'calendars': [for (final source in sources) source.toJson()],
+    });
+    if (events == null) {
+      throw const FormatException(
+        'Apple Calendar did not return an event list.',
+      );
+    }
     return List.unmodifiable(events.map(_readEvent));
   }
 

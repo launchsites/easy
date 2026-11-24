@@ -4,6 +4,8 @@ typedef _TodayFitInput = ({
   List<TaskItem> tasks,
   List<CalendarEvent> events,
   List<InternalRecurringEvent> series,
+  List<WorkspaceIcsCalendar> imports,
+  TimeSpan? coverage,
   SchedulingSettings settings,
   Set<String>? categories,
   Set<String> excludedTasks,
@@ -36,19 +38,25 @@ _TodayFitResult _projectTodayFit(_TodayFitInput input) {
   }
   final scopes = {for (final task in eligible.values) task.category};
   final settings = input.settings;
-  final coverage = input.series.isEmpty
-      ? null
-      : TimeSpan(plusDays(day, -1), plusDays(day, 2));
+  final coverage = input.coverage;
   final events = coverage == null
       ? input.events
       : [
           ...input.events,
-          for (final row in expandInternalWorkspace((
-            sources: input.series,
-            start: coverage.start,
-            end: coverage.end,
-          )))
-            row.event,
+          if (input.series.isNotEmpty)
+            for (final row in expandInternalWorkspace((
+              sources: input.series,
+              start: coverage.start,
+              end: coverage.end,
+            )))
+              row.event,
+          if (input.imports.isNotEmpty)
+            for (final row in expandWorkspaceIcs((
+              calendars: input.imports,
+              start: coverage.start,
+              end: coverage.end,
+            )))
+              if (row.status != CalendarEventStatus.cancelled) row.event,
         ];
   for (final event in events) {
     consider(event.start.subtract(Duration(minutes: settings.beforeMinutes)));
@@ -132,6 +140,9 @@ extension _WorkspaceTodayFit on _WorkspaceState {
     _gymSessions,
     _focus,
     _today,
+    _appleFeed.events,
+    _appleFeed.hasCurrentCoverage,
+    _appleCopyRevision,
   );
 
   _TodayFitResult? _currentTodayFit(DateTime now) {
@@ -158,10 +169,43 @@ extension _WorkspaceTodayFit on _WorkspaceState {
       identical(_data, _savedWorkspace) &&
       _calendarSourcesReadable &&
       !_taskSeriesUnreadable &&
-      _selectedAppleCalendars.isEmpty &&
-      _selectedIcsCalendars.isEmpty &&
       (!_allows(EasyFeature.workouts) || _gymSessions != null) &&
       _gymSessions?.lastOrNull?.finished != false;
+
+  List<CalendarEvent>? _appleEventsForTodayFit(
+    Set<CalendarIdentity> selected,
+    TimeSpan coverage,
+  ) {
+    if (selected.isEmpty) return const [];
+    if (!_appleFeed.hasCurrentCoverage ||
+        !_appleFeed.covers(coverage.start) ||
+        !_appleFeed.covers(
+          coverage.end.subtract(const Duration(microseconds: 1)),
+        ) ||
+        selected.any((id) => _appleFeed.sources[id]?.canRead != true)) {
+      return null;
+    }
+    final linked = <CalendarOccurrenceIdentity, CalendarEvent>{
+      if (_data.sections[_appleCopiesKey] != null ||
+          _unsavedAppleCopies.isNotEmpty)
+        for (final event in _standaloneEvents(_data.events))
+          ?_appleCopyFor(event.id): event,
+    };
+    final trusted = <CalendarEvent>[];
+    for (final row in _appleFeed.events) {
+      final event = row.event;
+      if (!selected.contains(row.id.calendar) ||
+          event.status == CalendarEventStatus.cancelled ||
+          !event.start.isBefore(coverage.end) ||
+          !coverage.start.isBefore(event.end) ||
+          _sameAppleEvent(linked[row.id], event)) {
+        continue;
+      }
+      if (event.status != CalendarEventStatus.confirmed) return null;
+      trusted.add(_fromApple(row));
+    }
+    return trusted;
+  }
 
   void _queueTodayFit([Duration? delay]) {
     _todayFitTimer?.cancel();
@@ -194,6 +238,18 @@ extension _WorkspaceTodayFit on _WorkspaceState {
       final now = DateTime.now();
       final day = dateOnly(now);
       final end = plusDays(day, 1);
+      final selectedApple = _selectedAppleCalendars;
+      final imports = _selectedIcsCalendars;
+      final coverage =
+          selectedApple.isNotEmpty ||
+              imports.isNotEmpty ||
+              _eventSeries.isNotEmpty
+          ? TimeSpan(plusDays(day, -1), plusDays(day, 2))
+          : null;
+      final apple = coverage == null
+          ? const <CalendarEvent>[]
+          : _appleEventsForTodayFit(selectedApple, coverage);
+      if (apple == null) return;
       final excludedTasks = <String>{};
       DateTime? manualUntil;
       for (final row in _taskFeed.workspaceOccurrences(_data.tasks, day)) {
@@ -212,10 +268,12 @@ extension _WorkspaceTodayFit on _WorkspaceState {
       }
       final input = (
         tasks: _workspaceTasks,
-        events: _eventSeries.isEmpty
+        events: _eventSeries.isEmpty && apple.isEmpty
             ? _data.events
-            : _standaloneEvents(_data.events).toList(),
+            : [..._standaloneEvents(_data.events), ...apple],
         series: _eventSeries,
+        imports: imports,
+        coverage: coverage,
         settings: settings,
         categories: _expandCategoryScope(_focus),
         excludedTasks: excludedTasks,
@@ -224,6 +282,7 @@ extension _WorkspaceTodayFit on _WorkspaceState {
       final next = manualUntil != null
           ? (id: null, at: now, checkAt: manualUntil)
           : input.series.isNotEmpty ||
+                input.imports.isNotEmpty ||
                 input.tasks.length + input.events.length > 2000
           ? await compute(_projectTodayFit, input)
           : _projectTodayFit(input);

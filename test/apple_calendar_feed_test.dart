@@ -12,6 +12,21 @@ final _day = DateTime(2026, 11, 24);
 
 void main() {
   test(
+    'a closed native change stream ends passive calendar coverage',
+    () async {
+      final notifications = StreamController<void>();
+      final adapter = _Adapter()..notifications = notifications.stream;
+      final feed = AppleCalendarFeed(adapter: adapter);
+      addTearDown(feed.dispose);
+      await feed.refresh(day: _day, selected: {_first});
+      expect(feed.hasCurrentCoverage, isTrue);
+      await notifications.close();
+      expect(feed.hasCurrentCoverage, isFalse);
+      expect(feed.events, hasLength(1));
+    },
+  );
+
+  test(
     'revocation during a native query evicts the previous permission scope',
     () async {
       final adapter = _Adapter();
@@ -109,6 +124,7 @@ void main() {
 
 class _Adapter extends EventKitCalendarAdapter {
   Object? eventError;
+  Stream<void> notifications = const Stream.empty();
   Completer<EventKitCalendarAccess>? nextAccess;
   EventKitCalendarAccess access = EventKitCalendarAccess.full;
   List<CalendarIdentity> sources = [_first, _second];
@@ -164,5 +180,5 @@ class _Adapter extends EventKitCalendarAdapter {
   }
 
   @override
-  Stream<void> get changes => const Stream.empty();
+  Stream<void> get changes => notifications;
 }
