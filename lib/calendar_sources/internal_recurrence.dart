@@ -1,3 +1,4 @@
+import 'package:timezone/data/latest_all.dart' as timezone_data;
 import 'package:timezone/timezone.dart' as timezone;
 
 import 'ics_calendar.dart';
@@ -56,12 +57,15 @@ class InternalRecurrenceRule {
     if (until != null) 'until': until!.toIso8601String(),
   };
 
-  String get _ics => [
+  String get _ics => _icsRule(count: count);
+
+  String _icsRule({int? count, String? until}) => [
     'FREQ=${frequency.name.toUpperCase()}',
     if (interval != 1) 'INTERVAL=$interval',
     if (weekdays.isNotEmpty)
       'BYDAY=${weekdays.map((day) => _weekdayNames[day - 1]).join(',')}',
     if (count != null) 'COUNT=$count',
+    if (until != null) 'UNTIL=$until',
   ].join(';');
 
   InternalRecurrenceRule _withCount(int value) => InternalRecurrenceRule(
@@ -309,6 +313,124 @@ class InternalRecurringEvent {
     if (_cutoff != null) 'cutoff': _cutoff.toIso8601String(),
   };
 
+  /// Calendar snapshot with a stable master UID for each active segment.
+  /// A future pattern change is a new master because it cannot be represented
+  /// by a detached RFC 5545 RANGE edit. Local series and occurrence IDs are
+  /// untouched. The returned events can be combined with standalone exports.
+  List<IcsEvent> toIcsEvents({String? floatingTimeZone}) {
+    final events = <IcsEvent>[];
+    final overrides = _overrides.entries.toList()
+      ..sort((left, right) => left.key.compareTo(right.key));
+    for (final (index, segment) in _segments.indexed) {
+      if (_cutoff != null && !segment.firstIdentity.isBefore(_cutoff)) break;
+      final next = index + 1 < _segments.length
+          ? _segments[index + 1].firstIdentity
+          : null;
+      final boundary = _earlierDay(next, _cutoff);
+      final event = segment.event;
+      final uid = index == 0
+          ? 'easy-series/${Uri.encodeComponent(id)}@calendar.easy'
+          : 'easy-series/${Uri.encodeComponent(id)}/${_icalDate(segment.firstIdentity)}@calendar.easy';
+      _validatePortableDraft(event, uid, floatingTimeZone);
+
+      final rule = segment.rule;
+      final truncation = boundary == null
+          ? null
+          : segment
+                .scheduledOn(boundary)
+                .components
+                .subtract(const Duration(days: 1));
+      final last = _earlierDay(
+        rule.until,
+        truncation == null ? null : _day(truncation),
+      );
+      final counted = rule.count;
+      // Avoid putting COUNT and UNTIL on the same RFC rule. A counted arm
+      // retains the exact number of nominal starts before its local split.
+      final cutoffCount = counted != null && boundary != null
+          ? _countBefore(segment, boundary, floatingTimeZone)
+          : counted;
+      final exportRule = rule._icsRule(
+        count: cutoffCount,
+        until: last == null || counted != null
+            ? null
+            : _exportUntil(event.start, last),
+      );
+
+      final detached = <IcsEvent>[];
+      final excluded = <IcsDateTime>[];
+      final extra = <IcsDateTime>[];
+      for (final entry in overrides) {
+        final identity = entry.key;
+        if (identity.isBefore(segment.firstIdentity) ||
+            (boundary != null && !identity.isBefore(boundary))) {
+          continue;
+        }
+        final original = segment.scheduledOn(identity);
+        final changed = entry.value.event;
+        // The current segment time can differ from the time at which the
+        // exception was made. Only the logical day is stable locally.
+        final hasClock = _hasPortableClock(original, floatingTimeZone);
+        if (!hasClock && original.kind == IcsDateTimeKind.floating) {
+          throw IcsExpansionException(
+            'A floating recurrence exception falls in a skipped local clock time.',
+            uid: uid,
+          );
+        }
+        if (changed == null) {
+          if (!hasClock) continue;
+          excluded.add(original);
+          detached.add(
+            IcsEvent(
+              uid: uid,
+              summary: event.title,
+              start: original,
+              recurrenceId: original,
+              status: 'CANCELLED',
+            ),
+          );
+          continue;
+        }
+        _validatePortableDraft(changed, uid, floatingTimeZone);
+        if (!hasClock) {
+          // A retained exception can outlive a nominal local clock skipped by
+          // DST. A standalone stable UID preserves the moved event itself.
+          detached.add(changed._master('$uid/override/${_icalDate(identity)}'));
+          continue;
+        }
+        // RDATE makes a retained exception portable even when a subsequent
+        // segment change removed that logical day from the regular cadence.
+        extra.add(original);
+        detached.add(
+          IcsEvent(
+            uid: uid,
+            summary: changed.title,
+            start: changed.start,
+            end: changed.end,
+            location: changed.location,
+            description: changed.description,
+            recurrenceId: original,
+          ),
+        );
+      }
+      events.add(
+        IcsEvent(
+          uid: uid,
+          summary: event.title,
+          start: event.start,
+          end: event.end,
+          location: event.location,
+          description: event.description,
+          recurrenceRule: exportRule,
+          recurrenceDates: extra,
+          exceptionDates: excluded,
+        ),
+      );
+      events.addAll(detached);
+    }
+    return List.unmodifiable(events);
+  }
+
   List<InternalEventOccurrence> occurrences({
     required DateTime windowStart,
     required DateTime windowEnd,
@@ -534,11 +656,27 @@ class InternalRecurringEvent {
   }
 
   int _remainingCount(_Segment segment, InternalEventOccurrence selected) {
-    var remaining = segment.rule.count!;
-    if (selected.identityDate == segment.firstIdentity) return remaining;
+    final remaining =
+        segment.rule.count! -
+        _countBefore(
+          segment,
+          selected.identityDate,
+          selected._floatingTimeZone,
+        );
+    if (remaining < 1) {
+      throw StateError(
+        'The recurring event changed. Open the occurrence again.',
+      );
+    }
+    return remaining;
+  }
+
+  int _countBefore(_Segment segment, DateTime boundary, String? zone) {
+    if (!boundary.isAfter(segment.firstIdentity)) return 0;
+    if (segment.rule.count == 1) return 1;
     final begin = _day(segment.event.start.components)
         .subtract(const Duration(days: 2));
-    final end = _day(selected.scheduledStart.components)
+    final end = _day(segment.scheduledOn(boundary).components)
         .add(const Duration(days: 2));
     final safeBegin = begin.year < 1 ? DateTime.utc(1) : begin;
     final safeEnd = end.isAfter(DateTime.utc(10000))
@@ -547,10 +685,10 @@ class InternalRecurringEvent {
     final counted = <DateTime>{};
     var start = safeBegin;
     var scans = 0;
-    while (start.isBefore(safeEnd)) {
+    while (start.isBefore(safeEnd) && counted.length < segment.rule.count!) {
       if (++scans > 512) {
         throw IcsExpansionException(
-          'The counted series is too long to split here.',
+          'The counted series is too long to measure at this date.',
           uid: id,
         );
       }
@@ -561,23 +699,16 @@ class InternalRecurringEvent {
         segment.rule,
         start,
         windowEnd,
-        selected._floatingTimeZone,
+        zone,
       )) {
         final date = segment.identityOf(
           occurrence.recurrenceId ?? segment.event.start,
         );
-        if (date.isBefore(selected.identityDate) && counted.add(date)) {
-          remaining--;
-        }
+        if (date.isBefore(boundary)) counted.add(date);
       }
       start = windowEnd;
     }
-    if (remaining < 1) {
-      throw StateError(
-        'The recurring event changed. Open the occurrence again.',
-      );
-    }
-    return remaining;
+    return counted.length;
   }
 
   InternalEventOccurrence _occurrence(
@@ -633,6 +764,11 @@ class _Segment {
 
   DateTime identityOf(IcsDateTime scheduled) => firstIdentity.add(
     _day(scheduled.components).difference(_day(event.start.components)),
+  );
+
+  IcsDateTime scheduledOn(DateTime identity) => _atComponents(
+    event.start,
+    event.start.components.add(identity.difference(firstIdentity)),
   );
 
   Map<String, Object?> toJson() => {
@@ -712,4 +848,100 @@ IcsDateTime _fromResolved(
       ? instant.toLocal()
       : timezone.TZDateTime.from(instant, timezone.getLocation(zone));
   return _atComponents(pattern, clock);
+}
+
+DateTime? _earlierDay(DateTime? left, DateTime? right) =>
+    left == null || (right != null && right.isBefore(left)) ? right : left;
+
+String _icalDate(DateTime value) =>
+    value.toIso8601String().split('T').first.replaceAll('-', '');
+
+String _icalClock(DateTime value) =>
+    value.toIso8601String().split('.').first.replaceAll(RegExp('[-:]'), '');
+
+String _exportUntil(IcsDateTime basis, DateTime last) {
+  final wall = last.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+  return switch (basis.kind) {
+    IcsDateTimeKind.date => _icalDate(last),
+    IcsDateTimeKind.floating => _icalClock(wall),
+    IcsDateTimeKind.utc => '${_icalClock(wall)}Z',
+    IcsDateTimeKind.zoned =>
+      '${_icalClock(_lastInstantAtOrBefore(wall, _portableZone(basis.timeZoneId!)))}Z',
+  };
+}
+
+timezone.Location _portableZone(String name) {
+  if (timezone.timeZoneDatabase.locations.isEmpty) {
+    timezone_data.initializeTimeZones();
+  }
+  return timezone.timeZoneDatabase.locations[name] ??
+      (throw IcsExpansionException('Unknown calendar time zone $name.'));
+}
+
+/// Find the last instant still on or before an inclusive wall-clock bound.
+/// This handles offset changes at midnight and entirely skipped civil dates.
+DateTime _lastInstantAtOrBefore(DateTime wall, timezone.Location zone) {
+  const margin = Duration(days: 2);
+  final end = wall.add(margin);
+  var cursor = wall.subtract(margin);
+  DateTime? latest;
+  while (cursor.isBefore(end)) {
+    final period = zone.lookupTimeZone(cursor.millisecondsSinceEpoch);
+    final boundary = period.end >= end.millisecondsSinceEpoch
+        ? end
+        : DateTime.fromMillisecondsSinceEpoch(period.end, isUtc: true);
+    final nominal = wall.subtract(period.timeZone.offset);
+    final candidate = nominal.isBefore(boundary)
+        ? nominal
+        : boundary.subtract(const Duration(seconds: 1));
+    if (!candidate.isBefore(cursor) &&
+        (latest == null || candidate.isAfter(latest))) {
+      latest = candidate;
+    }
+    cursor = boundary;
+  }
+  if (latest == null || latest.year < 1 || latest.year > 9999) {
+    throw const IcsExpansionException(
+      'The last repeat is outside the portable calendar range.',
+    );
+  }
+  return latest;
+}
+
+void _validatePortableDraft(
+  InternalEventDraft draft,
+  String uid,
+  String? floatingZone,
+) {
+  if (!_hasPortableClock(draft.start, floatingZone) ||
+      !_hasPortableClock(draft.end, floatingZone)) {
+    throw IcsExpansionException(
+      'An exported event time falls in a daylight-saving gap.',
+      uid: uid,
+    );
+  }
+}
+
+bool _hasPortableClock(IcsDateTime value, String? floatingZone) {
+  if (value.kind == IcsDateTimeKind.date || value.kind == IcsDateTimeKind.utc) {
+    return true;
+  }
+  final name = value.timeZoneId ?? floatingZone;
+  final zone = name == null ? null : _portableZone(name);
+  final wall = value.components;
+  DateTime clock(DateTime instant) => zone == null
+      ? instant.toLocal()
+      : timezone.TZDateTime.from(instant, zone);
+  return [-2, 0, 2]
+      .map((day) => clock(wall.add(Duration(days: day))).timeZoneOffset)
+      .toSet()
+      .any((offset) {
+        final actual = clock(wall.subtract(offset));
+        return actual.year == wall.year &&
+            actual.month == wall.month &&
+            actual.day == wall.day &&
+            actual.hour == wall.hour &&
+            actual.minute == wall.minute &&
+            actual.second == wall.second;
+      });
 }

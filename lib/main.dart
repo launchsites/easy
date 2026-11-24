@@ -136,6 +136,33 @@ const _scheduleSettingsKey = 'schedulingSettings';
 const _healthKey = 'health';
 const _recurringEventsKey = 'recurringEvents';
 
+IcsCalendar _exportWorkspaceCalendar(
+  ({
+    List<CalendarEvent> events,
+    List<InternalRecurringEvent> series,
+    Set<String> seriesIds,
+  })
+  snapshot,
+) {
+  final standalone = exportIcsRecords([
+    for (final event in snapshot.events)
+      if (!snapshot.seriesIds.contains(event.id))
+        IcsExportRecord(
+          uid: event.id,
+          title: event.title,
+          start: event.start,
+          end: event.end.isAfter(event.start) ? event.end : null,
+          allDay: event.allDay,
+          location: event.location,
+          description: event.description,
+        ),
+  ], name: appName);
+  return standalone.withEvents([
+    ...standalone.events,
+    for (final series in snapshot.series) ...series.toIcsEvents(),
+  ]);
+}
+
 CalendarIdentity _localCalendar(String category) => CalendarIdentity(
   accountId: _localCalendarAccount,
   calendarId: category.isEmpty ? 'general' : category,
@@ -1198,20 +1225,18 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   Future<void> _openIcsTransfer([WorkspaceIcsCalendar? source]) async {
     final IcsCalendar export;
     try {
-      export = source != null
-          ? await compute(IcsCalendar.parse, source.document)
-          : exportIcsRecords([
-              for (final event in _data.events)
-                IcsExportRecord(
-                  uid: event.id,
-                  title: event.title,
-                  start: event.start,
-                  end: event.end.isAfter(event.start) ? event.end : null,
-                  allDay: event.allDay,
-                  location: event.location,
-                  description: event.description,
-                ),
-            ], name: appName);
+      if (source != null) {
+        export = await compute(IcsCalendar.parse, source.document);
+      } else {
+        final snapshot = _data.events;
+        final series = _eventSeries;
+        final idSet = _eventSeriesIds;
+        export = await compute(_exportWorkspaceCalendar, (
+          events: snapshot,
+          series: series,
+          seriesIds: idSet,
+        ));
+      }
     } catch (_) {
       if (mounted) _inform('This calendar could not be opened.');
       return;
