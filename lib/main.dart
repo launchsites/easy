@@ -13,6 +13,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'activities/activities.dart';
+import 'automation/automation.dart';
+import 'automation/workspace_automation_events.dart';
 import 'ai/ai_device_state.dart';
 import 'ai/ai_linux_credential_vault.dart';
 import 'ai/ai_runtime.dart';
@@ -129,6 +131,7 @@ part 'workspace_focus_suggestions.dart';
 part 'workspace_manual_sync_actions.dart';
 part 'workspace_workout_capture.dart';
 part 'workspace_task_objectives.dart';
+part 'workspace_automation.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -278,6 +281,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   var _futureRemovalOpen = false;
   var _manualSyncOpen = false;
   var _taskObjectivesOpen = false;
+  var _automationOpen = false;
+  Timer? _automationCalendarTimer;
+  Object? _automationCacheKey;
+  AutomationData? _cachedAutomation;
   var _planningDay = false;
   var _recordingVoice = false;
   final _heldVoiceOverlay = HeldVoiceCaptureOverlay();
@@ -401,6 +408,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     _aiViewChanges.dispose();
     _estimateTimer?.cancel();
     _focusSuggestionBoundary?.cancel();
+    _automationCalendarTimer?.cancel();
     _reminderDebounce?.cancel();
     _voiceTranscriber.cancel();
     _heldVoiceOverlay.dispose();
@@ -429,6 +437,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       setState(() {});
     }
     if (!_loading && state == AppLifecycleState.resumed) {
+      _queueAutomationCalendarCheck();
       unawaited(_refreshExternalCalendars(force: true));
       if (_reminderWorkspace case final saved?) {
         _queueReminderSync(saved, force: true);
@@ -437,6 +446,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         when _reminderDebounce?.isActive == true) {
       _queueReminderSync(saved, force: true, immediate: true);
     }
+    if (state != AppLifecycleState.resumed) _automationCalendarTimer?.cancel();
   }
 
   Future<void> _load() async {
@@ -490,6 +500,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _loadFailed = false;
     });
     _refreshCalendarViews();
+    _queueAutomationCalendarCheck();
     if (!_requiresWorkspaceSetup) _queueReminderSync(data, force: true);
     if (!_allows(EasyFeature.ai)) _ai?.setForeground(false);
     if (!_requiresWorkspaceSetup &&
@@ -865,7 +876,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       );
 
   void _calendarViewsChanged() {
-    if (!_loading) _changeWorkspaceView();
+    if (!_loading) {
+      _changeWorkspaceView();
+      _queueAutomationCalendarCheck();
+    }
   }
 
   void _changeWorkspaceView([VoidCallback? update]) {
@@ -991,6 +1005,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                       title: 'Daily review',
                       onTap: _openDailyReview,
                     ),
+                  SettingsItem(
+                    icon: Icons.rule_rounded,
+                    title: 'Automation rules',
+                    subtitle: 'Prepare follow-up items for review',
+                    onTap: _openAutomation,
+                  ),
                   if (features.allows(EasyFeature.planning))
                     SettingsItem(
                       icon: Icons.schedule_rounded,
@@ -1975,12 +1995,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   void _openDailyReview() {
     if (!_allows(EasyFeature.reviews)) return;
-    final saved = _data.sections[_reviewsKey];
     final ReviewData review;
     try {
-      review = saved == null
-          ? ReviewData()
-          : ReviewData.fromJson(saved as Map<String, dynamic>);
+      review = _readReviewData(_data);
     } catch (_) {
       _inform('Your review history could not be opened.');
       return;
@@ -1992,10 +2009,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           agendaForDay: _reviewAgenda,
           activityMinutesForDay: (day) =>
               _confirmedMinutes(day, plusDays(day, 1)),
-          onChanged: (data) => _commitReviewedData(
-            _data,
-            _data.withSection(_reviewsKey, data.toJson()),
-          ),
+          onChanged: _saveReviewWithAutomation,
           onRollForward: _rollReviewTaskForward,
           onReviewActions: _openCaptureReview,
         ),
@@ -2422,6 +2436,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       await _saveMutation(WorkspaceMutation.workspace(snapshot));
       _savedWorkspace = data;
       _queueReminderSync(data);
+      _queueAutomationCalendarCheck();
     }, () => _update(_data));
   }
 
@@ -2480,6 +2495,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final previousPlans = _workoutPlans;
     setState(() => _reviewSaving = true);
     final operation = _pendingSave.then((_) async {
+      var saved = false;
       try {
         if (!mounted ||
             !identical(_data, previous) ||
@@ -2509,6 +2525,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           );
         }
         await _saveMutation(mutation, operationId: operationId);
+        saved = true;
         _savedWorkspace = updated;
         _queueReminderSync(updated);
         if (mounted) {
@@ -2523,7 +2540,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           });
         }
       } finally {
-        if (mounted) setState(() => _reviewSaving = false);
+        if (mounted) {
+          setState(() => _reviewSaving = false);
+          if (saved) _queueAutomationCalendarCheck();
+        }
       }
     });
     _pendingSave = operation.then<void>((_) {}, onError: (Object _) {});
@@ -2751,7 +2771,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (session == null || !mounted) return;
     final sessions = _gymSessions!;
     final index = sessions.indexWhere(
-      (value) => value.startedAt == session.startedAt,
+      (value) => value.startedAt.isAtSameMomentAs(session.startedAt),
     );
     final updated = [...sessions];
     if (index == -1) {
@@ -2759,8 +2779,20 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     } else {
       updated[index] = session;
     }
-    setState(() => _gymSessions = updated);
-    _persistGymSessions();
+    final workout = index >= 0 && sessions[index].finished
+        ? null
+        : automationForWorkout(session);
+    final revised = _withAutomationEvents(_data, [?workout]);
+    final addedDraft = !identical(revised, _data);
+    setState(() {
+      _gymSessions = updated;
+      if (addedDraft) _assignData(revised);
+    });
+    if (addedDraft) {
+      _persistWorkoutWithAutomation();
+    } else {
+      _persistGymSessions();
+    }
   }
 
   void _persistGymSessions() {
@@ -2833,10 +2865,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   void _saveRecord(Object record) {
     if (record is CalendarEvent && record.isReadOnly) return;
+    TaskItem? oldTask;
     if (record is TaskItem) {
       final previous = _data.tasks
           .where((task) => task.id == record.id)
           .firstOrNull;
+      oldTask = previous;
       if (previous?.parentId != record.parentId) {
         final issue = taskParentIssue(_data.tasks, record.id, record.parentId);
         if (issue != null) {
@@ -2890,7 +2924,11 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (_inspected != null && _recordId(_inspected!) == _recordId(record)) {
       _inspected = record;
     }
-    _update(data);
+    _update(
+      record is TaskItem && oldTask?.done == false
+          ? _withAutomationEvents(data, [?automationForTask(record)])
+          : data,
+    );
   }
 
   Future<void> _deleteRecord(Object record) async {
@@ -3542,6 +3580,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final events = [...previous.events];
     final notes = [...previous.notes];
     final repeats = <String, RecurringTaskSeries>{};
+    final automation = <AutomationEvent>[];
     List<GymSession>? gym;
     GymSession? capturedSession;
     NutritionData? nutrition;
@@ -3674,6 +3713,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
               true,
               completedAt: DateTime.now().toUtc(),
             );
+            if (automationForTask(tasks[index]) case final event?) {
+              automation.add(event);
+            }
             continue;
           }
           final row = _taskFeed.row(
@@ -3687,10 +3729,15 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
               repeats.containsKey(row.series.id)) {
             return 'Review the task’s current state.';
           }
-          repeats[row.series.id] = row.series.complete(
+          final completed = row.series.complete(
             row.occurrence,
             at: DateTime.now().toUtc(),
           );
+          repeats[row.series.id] = completed;
+          if (_automationForRepeatedTask(completed, row.task.id)
+              case final event?) {
+            automation.add(event);
+          }
       }
     }
 
@@ -3714,7 +3761,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }
     await _commitReviewedData(
       previous,
-      updated,
+      _withAutomationEvents(updated, automation),
       operationId: '${source.id}-apply-${source.revision}',
       sessions: gym,
     );

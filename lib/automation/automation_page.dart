@@ -53,11 +53,15 @@ class _AutomationPageState extends State<AutomationPage> {
       final next = await change();
       if (mounted) setState(() => _data = next);
       return true;
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('The change could not be saved. Try again.'),
+          SnackBar(
+            content: Text(
+              error is FormatException
+                  ? error.message
+                  : 'The change could not be saved. Try again.',
+            ),
           ),
         );
       }

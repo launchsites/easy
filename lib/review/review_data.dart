@@ -417,6 +417,8 @@ class ReviewData {
   final Map<(String, String), HabitCheckin> _checkins;
 
   Iterable<Habit> get habits => _habits.values;
+  Iterable<ReviewReflection> get reflections =>
+      _days.values.expand((day) => day.reflections);
 
   DailyReview dayFor(DateTime day) =>
       _days[reviewDayKey(day)] ?? DailyReview(day: day);

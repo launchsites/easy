@@ -23,13 +23,19 @@ extension _WorkspaceRepeatingTasks on _WorkspaceState {
     for (final item in series) item.toJson(),
   ]);
 
-  Future<void> _saveTaskSeries(RecurringTaskSeries series) async {
+  Future<void> _saveTaskSeries(
+    RecurringTaskSeries series, {
+    AutomationEvent? completed,
+  }) async {
     final previous = _data;
     final updated = _upsert(_taskFeed.series, series, (item) => item.id);
     if (_taskSeriesUnreadable || updated.length > maximumTaskSeries) {
       throw const FormatException('This repeating task could not be stored.');
     }
-    await _commitReviewedData(previous, _withTaskSeries(previous, updated));
+    await _commitReviewedData(
+      previous,
+      _withAutomationEvents(_withTaskSeries(previous, updated), [?completed]),
+    );
   }
 
   TaskSeriesRow? _repeatingTask(Object? record) =>
@@ -169,7 +175,10 @@ extension _WorkspaceRepeatingTasks on _WorkspaceState {
         ? row.series.complete(row.occurrence, at: DateTime.now().toUtc())
         : row.series.reopen(row.occurrence);
     try {
-      await _saveTaskSeries(next);
+      await _saveTaskSeries(
+        next,
+        completed: done ? _automationForRepeatedTask(next, row.task.id) : null,
+      );
     } catch (_) {
       if (mounted) _inform('The task could not be updated.');
       return;
