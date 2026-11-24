@@ -13,6 +13,8 @@ An extracted 64-bit review archive from `12730c86ac311e5c473a6810a69cc31ec257f1f
 
 The extracted review archive from `6f18fe901e9c3b2622240ff8b17e26d626b0df3e` passed the same 38 checkpoints in 222.81 seconds. [Updated archive verification](benchmark-results/native-release-smoke-6f18fe9-epyc-20261124.json)
 
+The `5d2ef907c9a6396e34943606fe8e80b96d099d35` review archive passed 38 baseline checkpoints in 156.14 seconds after extraction. The same binary passed 101 more checkpoints with IPv4 and IPv6 sockets blocked across the personal-day journey, Today fit, calendar transfer, workout completion fault, and recurring workout plan. The bundle contained 23 regular files with no workspace database or preferences. [Baseline report](benchmark-results/native-release-smoke-5d2ef90-epyc-20261124.json) · [Five offline scenarios](benchmark-results/native-final-scenarios-5d2ef90-epyc-20261124.json)
+
 The runner uses Flutter's Linux x64 release bundle, Python 3, Xvfb, xdotool, ImageMagick, and Tesseract. It checks simulated pointer and keyboard input at desktop and phone dimensions. Android, iOS, and physical touch use require separate checks.
 
 ```sh

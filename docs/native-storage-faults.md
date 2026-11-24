@@ -24,6 +24,8 @@ python3 tool/benchmark/native_storage_faults.py \
 
 The packaged `d1ac727` Linux app ran at 1280 × 720 against a fresh synthetic profile. A reader pinned the SQLite WAL while the app process received a 32,992-byte file-size ceiling. Clicking **Mark done** displayed the save error. Five status samples contained no completion confirmation, and SQLite retained the exact revision 1 document and digest. Restoring the ceiling let the same inspector action commit once at revision 2. The task’s other fields and saved note matched the initial document. A newly launched process read the exact revision 2 document, and SQLite’s quick check passed at every observation. [Packaged app results](benchmark-results/native-storage-ui-fault-d1ac727-20261124.json)
 
+The extracted `5d2ef90` release repeated the test with the same file-size ceiling. All four sampled failure frames preceded any success. The rejected save kept the original revision and digest. The retry and restart agreed on revision 2 and its exact digest, with every SQLite quick check passing. [Current release results](benchmark-results/native-storage-ui-fault-5d2ef90-20261124.json)
+
 The probe uses Xvfb, xdotool, ImageMagick and Tesseract. Give it the unpacked Linux executable and its build verification JSON. It checks the executable and compiled application library hashes before launching a disposable profile. [Inspector probe](../tool/benchmark/native_storage_ui_fault.py)
 
 ```sh
