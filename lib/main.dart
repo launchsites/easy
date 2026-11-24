@@ -123,6 +123,7 @@ part 'workspace_activity_actions.dart';
 part 'workspace_onboarding.dart';
 part 'workspace_focus_suggestions.dart';
 part 'workspace_manual_sync_actions.dart';
+part 'workspace_workout_capture.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -3304,6 +3305,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       onApply: _applyCaptureReview,
       defaultTaskDate: _captureDefaults.dateFor,
       defaultCategory: _reviewDefaultCategory,
+      onInspectWorkout: _inspectWorkoutCapture,
       initialDraft: draft,
       onPlayDraft: mediaAvailable ? _playVoiceDraft : null,
       onAiReview: aiAvailable ? _reviewCaptureWithAi : null,
@@ -3391,9 +3393,24 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   Future<CaptureReview> _reviewCaptureText({
     String? draftId,
     required String text,
-  }) async => interpretCapture(
-    _captureInput(await _saveCaptureDraft(draftId: draftId, text: text)),
-  );
+  }) async {
+    final source = await _saveCaptureDraft(draftId: draftId, text: text);
+    final liveWorkout = _allows(EasyFeature.workouts)
+        ? _liveWorkoutFor(source.capturedAt, _gymSessions ?? const [])
+        : null;
+    return interpretCapture(
+      _captureInput(source),
+      matchesLiveWorkout: liveWorkout == null
+          ? null
+          : (entry) =>
+                reviewGymWorkoutCapture(
+                  session: liveWorkout,
+                  originalText: entry,
+                  recordedAt: source.capturedAt,
+                ).draft !=
+                null,
+    );
+  }
 
   Future<({CaptureArchiveEntry? draft, CaptureReview? review, String? message})>
   _reviewCaptureWithAi(
@@ -3471,6 +3488,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   Future<String?> _applyCaptureReview(
     CaptureReview review,
     List<CaptureProposal> selected,
+    Map<CaptureProposal, CaptureWorkoutSelection> workoutChanges,
   ) async {
     final previous = _data;
     final source = previous.captures
@@ -3485,6 +3503,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         selected.toSet().length != selected.length ||
         selected.any(
           (entry) => !entry.isReady || !review.proposals.contains(entry),
+        ) ||
+        workoutChanges.keys.any(
+          (entry) =>
+              entry.draft is! CaptureWorkoutDraft || !selected.contains(entry),
         )) {
       return 'Choose the ready items you want to add.';
     }
@@ -3553,21 +3575,35 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           final sessions = _gymSessions;
           if (sessions == null) return 'Workout history could not be opened.';
           gym ??= [...sessions];
+          final target =
+              capturedSession ?? _liveWorkoutFor(source.capturedAt, gym);
+          final literal = _workoutSourceText(review, proposal);
+          if (workoutChanges[proposal] case final reviewed?) {
+            if (target == null ||
+                reviewed.draft.originalText != literal ||
+                (reviewed.markExplicitCompletion &&
+                    !reviewed.draft.canConfirmCompletion)) {
+              return 'The workout changed. Review the current sets again.';
+            }
+            final updated = reviewed.draft.apply(
+              target,
+              entryId: id,
+              markExplicitCompletion: reviewed.markExplicitCompletion,
+            );
+            if (updated == null) {
+              return 'The workout changed. Review the current sets again.';
+            }
+            gym[gym.indexOf(target)] = updated;
+            capturedSession = updated;
+            continue;
+          }
           final entry = GymLogEntry(
             id: id,
             title: draft.title,
             loggedAt: source.capturedAt,
             actual: draft.details == draft.title ? null : draft.details,
+            captureText: literal.length <= 2400 ? literal : null,
           );
-          final target =
-              capturedSession ??
-              gym
-                  .where(
-                    (session) =>
-                        !session.finished &&
-                        !source.capturedAt.isBefore(session.startedAt),
-                  )
-                  .lastOrNull;
           if (target == null) {
             var start = source.capturedAt;
             final starts = gym.map((session) => session.startedAt).toSet();

@@ -79,6 +79,10 @@ final _loggedStretch = RegExp(
   r'^(?:(?:after|following)\s+.{1,100}?[ ,]+)?i\s+stretched[.!]?$',
   caseSensitive: false,
 );
+final _workoutSequenceLead = RegExp(
+  r'^(?:after|following)\s+',
+  caseSensitive: false,
+);
 final _mealPhrase = RegExp(r'^i\s+ate\s+', caseSensitive: false);
 final _completion = RegExp(
   r'^mark\s+(.+?)\s+(?:as\s+)?(?:done|complete)\s*[.!]?\s*$',
@@ -111,7 +115,10 @@ final _uncertainTime = RegExp(
 );
 
 /// Interprets supported, explicit capture language without mutating any record.
-CaptureReview interpretCapture(CaptureInput input) {
+CaptureReview interpretCapture(
+  CaptureInput input, {
+  bool Function(String text)? matchesLiveWorkout,
+}) {
   final source = _Slice(input.text, 0, input.text.length).trim();
   if (source.start == source.end) {
     return CaptureReview(
@@ -127,9 +134,9 @@ CaptureReview interpretCapture(CaptureInput input) {
   final names = _CategoryNames(input.context.categories);
   final proposals = <CaptureProposal>[];
   final issues = <CaptureIssue>[];
-  for (final clause in _split(source, names)) {
+  for (final clause in _split(source, names, matchesLiveWorkout)) {
     final scope = _readScope(clause, names);
-    final lead = _readLead(scope.body, forced: scope.forcedKind);
+    final lead = _readScopedLead(scope, matchesLiveWorkout: matchesLiveWorkout);
     if (lead == null || lead.blocked) {
       issues.add(
         CaptureIssue(
@@ -365,7 +372,25 @@ _Lead _namedLead(String label, _Slice body) {
   }, body);
 }
 
-_Lead? _readLead(_Slice body, {String? forced, bool impliedEvent = true}) {
+_Lead? _readScopedLead(
+  _Scope scope, {
+  bool impliedEvent = true,
+  bool Function(String text)? matchesLiveWorkout,
+}) => _readLead(
+  scope.body,
+  forced: scope.forcedKind,
+  impliedEvent: impliedEvent,
+  matchesLiveWorkout: scope.category == null || scope.category == 'gym'
+      ? matchesLiveWorkout
+      : null,
+);
+
+_Lead? _readLead(
+  _Slice body, {
+  String? forced,
+  bool impliedEvent = true,
+  bool Function(String text)? matchesLiveWorkout,
+}) {
   final text = body.text;
   if (forced != null) return _namedLead(forced, body);
   if (_kindPrefix.firstMatch(text) case final match?) {
@@ -395,6 +420,9 @@ _Lead? _readLead(_Slice body, {String? forced, bool impliedEvent = true}) {
   if (_taskPhrase.firstMatch(text) case final match?) {
     return _Lead(CaptureIntentKind.task, body.skip(match.end));
   }
+  if (matchesLiveWorkout?.call(text) == true) {
+    return _Lead(CaptureIntentKind.workout, body);
+  }
   if (_taskVerb.hasMatch(text) ||
       taskCategoryHint(text, const {'gym', 'study', 'work'}) != null) {
     return _Lead(CaptureIntentKind.task, body);
@@ -406,7 +434,11 @@ _Lead? _readLead(_Slice body, {String? forced, bool impliedEvent = true}) {
   return null;
 }
 
-Iterable<_Slice> _split(_Slice source, _CategoryNames names) sync* {
+Iterable<_Slice> _split(
+  _Slice source,
+  _CategoryNames names, [
+  bool Function(String text)? matchesLiveWorkout,
+]) sync* {
   final text = source.text;
   var from = 0;
   bool? noteClause;
@@ -428,10 +460,10 @@ Iterable<_Slice> _split(_Slice source, _CategoryNames names) sync* {
       source.start + limit,
     ).trim();
     final scope = _readScope(next, names);
-    final nextLead = _readLead(
-      scope.body,
-      forced: scope.forcedKind,
+    final nextLead = _readScopedLead(
+      scope,
       impliedEvent: hard,
+      matchesLiveWorkout: matchesLiveWorkout,
     );
     if (!hard && nextLead == null) continue;
     final clause = _Slice(
@@ -443,6 +475,12 @@ Iterable<_Slice> _split(_Slice source, _CategoryNames names) sync* {
       if (_commaScope.hasMatch(clause.text)) continue;
       final previous = _readScope(clause, names);
       if (previous.forcedKind != null && previous.body.text.isEmpty) continue;
+      if (nextLead?.kind == CaptureIntentKind.workout &&
+          _workoutSequenceLead.hasMatch(previous.body.text) &&
+          _readScopedLead(previous, matchesLiveWorkout: matchesLiveWorkout) ==
+              null) {
+        continue;
+      }
     }
     if (nextLead == null) {
       if (noteClause == null) {

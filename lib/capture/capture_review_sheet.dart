@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../categories/category_palette.dart';
+import '../gym_session.dart';
 import '../ui_theme.dart';
 import 'capture_archive.dart';
 import 'capture_interpreter.dart';
@@ -19,7 +20,16 @@ typedef ReviewCaptureText = Future<CaptureReview> Function({
 typedef ApplyCaptureItems = Future<String?> Function(
   CaptureReview,
   List<CaptureProposal>,
+  Map<CaptureProposal, CaptureWorkoutSelection>,
 );
+typedef CaptureWorkoutPreview = ({
+  GymWorkoutCaptureDraft? draft,
+  String detail,
+});
+typedef CaptureWorkoutSelection = ({
+  GymWorkoutCaptureDraft draft,
+  bool markExplicitCompletion,
+});
 typedef ReviewCaptureWithAi =
     Future<
       ({CaptureArchiveEntry? draft, CaptureReview? review, String? message})
@@ -40,6 +50,7 @@ class CaptureReviewSheet extends StatefulWidget {
     this.onCancelTranscription,
     this.defaultTaskDate,
     this.defaultCategory,
+    this.onInspectWorkout,
     this.disabledKinds = const {},
     super.key,
   });
@@ -56,6 +67,8 @@ class CaptureReviewSheet extends StatefulWidget {
   final VoidCallback? onCancelTranscription;
   final DateTime? Function(DateTime)? defaultTaskDate;
   final String? Function(CaptureProposal)? defaultCategory;
+  final CaptureWorkoutPreview? Function(CaptureReview, CaptureProposal)?
+  onInspectWorkout;
   final Set<CaptureIntentKind> disabledKinds;
 
   @override
@@ -72,6 +85,8 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
   var _usingAi = false;
   var _transcribing = false;
   final _selected = <CaptureProposal>{};
+  var _workouts = <CaptureProposal, CaptureWorkoutPreview>{};
+  final _completedWorkouts = <CaptureProposal>{};
 
   @override
   void initState() {
@@ -125,6 +140,14 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
               audio: old?.audio,
             );
         _review = review;
+        _workouts = {
+          if (widget.onInspectWorkout case final inspect?)
+            for (final proposal in review.proposals)
+              if (proposal.isReady &&
+                  !widget.disabledKinds.contains(proposal.draft.kind))
+                proposal: ?inspect(review, proposal),
+        };
+        _completedWorkouts.clear();
         _selected
           ..clear()
           ..addAll(
@@ -156,10 +179,15 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
       _error = null;
     });
     try {
-      final error = await widget.onApply(
-        review,
-        review.proposals.where(_selected.contains).toList(),
-      );
+      final selected = review.proposals.where(_selected.contains).toList();
+      final error = await widget.onApply(review, selected, {
+        for (final proposal in selected)
+          if (_workouts[proposal]?.draft case final draft?)
+            proposal: (
+              draft: draft,
+              markExplicitCompletion: _completedWorkouts.contains(proposal),
+            ),
+      });
       if (!mounted) return;
       if (error == null) {
         Navigator.pop(context);
@@ -180,6 +208,8 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
       _review = null;
       _error = null;
       _selected.clear();
+      _workouts.clear();
+      _completedWorkouts.clear();
     });
   }
 
@@ -352,6 +382,18 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
                         featureDisabled: widget.disabledKinds.contains(
                           proposal.draft.kind,
                         ),
+                        workout: _workouts[proposal],
+                        workoutComplete: _completedWorkouts.contains(proposal),
+                        toggleWorkoutComplete:
+                            _working || !_selected.contains(proposal)
+                            ? null
+                            : (checked) => setState(() {
+                                if (checked == true) {
+                                  _completedWorkouts.add(proposal);
+                                } else {
+                                  _completedWorkouts.remove(proposal);
+                                }
+                              }),
                         selected: _selected.contains(proposal),
                         toggle:
                             _working ||
@@ -365,6 +407,7 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
                                   _selected.add(proposal);
                                 } else {
                                   _selected.remove(proposal);
+                                  _completedWorkouts.remove(proposal);
                                 }
                               }),
                       ),
@@ -453,6 +496,9 @@ class _ProposalTile extends StatelessWidget {
     required this.featureDisabled,
     required this.defaultTaskDate,
     required this.defaultCategory,
+    required this.workout,
+    required this.workoutComplete,
+    required this.toggleWorkoutComplete,
   });
 
   final CaptureProposal proposal;
@@ -462,6 +508,9 @@ class _ProposalTile extends StatelessWidget {
   final bool featureDisabled;
   final DateTime? Function(DateTime)? defaultTaskDate;
   final String? Function(CaptureProposal)? defaultCategory;
+  final CaptureWorkoutPreview? workout;
+  final bool workoutComplete;
+  final ValueChanged<bool?>? toggleWorkoutComplete;
 
   @override
   Widget build(BuildContext context) {
@@ -513,7 +562,7 @@ class _ProposalTile extends StatelessWidget {
           value: selected,
           onChanged: toggle,
           controlAffinity: ListTileControlAffinity.leading,
-          title: Text(draft.title),
+          title: Text(workout?.draft?.title ?? draft.title),
           subtitle: Text(
             [
               label,
@@ -524,12 +573,25 @@ class _ProposalTile extends StatelessWidget {
               if (draft is CaptureTaskDraft)
                 ?taskSchedulingHoldHint(draft.title)?.message,
               ?detail,
+              ?workout?.detail,
               if (proposal.missingRequired.isNotEmpty)
                 'Needs ${proposal.missingRequired.join(', ')}',
               for (final issue in proposal.issues) issue.message,
             ].join(' · '),
           ),
         ),
+        if (selected && workout?.draft?.canConfirmCompletion == true)
+          CheckboxListTile(
+            dense: true,
+            value: workoutComplete,
+            onChanged: toggleWorkoutComplete,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: Text(
+              workout?.draft?.kind == GymWorkoutCaptureKind.strength
+                  ? 'Mark these sets done'
+                  : 'Mark this exercise done',
+            ),
+          ),
         const Divider(),
       ],
     );
