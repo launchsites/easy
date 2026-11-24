@@ -22,6 +22,7 @@ Future<void> main(List<String> args) async {
           '--json-object',
           '--json-schema',
           '--json-schema-meanings',
+          '--production-json-schema',
         }.contains,
       )
       .toList();
@@ -36,6 +37,7 @@ Future<void> main(List<String> args) async {
   final jsonObject = option == '--json-object';
   final meanings = option == '--json-schema-meanings';
   final jsonSchema = option == '--json-schema' || meanings;
+  final productionSchema = option == '--production-json-schema';
   if (args.length < 4 ||
       modes.length > 1 ||
       limits.length > 1 ||
@@ -46,7 +48,8 @@ Future<void> main(List<String> args) async {
     stderr.writeln(
       'Usage: dart run tool/benchmark/provider_capture_bench.dart '
       'http://127.0.0.1:PORT/v1 MODEL CASES_JSON OUTPUT_JSON '
-      '[--json-object | --json-schema | --json-schema-meanings] '
+      '[--json-object | --json-schema | --json-schema-meanings | '
+      '--production-json-schema] '
       '[--max-output-tokens=80…1024]',
     );
     exitCode = 2;
@@ -58,6 +61,7 @@ Future<void> main(List<String> args) async {
     maxInputTokens: 8192,
     maxOutputTokens: limit,
     jsonObjectMode: jsonObject,
+    captureJsonSchema: productionSchema,
   );
   if (config.completionsEndpoint == null) {
     throw ArgumentError('Use a literal loopback endpoint.');
@@ -76,7 +80,7 @@ Future<void> main(List<String> args) async {
     persistBudget: (_) async {
       throw StateError('A local request must not reserve spend.');
     },
-    timeout: const Duration(seconds: 60),
+    timeout: Duration(seconds: productionSchema ? 30 : 60),
   );
   final results = <Map<String, Object?>>[];
   try {
@@ -148,6 +152,7 @@ Future<void> main(List<String> args) async {
     'model_label': args[1],
     'json_object_mode': jsonObject,
     'experimental_json_schema': jsonSchema,
+    'production_json_schema': productionSchema,
     'experimental_category_meanings': meanings,
     'maximum_output_tokens': limit,
     'clock_anchor': anchor.toIso8601String(),

@@ -18,7 +18,8 @@ class AiProviderConfig {
     this.allowEstimates = false,
     this.jsonObjectMode = true,
     this.tokenLimitField = AiTokenLimitField.maxCompletionTokens,
-  }) : execution = AiExecution.paidApi;
+  }) : execution = AiExecution.paidApi,
+       captureJsonSchema = false;
 
   const AiProviderConfig.loopback({
     required this.baseUri,
@@ -27,6 +28,7 @@ class AiProviderConfig {
     required this.maxOutputTokens,
     this.allowEstimates = false,
     this.jsonObjectMode = false,
+    this.captureJsonSchema = false,
     this.tokenLimitField = AiTokenLimitField.maxTokens,
   }) : execution = AiExecution.local,
        credentialRef = null,
@@ -41,6 +43,10 @@ class AiProviderConfig {
   final int maxOutputTokens;
   final bool allowEstimates;
   final bool jsonObjectMode;
+
+  /// Requests a strict, capture-specific response schema from a compatible
+  /// loopback runtime. Replies still pass the normal capture validator.
+  final bool captureJsonSchema;
   final AiTokenLimitField tokenLimitField;
 
   AiBudgetRequest budgetRequest(String id, {required AiWorkKind work}) =>

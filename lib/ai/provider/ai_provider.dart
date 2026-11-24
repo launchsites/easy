@@ -10,6 +10,7 @@ import '../ai_budget.dart';
 import '../inference_jobs.dart';
 import '../vision/meal_vision.dart';
 import '../vision/vision_image.dart';
+import 'capture_json_schema.dart';
 import 'http_client_portable.dart'
     if (dart.library.io) 'http_client_io.dart'
     as platform;
@@ -134,6 +135,7 @@ class AiProviderClient {
         config,
         estimate ? _estimateInstructions : _captureInstructions,
         payload,
+        isCapture: !estimate,
       );
       return bytes.length <= _maxRequestBytes &&
           bytes.length <= config.maxInputTokens;
@@ -216,10 +218,13 @@ class AiProviderClient {
       oversizeInput: input.text.length > _maxRequestBytes,
       instructions: _captureInstructions,
       payload: () => fields,
+      isCapture: true,
       parse: (content) {
         if (content.length > 128 * 1024) return null;
         final response = _jsonObject(content);
-        if (response == null || !_usesOfferedCategories(response, fields)) {
+        if (response == null ||
+            (config.captureJsonSchema && response['version'] != 2) ||
+            !_usesOfferedCategories(response, fields)) {
           return null;
         }
         final review = validateModelCapture(input, response);
@@ -293,6 +298,7 @@ class AiProviderClient {
     required String instructions,
     required Map<String, Object?> Function() payload,
     required T? Function(String content) parse,
+    bool isCapture = false,
     AiVisionImage? image,
     int imageInputTokenCeiling = 0,
   }) async {
@@ -352,7 +358,12 @@ class AiProviderClient {
     final int textBytes;
     try {
       final fields = payload();
-      final text = _requestBytes(config, instructions, fields);
+      final text = _requestBytes(
+        config,
+        instructions,
+        fields,
+        isCapture: isCapture,
+      );
       textBytes = text.length;
       bytes = image == null
           ? text
@@ -549,6 +560,7 @@ List<int> _requestBytes(
   String instructions,
   Map<String, Object?> payload, {
   AiVisionImage? image,
+  bool isCapture = false,
 }) => utf8.encode(
   jsonEncode({
     'model': config.model,
@@ -569,7 +581,10 @@ List<int> _requestBytes(
     ],
     'stream': false,
     config.tokenLimitProperty: config.maxOutputTokens,
-    if (config.jsonObjectMode) 'response_format': {'type': 'json_object'},
+    if (isCapture && config.captureJsonSchema)
+      'response_format': captureJsonSchemaResponseFormat(payload)
+    else if (config.jsonObjectMode)
+      'response_format': {'type': 'json_object'},
   }),
 );
 

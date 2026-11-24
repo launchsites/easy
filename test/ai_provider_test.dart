@@ -37,6 +37,7 @@ void main() {
         final json = jsonDecode(body) as Map<String, dynamic>;
         expect(json['max_completion_tokens'], 100);
         expect(json['stream'], false);
+        expect(json['response_format'], {'type': 'json_object'});
         return _completion(
           _captureOutput(fixture.input),
           input: 20,
@@ -231,6 +232,194 @@ void main() {
       expect(result.accounting, isNull);
       expect(fixture.vault.references, isEmpty);
       expect(fixture.saved, isEmpty);
+    },
+  );
+
+  test(
+    'opt-in local schema contains only the offered capture fields',
+    () async {
+      final fixture = _Fixture();
+      final config = _local(captureJsonSchema: true);
+      final input = CaptureInput(
+        id: fixture.input.id,
+        revision: fixture.input.revision,
+        text: 'Task: Send the brief; Event: Private appointment 7–8pm',
+        context: CaptureContext(
+          anchor: _clock(),
+          revision: fixture.input.context.revision,
+          categories: const {'work': 'Work', 'custom': 'Hidden category'},
+        ),
+      );
+      final provider = fixture.provider((request) async {
+        final body = (request as http.Request).body;
+        expect(body, isNot(contains('Hidden category')));
+        expect(body, isNot(contains('Private appointment')));
+        final decoded = jsonDecode(body) as Map;
+        final format = decoded['response_format'] as Map;
+        expect(format['type'], 'json_schema');
+        final wrapper = format['json_schema'] as Map;
+        expect(wrapper['name'], 'capture_suggestions');
+        expect(wrapper['strict'], true);
+        final schema = wrapper['schema'] as Map;
+        expect(schema['additionalProperties'], false);
+        final properties = schema['properties'] as Map;
+        expect(properties['version'], {
+          'enum': [2],
+        });
+        expect(properties['captureId'], {
+          'enum': [input.id],
+        });
+        expect(properties['sourceRevision'], {
+          'enum': [input.revision],
+        });
+        expect(properties['contextRevision'], {
+          'enum': [input.context.revision],
+        });
+        final suggestions = properties['suggestions'] as Map;
+        expect(suggestions['type'], 'array');
+        expect(suggestions['maxItems'], 1);
+        final items = suggestions['items'] as Map;
+        expect(items['additionalProperties'], false);
+        expect(items['required'], ['clause', 'kind', 'category']);
+        expect(items['properties'], {
+          'clause': {
+            'enum': [0],
+          },
+          'kind': {
+            'enum': ['category'],
+          },
+          'category': {
+            'enum': ['work', null],
+          },
+        });
+        return _completion(_enrichedOutput(input));
+      });
+      expect(provider.fitsRequest(config, aiCapturePayload(input)), true);
+      final result = await provider.capture(
+        config: config,
+        claim: fixture.claim(config),
+        input: input,
+        currentRevision: fixture.currentRevision,
+      );
+      expect(result.succeeded, true);
+      expect(result.value!.proposals.first.draft.category, 'work');
+      expect(result.value!.proposals.first.requiresSelection, true);
+      expect(fixture.saved, isEmpty);
+      expect(fixture.vault.references, isEmpty);
+    },
+  );
+
+  test('a local grammar keeps version, disclosure and dedup fences', () async {
+    final config = _local(captureJsonSchema: true);
+    for (final drift in ['legacy', 'extra category', 'duplicate clause']) {
+      final fixture = _Fixture();
+      final input = fixture.input;
+      final proposal = {
+        'clause': 0,
+        'kind': 'category',
+        'category': 'personal',
+      };
+      final result = await fixture
+          .provider(
+            (_) async => _completion(switch (drift) {
+              'legacy' => _captureOutput(input),
+              'extra category' => _enrichedOutput(input, category: 'unknown'),
+              _ => _enrichedOutput(
+                input,
+              )..['suggestions'] = [proposal, proposal],
+            }),
+          )
+          .capture(
+            config: config,
+            claim: fixture.claim(config),
+            input: input,
+            currentRevision: fixture.currentRevision,
+          );
+      expect(result.failure, AiProviderFailure.invalidResponse, reason: drift);
+      expect(result.value, isNull);
+      expect(fixture.saved, isEmpty);
+    }
+  });
+
+  test('a server rejecting local capture schemas receives no retry', () async {
+    final fixture = _Fixture();
+    final config = _local(captureJsonSchema: true);
+    var calls = 0;
+    final result = await fixture
+        .provider((_) async {
+          calls++;
+          return http.StreamedResponse(const Stream.empty(), 400);
+        })
+        .capture(
+          config: config,
+          claim: fixture.claim(config),
+          input: fixture.input,
+          currentRevision: fixture.currentRevision,
+        );
+    expect(calls, 1);
+    expect(result.failure, AiProviderFailure.providerRejected);
+    expect(result.statusCode, 400);
+    expect(fixture.saved, isEmpty);
+  });
+
+  test('local capture schema does not change the estimate request', () async {
+    final fixture = _Fixture();
+    final config = _local(captureJsonSchema: true, allowEstimates: true);
+    final provider = fixture.provider((request) async {
+      final body = jsonDecode((request as http.Request).body) as Map;
+      expect(body.containsKey('response_format'), false);
+      expect(request.headers.containsKey('authorization'), false);
+      return _completion({
+        'captureId': fixture.input.id,
+        'sourceRevision': fixture.input.revision,
+        'contextRevision': fixture.input.context.revision,
+        'minutes': 35,
+      });
+    });
+    final result = await provider.estimate(
+      config: config,
+      claim: fixture.claim(config, work: AiWorkKind.discretionary),
+      input: AiEstimateInput(title: 'Draft the brief'),
+      currentRevision: fixture.currentRevision,
+    );
+    expect(result.value!.duration, const Duration(minutes: 35));
+    expect(fixture.saved, isEmpty);
+  });
+
+  test(
+    'local capture schema overhead is included in the request limit',
+    () async {
+      final fixture = _Fixture();
+      int? wireBytes;
+      final plain = _local();
+      await fixture
+          .provider((request) async {
+            wireBytes = (request as http.Request).bodyBytes.length;
+            return _completion(_captureOutput(fixture.input));
+          })
+          .capture(
+            config: plain,
+            claim: fixture.claim(plain),
+            input: fixture.input,
+            currentRevision: fixture.currentRevision,
+          );
+      final limited = _Fixture();
+      final config = _local(
+        captureJsonSchema: true,
+        maxInputTokens: wireBytes!,
+      );
+      final provider = limited.provider(_unexpected);
+      expect(
+        provider.fitsRequest(config, aiCapturePayload(limited.input)),
+        false,
+      );
+      final result = await provider.capture(
+        config: config,
+        claim: limited.claim(config),
+        input: limited.input,
+        currentRevision: limited.currentRevision,
+      );
+      expect(result.failure, AiProviderFailure.requestTooLarge);
     },
   );
 
@@ -654,13 +843,32 @@ AiProviderConfig _paid({
   allowEstimates: allowEstimates,
 );
 
-AiProviderConfig _local({String address = 'http://127.0.0.1:8800/v1'}) =>
-    AiProviderConfig.loopback(
-      baseUri: Uri.parse(address),
-      model: 'local-fixture',
-      maxInputTokens: 10000,
-      maxOutputTokens: 100,
-    );
+AiProviderConfig _local({
+  String address = 'http://127.0.0.1:8800/v1',
+  bool captureJsonSchema = false,
+  bool allowEstimates = false,
+  int maxInputTokens = 10000,
+}) => AiProviderConfig.loopback(
+  baseUri: Uri.parse(address),
+  model: 'local-fixture',
+  maxInputTokens: maxInputTokens,
+  maxOutputTokens: 100,
+  captureJsonSchema: captureJsonSchema,
+  allowEstimates: allowEstimates,
+);
+
+Map<String, Object> _enrichedOutput(
+  CaptureInput input, {
+  String category = 'work',
+}) => {
+  'version': 2,
+  'captureId': input.id,
+  'sourceRevision': input.revision,
+  'contextRevision': input.context.revision,
+  'suggestions': [
+    {'clause': 0, 'kind': 'category', 'category': category},
+  ],
+};
 
 class _Fixture {
   _Fixture({String? vaultValue = _fakeKey, AiBudgetLedger? sharedLedger})
