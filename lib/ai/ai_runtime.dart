@@ -78,6 +78,7 @@ class AiAutomaticPreview {
     required this.endpoint,
     required this.model,
     required this.includeOptionalMetadata,
+    required this.adaptiveEstimatePacing,
     required this.reserveMicros,
     required this.monthlyCapMicros,
   });
@@ -86,6 +87,7 @@ class AiAutomaticPreview {
   final Uri endpoint;
   final String model;
   final bool includeOptionalMetadata;
+  final bool adaptiveEstimatePacing;
   final int? reserveMicros;
   final int monthlyCapMicros;
 }
@@ -160,12 +162,42 @@ class AiRuntime extends ChangeNotifier {
       _storageReady && _settings.allowMealVision && _settings.provider != null;
   List<AiPendingEstimate> get pendingEstimates => _enrichment.pending;
 
+  bool get automaticEstimateOpportunity {
+    final pace = _automaticPace();
+    return pace != null && _enrichment.permitsTime(_clock(), pace);
+  }
+
   bool canAutomaticallyEstimate(AiEnrichmentCandidate candidate) =>
-      _storageReady &&
-      _foreground &&
-      _settings.automaticEstimates &&
+      automaticEstimateOpportunity &&
       candidate.valid &&
-      _enrichment.permits(candidate, AiEnrichmentState.hourOf(_clock()));
+      _enrichment.attempted[candidate.taskId] != candidate.revision;
+
+  AiAutomaticPace? _automaticPace() {
+    if (!_storageReady ||
+        !_foreground ||
+        !_settings.automaticEstimates ||
+        _enrichment.pending.length >= 32) {
+      return null;
+    }
+    final adaptive = _settings.adaptiveEstimatePacing;
+    return switch (_settings.route) {
+      AiRoute.offline => null,
+      AiRoute.local => AiAutomaticPace.forLocal(adaptive: adaptive),
+      AiRoute.api => AiAutomaticPace.forApi(
+        budget: budget,
+        requestMicros: _maximumAutomaticQuote(_settings),
+        adaptive: adaptive,
+      ),
+    };
+  }
+
+  int? _maximumAutomaticQuote(AiRuntimeSettings settings) {
+    final quote = settings.provider?.budgetRequest(
+      'automatic-estimate-preview',
+      work: AiWorkKind.discretionary,
+    );
+    return quote == null ? null : _ledger.maximumCost(quote);
+  }
 
   List<AiPendingEstimate> currentPendingEstimates(AiRevisionLookup current) =>
       List.unmodifiable(
@@ -265,6 +297,7 @@ class AiRuntime extends ChangeNotifier {
           endpoint: config.completionsEndpoint!,
           model: config.model,
           includeOptionalMetadata: next.includeOptionalMetadata,
+          adaptiveEstimatePacing: next.adaptiveEstimatePacing,
           reserveMicros: next.route == AiRoute.api
               ? _ledger.maximumCost(
                   config.budgetRequest(
@@ -557,7 +590,9 @@ class AiRuntime extends ChangeNotifier {
     if (_busy) return status(AiRunStatus.busy);
     if (!_current(source, currentRevision)) return status(AiRunStatus.stale);
     final activeSettings = settings;
-    if (automatic != null && !canAutomaticallyEstimate(automatic)) {
+    final pace = automatic == null ? null : _automaticPace();
+    if (automatic != null &&
+        (pace == null || !_enrichment.permits(automatic, _clock(), pace))) {
       return status(AiRunStatus.blocked);
     }
     final discretionary = work == AiWorkKind.discretionary;
@@ -669,14 +704,14 @@ class AiRuntime extends ChangeNotifier {
       }
       if (automatic != null) {
         final remembered = await _writeLane(() async {
-          final hour = AiEnrichmentState.hourOf(_clock());
+          final now = _clock();
           if (!_foreground ||
               _cancelRequested ||
               !_current(source, currentRevision) ||
-              !_enrichment.permits(automatic, hour)) {
+              !_enrichment.permits(automatic, now, pace!)) {
             return false;
           }
-          return _writeEnrichment(_enrichment.withAttempt(automatic, hour));
+          return _writeEnrichment(_enrichment.withAttempt(automatic, now));
         });
         if (!remembered) {
           queue.cancel(id);
@@ -908,6 +943,7 @@ bool _automaticNeedsConsent(AiRuntimeSettings before, AiRuntimeSettings after) {
       prior?.model != next?.model ||
       prior?.tokenLimitField != next?.tokenLimitField ||
       (!before.includeOptionalMetadata && after.includeOptionalMetadata) ||
+      (!before.adaptiveEstimatePacing && after.adaptiveEstimatePacing) ||
       after.monthlyCapMicros > before.monthlyCapMicros ||
       after.maxInputTokens > before.maxInputTokens ||
       after.maxOutputTokens > before.maxOutputTokens ||

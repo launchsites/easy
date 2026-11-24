@@ -76,6 +76,7 @@ class AiRuntimeSettings {
     this.confirmLocal = true,
     this.allowEstimates = false,
     this.automaticEstimates = false,
+    this.adaptiveEstimatePacing = false,
     this.allowMealVision = false,
     this.imageInputTokenCeiling,
     this.apiUsesCompletionTokenLimit = true,
@@ -95,6 +96,7 @@ class AiRuntimeSettings {
   final bool confirmLocal;
   final bool allowEstimates;
   final bool automaticEstimates;
+  final bool adaptiveEstimatePacing;
   final bool allowMealVision;
   final int? imageInputTokenCeiling;
   final bool apiUsesCompletionTokenLimit;
@@ -111,6 +113,7 @@ class AiRuntimeSettings {
       (apiBaseUrl.trim().isEmpty || _apiAddress != null) &&
       (localBaseUrl.trim().isEmpty || _localAddress != null) &&
       (!automaticEstimates || (allowEstimates && route != AiRoute.offline)) &&
+      (!adaptiveEstimatePacing || automaticEstimates) &&
       (imageInputTokenCeiling == null ||
           (imageInputTokenCeiling! > 0 &&
               _nonnegative(imageInputTokenCeiling!))) &&
@@ -218,32 +221,34 @@ class AiRuntimeSettings {
     'confirmLocal': confirmLocal,
     'allowEstimates': allowEstimates,
     'automaticEstimates': automaticEstimates,
+    'adaptiveEstimatePacing': adaptiveEstimatePacing,
     'allowMealVision': allowMealVision,
     'imageInputTokenCeiling': imageInputTokenCeiling,
     'apiUsesCompletionTokenLimit': apiUsesCompletionTokenLimit,
   };
 
-  factory AiRuntimeSettings.fromJson(Map<String, dynamic> values) =>
-      AiRuntimeSettings(
-        route: AiRoute.values.byName(values['route'] as String),
-        apiBaseUrl: values['apiBaseUrl'] as String,
-        apiModel: values['apiModel'] as String,
-        localBaseUrl: values['localBaseUrl'] as String,
-        localModel: values['localModel'] as String,
-        monthlyCapMicros: values['monthlyCapMicros'] as int,
-        inputMicrosPerMillion: values['inputMicrosPerMillion'] as int?,
-        outputMicrosPerMillion: values['outputMicrosPerMillion'] as int?,
-        maxInputTokens: values['maxInputTokens'] as int,
-        maxOutputTokens: values['maxOutputTokens'] as int,
-        includeOptionalMetadata: values['includeOptionalMetadata'] as bool,
-        confirmLocal: values['confirmLocal'] as bool,
-        allowEstimates: values['allowEstimates'] as bool,
-        automaticEstimates: values['automaticEstimates'] as bool? ?? false,
-        allowMealVision: values['allowMealVision'] as bool? ?? false,
-        imageInputTokenCeiling: values['imageInputTokenCeiling'] as int?,
-        apiUsesCompletionTokenLimit:
-            values['apiUsesCompletionTokenLimit'] as bool,
-      );
+  factory AiRuntimeSettings.fromJson(
+    Map<String, dynamic> values,
+  ) => AiRuntimeSettings(
+    route: AiRoute.values.byName(values['route'] as String),
+    apiBaseUrl: values['apiBaseUrl'] as String,
+    apiModel: values['apiModel'] as String,
+    localBaseUrl: values['localBaseUrl'] as String,
+    localModel: values['localModel'] as String,
+    monthlyCapMicros: values['monthlyCapMicros'] as int,
+    inputMicrosPerMillion: values['inputMicrosPerMillion'] as int?,
+    outputMicrosPerMillion: values['outputMicrosPerMillion'] as int?,
+    maxInputTokens: values['maxInputTokens'] as int,
+    maxOutputTokens: values['maxOutputTokens'] as int,
+    includeOptionalMetadata: values['includeOptionalMetadata'] as bool,
+    confirmLocal: values['confirmLocal'] as bool,
+    allowEstimates: values['allowEstimates'] as bool,
+    automaticEstimates: values['automaticEstimates'] as bool? ?? false,
+    adaptiveEstimatePacing: values['adaptiveEstimatePacing'] as bool? ?? false,
+    allowMealVision: values['allowMealVision'] as bool? ?? false,
+    imageInputTokenCeiling: values['imageInputTokenCeiling'] as int?,
+    apiUsesCompletionTokenLimit: values['apiUsesCompletionTokenLimit'] as bool,
+  );
 }
 
 bool _nonnegative(int value) => value >= 0 && value <= aiMaxExactInteger;

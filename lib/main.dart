@@ -307,6 +307,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   final _aiViewChanges = ValueNotifier(0);
   Timer? _estimateTimer;
   int? _lastEstimateCheck;
+  DateTime _lastWorkspaceInput = DateTime.now();
   final _voiceTranscriber = LocalTranscriber();
   VoiceTranscriptionConfig? _voiceConfig;
 
@@ -1056,7 +1057,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _estimateTimer = null;
       return;
     }
-    _estimateTimer ??= Timer.periodic(const Duration(minutes: 4), (_) {
+    _estimateTimer ??= Timer.periodic(const Duration(minutes: 2), (_) {
       unawaited(_runAutomaticEstimate());
     });
   }
@@ -1105,14 +1106,17 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         runtime == null ||
         runtime.busy ||
         !_allows(EasyFeature.ai) ||
-        !runtime.settings.automaticEstimates) {
+        !runtime.automaticEstimateOpportunity ||
+        ModalRoute.of(context)?.isCurrent != true) {
       return;
     }
     final now = DateTime.now();
-    final hour =
-        now.toUtc().millisecondsSinceEpoch ~/ Duration.millisecondsPerHour;
-    if (hour == _lastEstimateCheck) return;
-    _lastEstimateCheck = hour;
+    if (now.difference(_lastWorkspaceInput) < const Duration(seconds: 25))
+      return;
+    final pulse =
+        now.millisecondsSinceEpoch ~/ (2 * Duration.millisecondsPerMinute);
+    if (pulse == _lastEstimateCheck) return;
+    _lastEstimateCheck = pulse;
     final candidates =
         _data.tasks
             .where((task) => !task.done && task.estimatedMinutes == null)
@@ -4165,179 +4169,195 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _search,
     };
     return _categoryScope(
-      CallbackShortcuts(
-        bindings: shortcuts,
-        child: Focus(
-          autofocus: true,
-          child: AbsorbPointer(
-            absorbing: _reviewSaving,
-            child: MobileModeFrame(
-              mode: space,
-              modeColor: mode == null ? null : Color(mode.color),
-              child: Scaffold(
-                backgroundColor: mobile ? paper : shell,
-                body: SafeArea(
-                  bottom: !mobile,
-                  child: mobile
-                      ? Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Column(
-                              children: [
-                                if (_destination != _Destination.today &&
-                                    (_destination != _Destination.calendar ||
-                                        space != null))
-                                  _MobileHeader(
-                                    space: space,
-                                    modes: modes,
-                                    displayBrand:
-                                        _destination != _Destination.calendar,
-                                    onSpaceChanged: _changeSpace,
-                                    onSearch: _search,
-                                    onSettings: _openSettings,
-                                  ),
-                                Expanded(child: page),
-                              ],
-                            ),
-                            Positioned(
-                              right: 20,
-                              bottom: MediaQuery.paddingOf(context).bottom + 20,
-                              child: HoldCaptureButton(
-                                onTap: _capture,
-                                onHeldRecord:
-                                    kIsWeb || !_allows(EasyFeature.captureMedia)
-                                    ? null
-                                    : (action) =>
-                                          _openVoiceCapture(heldAction: action),
-                              ),
-                            ),
-                            Positioned.fill(
-                              child: OrbitNavigation(
-                                destinations: [
-                                  for (final destination in _Destination.values)
-                                    OrbitDestination(
-                                      destination.label,
-                                      destination.icon,
-                                    ),
-                                ],
-                                selectedIndex: _destination.index,
-                                onSelected: (index) =>
-                                    _navigate(_Destination.values[index]),
-                              ),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          children: [
-                            _DesktopHeader(
-                              onSearch: _search,
-                              onCapture: _capture,
-                            ),
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  12,
-                                  0,
-                                  14,
-                                  14,
-                                ),
-                                child: Row(
-                                  children: [
-                                    _Sidebar(
-                                      destination: _destination,
-                                      compact: compact,
+      Listener(
+        onPointerDown: (_) => _lastWorkspaceInput = DateTime.now(),
+        onPointerSignal: (_) => _lastWorkspaceInput = DateTime.now(),
+        child: CallbackShortcuts(
+          bindings: shortcuts,
+          child: Focus(
+            autofocus: true,
+            onKeyEvent: (_, _) {
+              _lastWorkspaceInput = DateTime.now();
+              return KeyEventResult.ignored;
+            },
+            child: AbsorbPointer(
+              absorbing: _reviewSaving,
+              child: MobileModeFrame(
+                mode: space,
+                modeColor: mode == null ? null : Color(mode.color),
+                child: Scaffold(
+                  backgroundColor: mobile ? paper : shell,
+                  body: SafeArea(
+                    bottom: !mobile,
+                    child: mobile
+                        ? Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Column(
+                                children: [
+                                  if (_destination != _Destination.today &&
+                                      (_destination != _Destination.calendar ||
+                                          space != null))
+                                    _MobileHeader(
                                       space: space,
                                       modes: modes,
-                                      onNavigate: _navigate,
+                                      displayBrand:
+                                          _destination != _Destination.calendar,
                                       onSpaceChanged: _changeSpace,
+                                      onSearch: _search,
                                       onSettings: _openSettings,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(child: _Surface(child: page)),
-                                    if (_inspected != null &&
-                                        width >= 1000) ...[
-                                      const SizedBox(width: 12),
-                                      SizedBox(
-                                        width: width >= 1250 ? 294 : 264,
-                                        child: _Surface(
-                                          child: _RecordDetails(
-                                            record: _inspected!,
-                                            onClose: () => setState(
-                                              () => _inspected = null,
-                                            ),
-                                            onEdit: () =>
-                                                _editRecord(_inspected!),
-                                            onDelete: () =>
-                                                _deleteRecord(_inspected!),
-                                            noteTargets: _inspected is NoteItem
-                                                ? _noteTargets()
-                                                : const [],
-                                            onOpenNoteLink: _openNoteLink,
-                                            onEstimate: _canEstimate(_inspected)
-                                                ? () => _suggestDuration(
-                                                    _inspected! as TaskItem,
-                                                  )
-                                                : null,
-                                            onAppleCopy:
-                                                _canCopyToApple(_inspected)
-                                                ? () => _copyToApple(
-                                                    _inspected!
-                                                        as CalendarEvent,
-                                                  )
-                                                : null,
-                                            repeatingTask:
-                                                _repeatingTask(_inspected) !=
-                                                null,
-                                            onRepeat: switch (_inspected) {
-                                              CalendarEvent event
-                                                  when _canRepeatEvent(event) =>
-                                                () => _setEventRepeat(event),
-                                              TaskItem task
-                                                  when _canRepeatTask(task) =>
-                                                () => _setTaskRepeat(task),
-                                              _ => null,
-                                            },
-                                            onAssignPlace:
-                                                _canAssignPlace(_inspected)
-                                                ? () => _assignPlace(
-                                                    _inspected!
-                                                        as CalendarEvent,
-                                                  )
-                                                : null,
-                                            onAddSubtask:
-                                                _canAddSubtask(_inspected)
-                                                ? () => _addSubtask(
-                                                    _inspected! as TaskItem,
-                                                  )
-                                                : null,
-                                            onBreakdown:
-                                                _canAddSubtask(_inspected)
-                                                ? () => _breakDownTask(
-                                                    _inspected! as TaskItem,
-                                                  )
-                                                : null,
-                                            reminderSet: _hasRecordReminder(
-                                              _inspected,
-                                            ),
-                                            onReminder:
-                                                _recordReminderTarget(
-                                                      _inspected,
-                                                    ) !=
-                                                    null
-                                                ? () => _editRecordReminder(
-                                                    _inspected!,
-                                                  )
-                                                : null,
-                                          ),
+                                  Expanded(child: page),
+                                ],
+                              ),
+                              Positioned(
+                                right: 20,
+                                bottom:
+                                    MediaQuery.paddingOf(context).bottom + 20,
+                                child: HoldCaptureButton(
+                                  onTap: _capture,
+                                  onHeldRecord:
+                                      kIsWeb ||
+                                          !_allows(EasyFeature.captureMedia)
+                                      ? null
+                                      : (action) => _openVoiceCapture(
+                                          heldAction: action,
                                         ),
-                                      ),
-                                    ],
-                                  ],
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                              Positioned.fill(
+                                child: OrbitNavigation(
+                                  destinations: [
+                                    for (final destination
+                                        in _Destination.values)
+                                      OrbitDestination(
+                                        destination.label,
+                                        destination.icon,
+                                      ),
+                                  ],
+                                  selectedIndex: _destination.index,
+                                  onSelected: (index) =>
+                                      _navigate(_Destination.values[index]),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            children: [
+                              _DesktopHeader(
+                                onSearch: _search,
+                                onCapture: _capture,
+                              ),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    0,
+                                    14,
+                                    14,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      _Sidebar(
+                                        destination: _destination,
+                                        compact: compact,
+                                        space: space,
+                                        modes: modes,
+                                        onNavigate: _navigate,
+                                        onSpaceChanged: _changeSpace,
+                                        onSettings: _openSettings,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(child: _Surface(child: page)),
+                                      if (_inspected != null &&
+                                          width >= 1000) ...[
+                                        const SizedBox(width: 12),
+                                        SizedBox(
+                                          width: width >= 1250 ? 294 : 264,
+                                          child: _Surface(
+                                            child: _RecordDetails(
+                                              record: _inspected!,
+                                              onClose: () => setState(
+                                                () => _inspected = null,
+                                              ),
+                                              onEdit: () =>
+                                                  _editRecord(_inspected!),
+                                              onDelete: () =>
+                                                  _deleteRecord(_inspected!),
+                                              noteTargets:
+                                                  _inspected is NoteItem
+                                                  ? _noteTargets()
+                                                  : const [],
+                                              onOpenNoteLink: _openNoteLink,
+                                              onEstimate:
+                                                  _canEstimate(_inspected)
+                                                  ? () => _suggestDuration(
+                                                      _inspected! as TaskItem,
+                                                    )
+                                                  : null,
+                                              onAppleCopy:
+                                                  _canCopyToApple(_inspected)
+                                                  ? () => _copyToApple(
+                                                      _inspected!
+                                                          as CalendarEvent,
+                                                    )
+                                                  : null,
+                                              repeatingTask:
+                                                  _repeatingTask(_inspected) !=
+                                                  null,
+                                              onRepeat: switch (_inspected) {
+                                                CalendarEvent event
+                                                    when _canRepeatEvent(
+                                                      event,
+                                                    ) =>
+                                                  () => _setEventRepeat(event),
+                                                TaskItem task
+                                                    when _canRepeatTask(task) =>
+                                                  () => _setTaskRepeat(task),
+                                                _ => null,
+                                              },
+                                              onAssignPlace:
+                                                  _canAssignPlace(_inspected)
+                                                  ? () => _assignPlace(
+                                                      _inspected!
+                                                          as CalendarEvent,
+                                                    )
+                                                  : null,
+                                              onAddSubtask:
+                                                  _canAddSubtask(_inspected)
+                                                  ? () => _addSubtask(
+                                                      _inspected! as TaskItem,
+                                                    )
+                                                  : null,
+                                              onBreakdown:
+                                                  _canAddSubtask(_inspected)
+                                                  ? () => _breakDownTask(
+                                                      _inspected! as TaskItem,
+                                                    )
+                                                  : null,
+                                              reminderSet: _hasRecordReminder(
+                                                _inspected,
+                                              ),
+                                              onReminder:
+                                                  _recordReminderTarget(
+                                                        _inspected,
+                                                      ) !=
+                                                      null
+                                                  ? () => _editRecordReminder(
+                                                      _inspected!,
+                                                    )
+                                                  : null,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
               ),
             ),

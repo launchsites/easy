@@ -66,7 +66,14 @@ Future<bool> showAiAutomaticDialog(
             SelectableText(preview.endpoint.toString()),
             Text(preview.model, style: const TextStyle(color: muted)),
             const SizedBox(height: 12),
-            const Text('One request per hour while Easy is active.'),
+            Text(
+              preview.adaptiveEstimatePacing
+                  ? preview.route == AiRoute.api
+                        ? 'Up to 12 estimates a day as your forecast allows. '
+                              'Requests pause when there is no room in the monthly limit.'
+                        : 'Up to six estimates a day while Easy is active.'
+                  : 'One request per hour while Easy is active.',
+            ),
             const Text('Fields sent', style: sectionHeadingStyle),
             const Text('Task title and temporary request ID'),
             if (preview.includeOptionalMetadata)
@@ -123,6 +130,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _confirmLocal = true;
   bool _estimates = false;
   bool _automatic = false;
+  bool _adaptive = false;
   bool _mealVision = false;
   bool _completionTokens = true;
   String? _error;
@@ -173,6 +181,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       _confirmLocal = settings.confirmLocal;
       _estimates = settings.allowEstimates;
       _automatic = settings.automaticEstimates;
+      _adaptive = settings.adaptiveEstimatePacing;
       _mealVision = settings.allowMealVision;
       _completionTokens = settings.apiUsesCompletionTokenLimit;
       _apiUrl.text = settings.apiBaseUrl;
@@ -263,6 +272,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       confirmLocal: _confirmLocal,
       allowEstimates: _estimates,
       automaticEstimates: _automatic,
+      adaptiveEstimatePacing: _automatic && _adaptive,
       allowMealVision: _mealVision,
       imageInputTokenCeiling: imageCeiling,
       apiUsesCompletionTokenLimit: _completionTokens,
@@ -563,6 +573,20 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             title: const Text('Use spare capacity'),
             subtitle: const Text('Prepare duration suggestions for review'),
             onChanged: (value) => setState(() => _automatic = value),
+          ),
+        if (_estimates && _automatic && (api || local))
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _adaptive,
+            title: Text(
+              api ? 'Adjust to the spend forecast' : 'Use more foreground time',
+            ),
+            subtitle: Text(
+              api
+                  ? 'Prepare more drafts when the allowance can sustain them'
+                  : 'Prepare up to six estimates a day',
+            ),
+            onChanged: (value) => setState(() => _adaptive = value),
           ),
         if (_error case final error?)
           Semantics(

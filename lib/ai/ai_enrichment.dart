@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'ai_budget.dart';
 import 'ai_runtime_settings.dart';
 import 'inference_jobs.dart';
 
@@ -82,26 +85,46 @@ class AiPendingEstimate {
 /// Durable scheduling stamps and proposals. They contain no title or samples.
 class AiEnrichmentState {
   AiEnrichmentState({
-    this.lastHour,
+    this.lastMinute,
+    this.attemptsOnLastDay = 0,
     Map<String, AiCaptureRevision> attempted = const {},
     List<AiPendingEstimate> pending = const [],
   }) : attempted = Map.unmodifiable(attempted),
        pending = List.unmodifiable(pending);
 
-  final int? lastHour;
+  final int? lastMinute;
+  final int attemptsOnLastDay;
   final Map<String, AiCaptureRevision> attempted;
   final List<AiPendingEstimate> pending;
 
-  static int hourOf(DateTime time) =>
-      time.millisecondsSinceEpoch ~/ Duration.millisecondsPerHour;
+  static int minuteOf(DateTime time) =>
+      time.millisecondsSinceEpoch ~/ Duration.millisecondsPerMinute;
 
-  bool permits(AiEnrichmentCandidate candidate, int hour) =>
-      (lastHour == null || hour > lastHour!) &&
+  bool permits(
+    AiEnrichmentCandidate candidate,
+    DateTime at,
+    AiAutomaticPace pace,
+  ) =>
+      permitsTime(at, pace) &&
       attempted[candidate.taskId] != candidate.revision;
 
-  AiEnrichmentState withAttempt(AiEnrichmentCandidate candidate, int hour) =>
+  bool permitsTime(DateTime at, AiAutomaticPace pace) {
+    final latest = lastMinute;
+    if (latest == null) return true;
+    final current = minuteOf(at);
+    if (!pace.adaptive) return current ~/ 60 > latest ~/ 60;
+    return current - latest >= pace.minimumMinutes &&
+        (_dayOf(current) != _dayOf(latest) ||
+            attemptsOnLastDay < pace.dailyAttempts);
+  }
+
+  AiEnrichmentState withAttempt(AiEnrichmentCandidate candidate, DateTime at) =>
       AiEnrichmentState(
-        lastHour: hour,
+        lastMinute: minuteOf(at),
+        attemptsOnLastDay:
+            lastMinute != null && _dayOf(lastMinute!) == _dayOf(minuteOf(at))
+            ? attemptsOnLastDay + 1
+            : 1,
         attempted: {
           for (final entry in attempted.entries)
             if (entry.key != candidate.taskId) entry.key: entry.value,
@@ -112,7 +135,8 @@ class AiEnrichmentState {
 
   AiEnrichmentState withEstimate(AiPendingEstimate estimate) =>
       AiEnrichmentState(
-        lastHour: lastHour,
+        lastMinute: lastMinute,
+        attemptsOnLastDay: attemptsOnLastDay,
         attempted: attempted,
         pending: [
           estimate,
@@ -123,7 +147,8 @@ class AiEnrichmentState {
 
   AiEnrichmentState withoutEstimate(AiPendingEstimate estimate) =>
       AiEnrichmentState(
-        lastHour: lastHour,
+        lastMinute: lastMinute,
+        attemptsOnLastDay: attemptsOnLastDay,
         attempted: attempted,
         pending: [
           for (final other in pending)
@@ -136,7 +161,9 @@ class AiEnrichmentState {
       );
 
   Map<String, Object?> toJson() => {
-    'lastHour': lastHour,
+    'lastHour': lastMinute == null ? null : lastMinute! ~/ 60,
+    if (lastMinute != null) 'lastMinute': lastMinute,
+    if (attemptsOnLastDay != 0) 'attemptsOnLastDay': attemptsOnLastDay,
     'attempted': {
       for (final entry in attempted.entries)
         entry.key: [entry.value.sourceRevision, entry.value.contextRevision],
@@ -166,15 +193,73 @@ class AiEnrichmentState {
           (entry) => AiPendingEstimate.fromJson(entry as Map<String, dynamic>),
         )
         .toList();
-    final hour = data['lastHour'] as int?;
-    if ((hour == null && (attempted.isNotEmpty || pending.isNotEmpty)) ||
+    final legacyHour = data['lastHour'] as int?;
+    final minute =
+        data['lastMinute'] as int? ??
+        (legacyHour == null ? null : legacyHour * 60 + 59);
+    final today = data['attemptsOnLastDay'] as int? ?? (minute == null ? 0 : 1);
+    if ((minute == null &&
+            (today != 0 || attempted.isNotEmpty || pending.isNotEmpty)) ||
+        (minute != null && (today < 1 || today > 128)) ||
+        (legacyHour != null && minute! ~/ 60 != legacyHour) ||
         pending.map((item) => item.taskId).toSet().length != pending.length) {
       throw const FormatException('Invalid enrichment history.');
     }
     return AiEnrichmentState(
-      lastHour: hour,
+      lastMinute: minute,
+      attemptsOnLastDay: today,
       attempted: attempted,
       pending: pending,
     );
+  }
+}
+
+int _dayOf(int minute) => minute ~/ Duration.minutesPerDay;
+
+class AiAutomaticPace {
+  const AiAutomaticPace._(
+    this.minimumMinutes,
+    this.dailyAttempts, {
+    this.adaptive = true,
+  });
+
+  const AiAutomaticPace.hourly() : this._(60, 24, adaptive: false);
+
+  final int minimumMinutes;
+  final int dailyAttempts;
+  final bool adaptive;
+
+  static AiAutomaticPace forLocal({required bool adaptive}) => adaptive
+      ? const AiAutomaticPace._(20, 6)
+      : const AiAutomaticPace.hourly();
+
+  static AiAutomaticPace? forApi({
+    required AiBudgetReport budget,
+    required int? requestMicros,
+    required bool adaptive,
+  }) {
+    if (requestMicros == null ||
+        requestMicros < 0 ||
+        requestMicros > budget.discretionaryMicros ||
+        (requestMicros > 0 &&
+            budget.projectedMicros >= budget.monthlyCapMicros)) {
+      return null;
+    }
+    if (!adaptive) return const AiAutomaticPace.hourly();
+    final remainingDays = math.max(1, budget.month.days - budget.asOf.day + 1);
+    final perDay = requestMicros == 0
+        ? 12
+        : math.min(
+            12,
+            budget.discretionaryMicros ~/ remainingDays ~/ requestMicros,
+          );
+    if (perDay == 0) return null;
+    final minutes = switch (perDay) {
+      >= 12 => 15,
+      >= 6 => 30,
+      >= 3 => 60,
+      _ => 120,
+    };
+    return AiAutomaticPace._(minutes, perDay);
   }
 }
