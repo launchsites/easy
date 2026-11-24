@@ -124,10 +124,14 @@ jobs:
         run: |
           result="$RUNNER_TEMP/linux-package-proof"
           bundle="$RUNNER_TEMP/extracted-linux-package/easy"
-          for binary in "$bundle/easy" "$bundle/lib/"*.so; do
-            printf '\n%s\n' "${binary##*/}"
-            ldd "$binary" || true
-          done > "$result/dynamic-libraries.txt"
+          {
+            printf 'Downloaded executable using its normal loader context\n'
+            ldd "$bundle/easy"
+            for library in "$bundle/lib/"*.so; do
+              printf '\n%s using the executable bundle library directory\n' "${library##*/}"
+              LD_LIBRARY_PATH="$bundle/lib" ldd "$library" || true
+            done
+          } > "$result/dynamic-libraries.txt"
           if grep -q 'not found' "$result/dynamic-libraries.txt"; then
             grep -B 2 'not found' "$result/dynamic-libraries.txt" >&2
             exit 1
