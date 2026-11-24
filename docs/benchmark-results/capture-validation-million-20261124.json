@@ -1,0 +1,31 @@
+{
+  "run_at_utc": "2026-11-24T06:30:40.664056Z",
+  "seed": 261124,
+  "rounds": 1000000,
+  "valid_batches": 1000000,
+  "withheld_mutated_batches": 1000000,
+  "mutation_counts": {
+    "wrongCapture": 76987,
+    "staleSource": 76717,
+    "staleContext": 76853,
+    "unknownVersion": 77701,
+    "mixedProposalBatch": 76750,
+    "wrongKind": 76829,
+    "wrongSpanStart": 76733,
+    "wrongSpanEnd": 76691,
+    "wrongTitle": 76448,
+    "wrongCategory": 76757,
+    "inventedDeadline": 77274,
+    "unknownField": 77095,
+    "wrongFieldType": 77165
+  },
+  "wall_ms": 280332.089,
+  "source_revision": "0c0bdd328914ac307ddb658ca0d9a8c2a122c5b1",
+  "cpu_affinity": [
+    3
+  ],
+  "address_space_limit_bytes": 268435456,
+  "peak_rss_kib": 18236,
+  "elapsed_seconds": 280.344,
+  "aot_sha256": "6a44aaa68563bf2f7ea5c9f8cd1a722fd4138bb4363a256d39fcc548315c2cf9"
+}

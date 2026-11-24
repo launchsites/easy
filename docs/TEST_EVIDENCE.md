@@ -34,7 +34,7 @@ The frozen Flutter suite at `96dc0f3` passed 830 tests under `TZ=Europe/London`.
 
 - Five thousand seeded schedule cases check time bounds, dependencies, buffers, effort, split size and ordering. A 20,000-node cycle exercises bounded traversal. The small split oracle exercises 2,500 cases.
 - A 12,000-case planner replay preserved 110,769 placement decisions while reducing time spent looking for candidate slots. Daily available time also passed 500 checks against the full planner.
-- Ten thousand unchanged capture claims passed validation and ten thousand seeded mutations were withheld. Later model-only suggestions require explicit selection and preserve validated dates and destructive-action boundaries.
+- One million unchanged two-item capture batches passed validation and one million seeded mutations were withheld. The AOT run used one CPU with a 256 MiB address-space limit. Later model-only suggestions require explicit selection. [Large validator run](benchmark-results/capture-validation-million-20261124.json)
 - Model and speech benchmarks used pinned open weights and synthetic fixtures. Results document strict schema and factual failures, as well as timing, memory ceilings and cold-start failures.
 - Forty-eight controlled loopback calls compared point and range prompts with two pinned Qwen models under one- and two-CPU bounds. The models returned no validated ranges. Controlled provider replies independently verified range review. [Local model measurements](local-inference-benchmark.md)
 - Native voice evidence uses an isolated virtual microphone. Held release, slide-left cancel, slide-up lock, resize interruption and live Gym capture were exercised with saved audio and records verified after restart.

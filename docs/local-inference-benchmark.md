@@ -72,6 +72,8 @@ The application accepted 10,000 exact two-item model responses and withheld all 
 TZ=Europe/London dart run tool/benchmark/capture_validation_fuzz.dart /tmp/easy-capture-validation.json
 ```
 
+An extended AOT run used the same seed and exercised one million valid batches plus one million mutated batches. All thirteen mutation classes appeared at least 76,000 times. The run took 280.34 seconds on one virtual CPU, with a 256 MiB virtual address-space ceiling and a measured 17.81 MiB peak RSS. This exercises the validator using generated responses. [Extended validation results](benchmark-results/capture-validation-million-20261124.json)
+
 ## AI budget accounting replay
 
 A Dart AOT simulator compared the GBP ledger with independent integer accounting through 64 seeded request histories. Across 131,072 operations and 163,328 monthly report checks, every balance, charge and decision agreed. The cases included 5,235 serialization and restart cycles, 2,116 month changes and 14,481 settlements after the clock moved to a different month. The replay also covered changed caps, paid and unpaid local requests, missing usage, known non-dispatch, provider usage above the reserved limit and duplicate request IDs.

@@ -5,7 +5,7 @@ import 'dart:math';
 import 'package:easy/capture/capture_interpreter.dart';
 
 const _seed = 261124;
-const _rounds = 10000;
+const _defaultRounds = 10000;
 const _mutations = [
   'wrongCapture',
   'staleSource',
@@ -23,9 +23,10 @@ const _mutations = [
 ];
 
 void main(List<String> args) {
-  if (args.length != 1) {
+  final rounds = args.length == 2 ? int.tryParse(args[1]) : _defaultRounds;
+  if (args.isEmpty || args.length > 2 || rounds == null || rounds < 1) {
     stderr.writeln(
-      'Usage: dart run tool/benchmark/capture_validation_fuzz.dart OUTPUT_JSON',
+      'Usage: dart run tool/benchmark/capture_validation_fuzz.dart OUTPUT_JSON [ROUNDS]',
     );
     exitCode = 2;
     return;
@@ -33,7 +34,7 @@ void main(List<String> args) {
   final rng = Random(_seed);
   final sampled = {for (final mutation in _mutations) mutation: 0};
   final started = Stopwatch()..start();
-  for (var index = 0; index < _rounds; index++) {
+  for (var index = 0; index < rounds; index++) {
     final payload = _fixture(rng, index);
     final before = validateModelCapture(
       payload.input,
@@ -55,16 +56,16 @@ void main(List<String> args) {
   final evidence = {
     'run_at_utc': DateTime.now().toUtc().toIso8601String(),
     'seed': _seed,
-    'rounds': _rounds,
-    'valid_batches': _rounds,
-    'withheld_mutated_batches': _rounds,
+    'rounds': rounds,
+    'valid_batches': rounds,
+    'withheld_mutated_batches': rounds,
     'mutation_counts': sampled,
     'wall_ms': started.elapsedMicroseconds / 1000,
   };
-  File(args.single).writeAsStringSync(
+  File(args.first).writeAsStringSync(
     '${const JsonEncoder.withIndent('  ').convert(evidence)}\n',
   );
-  stdout.writeln('$_rounds valid controls and $_rounds rejected mutations.');
+  stdout.writeln('$rounds valid controls and $rounds rejected mutations.');
 }
 
 ({CaptureInput input, Map<String, Object?> wire}) _fixture(
