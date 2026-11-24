@@ -2,6 +2,11 @@ name: Apple SDK check
 
 on:
   workflow_dispatch:
+    inputs:
+      ios_simulator_smoke:
+        description: Launch Easy on an iPhone simulator and capture first-run setup
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -51,3 +56,20 @@ jobs:
           FLUTTER_XCODE_CODE_SIGNING_ALLOWED: 'NO'
           FLUTTER_XCODE_CODE_SIGNING_REQUIRED: 'NO'
         run: flutter build macos --release --no-pub
+
+      - name: Verify iPhone simulator first launch
+        if: ${{ inputs.ios_simulator_smoke }}
+        timeout-minutes: 10
+        run: |
+          python3 tool/benchmark/ios_simulator_smoke.py \
+            build/ios/iphonesimulator/Runner.app \
+            "$RUNNER_TEMP/easy-ios-simulator-smoke/setup.png"
+
+      - name: Upload the first-run screenshot
+        if: ${{ inputs.ios_simulator_smoke }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: easy-iphone-setup
+          path: ${{ runner.temp }}/easy-ios-simulator-smoke/setup.png
+          if-no-files-found: error
+          retention-days: 7

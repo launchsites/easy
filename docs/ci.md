@@ -4,7 +4,9 @@
 
 An active `main` run can finish while the newest push waits. Each new pull request revision cancels the previous run for that pull request.
 
-**Apple SDK check** is available from the Actions tab through **Run workflow**. It uses the GitHub-hosted `macos-15` image with Xcode 26.3 to compile a debug build for the iOS simulator and an unsigned macOS release. It is an SDK compile check. Device behavior and distribution signing have separate verification. [Apple workflow](../.github/workflows/apple-sdk.yml) · [Hosted runner SDK inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md)
+**Apple SDK check** is available from the Actions tab through **Run workflow**. It uses the GitHub-hosted `macos-15` image with Xcode 26.3 to compile a debug build for the iOS simulator and an unsigned macOS release. Physical-device testing and distribution signing are separate. [Apple workflow](../.github/workflows/apple-sdk.yml) · [Hosted runner SDK inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md)
+
+Select **Launch Easy on an iPhone simulator and capture first-run setup** to also install and open the built app on a disposable iPhone simulator. The smoke check verifies the app's private SQLite store, its first revision and document checksums, and that setup is pending with an empty workspace. The run saves a first-launch screenshot as `easy-iphone-setup` for seven days. [Simulator smoke script](../tool/benchmark/ios_simulator_smoke.py)
 
 Both workflows request read-only repository contents and use GitHub's checkout action at its exact release commit. Builds stay in the runner workspace. Flutter comes directly from its upstream repository. [Checkout v6.0.2](https://github.com/actions/checkout/releases/tag/v6.0.2) · [Flutter 3.50.1](https://github.com/flutter/flutter/releases/tag/3.50.1)
 
