@@ -2,10 +2,12 @@
 
 Easy is a local workspace for your calendar, tasks, and notes. It opens with sample entries so you can try the views and interactions right away. New entries and edits are saved on the device.
 
-- **Today** shows your schedule and tasks for the current day.
+- **Today** opens on the date, upcoming events, and tasks due today. On a phone it also includes a note to self. Pick a mode such as Gym to put its objectives and relevant notes first.
 - **Calendar** puts the schedule below a single tappable date. On a phone, swipe sideways to jump a day or scroll through days vertically. Wide windows show the week together.
-- **Tasks** groups open and completed work by date. **Notes** supports search across titles and text.
-- **Mobile navigation** opens from the bottom-left button. Hold, drag toward a destination, and release to switch views. Return to the center before releasing to cancel. You can also tap to open the menu, then tap a destination. The bottom-right plus opens the editor.
+- **Tasks** groups open and completed work by date. **Notes** is a searchable list with a title, preview, and date on each row.
+- **Mobile navigation** opens from the bottom-left button. Hold, drag toward a destination, and release to switch views. Return to the center before releasing to cancel. You can also tap to open the menu, then tap a destination. The bottom-right plus opens a single capture field.
+- **Quick capture** takes an event like `Studio review tomorrow 14:00-14:45` in one line. When a time is missing, the same field asks for it. Tasks default to today and accept a typed due date. Notes accept plain text.
+- **Gym** opens a planned or freestyle session on your phone. Record a planned exercise as written, enter what you actually did, or add an extra line during the session.
 
 ## Run
 

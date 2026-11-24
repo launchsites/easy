@@ -3,7 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'calendar_page.dart';
 import 'list_pages.dart';
 import 'ui_theme.dart' show accent, ink, line, muted, paper, raisedPaper;
-import 'workspace_data.dart' show spaceColor, spaceName;
+import 'workspace_data.dart' show spaceColor, spaceColors, spaceName;
 
 enum RecordKind { task, event, note }
 
@@ -33,7 +33,6 @@ class RecordEditor extends StatefulWidget {
 
 class _RecordEditorState extends State<RecordEditor> {
   static const _wash = Color(0xFFF1F1EB);
-  static const _categories = ['personal', 'work', 'study', 'health'];
 
   final _form = GlobalKey<FormState>();
   final _titleFocus = FocusNode();
@@ -70,7 +69,7 @@ class _RecordEditorState extends State<RecordEditor> {
         event?.category ??
         task?.category ??
         widget.initialCategory ??
-        _categories.first;
+        'personal';
     _dueDate = task == null ? widget.initialTaskDate : task.date;
     _allDay = event?.allDay ?? false;
 
@@ -236,6 +235,10 @@ class _RecordEditorState extends State<RecordEditor> {
             title: title,
             body: _body.text,
             updated: now,
+            category: widget.note == null
+                ? widget.initialCategory
+                : widget.note!.category,
+            noteToSelf: widget.note?.noteToSelf ?? false,
           ),
         );
     }
@@ -341,7 +344,7 @@ class _RecordEditorState extends State<RecordEditor> {
             controller.isOpen ? controller.close() : controller.open(),
       ),
       menuChildren: [
-        for (final category in {..._categories, _category})
+        for (final category in {...spaceColors.keys, _category})
           MenuItemButton(
             leadingIcon: Icon(
               Icons.circle,

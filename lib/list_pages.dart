@@ -28,12 +28,16 @@ class NoteItem {
     required this.title,
     required this.body,
     required this.updated,
+    this.category,
+    this.noteToSelf = false,
   });
 
   final String id;
   final String title;
   final String body;
   final DateTime updated;
+  final String? category;
+  final bool noteToSelf;
 }
 
 enum _TaskFilter {
@@ -440,7 +444,7 @@ class _NotesPageState extends State<NotesPage> {
           size: 20,
         ),
       ),
-      slivers: (wide) => [
+      slivers: (_) => [
         if (_searchOpen)
           SliverToBoxAdapter(
             child: Padding(
@@ -474,65 +478,25 @@ class _NotesPageState extends State<NotesPage> {
               message: query.isEmpty ? 'No notes yet' : 'No matching notes',
             ),
           ),
-        if (notes.isNotEmpty) ...[
-          const SliverToBoxAdapter(child: SizedBox(height: 20)),
-          _NoteIndex(notes: notes, wide: wide, onNoteTap: widget.onNoteTap),
-        ],
+        SliverList.separated(
+          itemCount: notes.length,
+          separatorBuilder: (_, _) => const Divider(height: 1, color: line),
+          itemBuilder: (context, index) {
+            final note = notes[index];
+            return _NoteRow(
+              key: ValueKey(note.id),
+              note: note,
+              onTap: () => widget.onNoteTap(note),
+            );
+          },
+        ),
       ],
     );
   }
 }
 
-class _NoteIndex extends StatelessWidget {
-  const _NoteIndex({
-    required this.notes,
-    required this.wide,
-    required this.onNoteTap,
-  });
-
-  final List<NoteItem> notes;
-  final bool wide;
-  final ValueChanged<NoteItem> onNoteTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final columns = wide ? 2 : 1;
-    return SliverList.separated(
-      itemCount: (notes.length + columns - 1) ~/ columns,
-      separatorBuilder: (_, _) => SizedBox(height: wide ? 15 : 12),
-      itemBuilder: (context, index) {
-        final first = index * columns;
-        final firstTile = _NoteTile(
-          note: notes[first],
-          onTap: () => onNoteTap(notes[first]),
-        );
-        if (!wide) return firstTile;
-
-        final second = first + 1;
-        return IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: firstTile),
-              const SizedBox(width: 15),
-              Expanded(
-                child: second < notes.length
-                    ? _NoteTile(
-                        note: notes[second],
-                        onTap: () => onNoteTap(notes[second]),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _NoteTile extends StatelessWidget {
-  const _NoteTile({required this.note, required this.onTap});
+class _NoteRow extends StatelessWidget {
+  const _NoteRow({required this.note, required this.onTap, super.key});
 
   final NoteItem note;
   final VoidCallback onTap;
@@ -541,99 +505,60 @@ class _NoteTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final updated = MaterialLocalizations.of(context)
         .formatShortDate(note.updated.toLocal());
-    final preview = note.body.trim().split(RegExp(r'\n\s*\n')).first;
-    const borderRadius = BorderRadius.all(Radius.circular(13));
+    final body = note.body.trimLeft();
+    final firstBreak = body.indexOf('\n');
+    final preview = (firstBreak == -1 ? body : body.substring(0, firstBreak))
+        .trimRight();
+    final title = note.title.trim();
+    const metadata = TextStyle(color: muted, fontSize: 13, height: 1.3);
     return Material(
-      color: raisedPaper,
-      shape: const RoundedRectangleBorder(
-        borderRadius: borderRadius,
-        side: BorderSide(color: line),
-      ),
-      clipBehavior: Clip.antiAlias,
+      type: MaterialType.transparency,
       child: InkWell(
         onTap: onTap,
-        borderRadius: borderRadius,
+        borderRadius: BorderRadius.circular(7),
         hoverColor: _softSurface,
         focusColor: softAccent,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 172),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 19, 15),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Column(
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(5, 10, 7, 10),
+          child: Row(
+            children: [
+              const Icon(Icons.description_outlined, size: 20, color: accent),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            note.title.trim().isEmpty
-                                ? 'Untitled note'
-                                : note.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: ink,
-                              fontSize: 22,
-                              height: 1.2,
-                              letterSpacing: -0.7,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Padding(
-                          padding: EdgeInsets.only(top: 3),
-                          child: Icon(
-                            Icons.arrow_outward_rounded,
-                            color: muted,
-                            size: 17,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (preview.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 9),
-                        child: Text(
-                          preview,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: muted,
-                            fontSize: 14,
-                            height: 1.52,
-                          ),
-                        ),
+                    Text(
+                      title.isEmpty ? 'Untitled note' : title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: ink,
+                        fontSize: 16,
+                        height: 1.25,
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: updated,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          if (preview.isNotEmpty)
+                            TextSpan(text: '  ·  $preview'),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: metadata,
+                    ),
                   ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Divider(height: 1, color: line),
-                      const SizedBox(height: 10),
-                      Text(
-                        updated,
-                        style: const TextStyle(
-                          color: muted,
-                          fontSize: 12,
-                          height: 1.3,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

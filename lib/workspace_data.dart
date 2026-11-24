@@ -12,6 +12,7 @@ const spaceColors = <String, Color>{
   'work': Color(0xff4e6c9b),
   'personal': Color(0xff8a6235),
   'study': Color(0xff775d96),
+  'gym': Color(0xff975b4b),
   'health': Color(0xff44734f),
 };
 
@@ -70,7 +71,7 @@ class WorkspaceData {
           title: 'Strength training',
           start: at(17, 30),
           end: at(18, 15),
-          category: 'health',
+          category: 'gym',
           location: 'Gym',
         ),
         CalendarEvent(
@@ -118,6 +119,20 @@ class WorkspaceData {
           done: false,
         ),
         TaskItem(
+          id: 'sample-set-log',
+          title: 'Log today’s working sets',
+          category: 'gym',
+          date: today,
+          done: false,
+        ),
+        TaskItem(
+          id: 'sample-session-note',
+          title: 'Review the last session',
+          category: 'gym',
+          date: null,
+          done: false,
+        ),
+        TaskItem(
           id: 'sample-pickup',
           title: 'Pick up a prescription',
           category: 'health',
@@ -141,6 +156,13 @@ class WorkspaceData {
       ],
       notes: [
         NoteItem(
+          id: 'sample-daily-note',
+          title: 'Get the outline out first',
+          body: 'Keep the first work block clear until the draft is sent.',
+          updated: today,
+          noteToSelf: true,
+        ),
+        NoteItem(
           id: 'sample-studio-note',
           title: 'Studio review notes',
           body: 'Walk through the first draft together.\n\nDecisions to make\n• Confirm the scope for Friday.\n• Choose what to take into the second draft.',
@@ -160,9 +182,11 @@ class WorkspaceData {
         ),
         NoteItem(
           id: 'sample-training-note',
-          title: 'Training plan',
-          body: 'Keep the warm-up short and repeatable. Start the next session with the same weight and focus on control.',
+          title: 'Keep the warm-up repeatable',
+          body: 'Bring the session log and record how the last set felt.',
           updated: plusDays(today, -6),
+          category: 'gym',
+          noteToSelf: true,
         ),
       ],
     );
@@ -202,6 +226,8 @@ class WorkspaceData {
             title: note['title'] as String,
             body: note['body'] as String,
             updated: DateTime.parse(note['updated'] as String),
+            category: note['category'] as String?,
+            noteToSelf: note['noteToSelf'] as bool? ?? false,
           ),
       ],
     );
@@ -237,6 +263,8 @@ class WorkspaceData {
           'title': note.title,
           'body': note.body,
           'updated': note.updated.toIso8601String(),
+          if (note.category != null) 'category': note.category,
+          if (note.noteToSelf) 'noteToSelf': true,
         },
     ],
   });

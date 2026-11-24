@@ -5,8 +5,11 @@ import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'calendar_page.dart';
+import 'gym_session.dart';
 import 'list_pages.dart';
+import 'mobile_home.dart';
 import 'orbit_navigation.dart';
+import 'quick_capture.dart';
 import 'record_editor.dart';
 import 'today_page.dart';
 import 'workspace_data.dart';
@@ -42,6 +45,7 @@ enum _Destination {
 }
 
 const _storageKey = 'easy.workspace.v1';
+const _gymStorageKey = 'easy.gym-sessions.v1';
 
 class _Workspace extends StatefulWidget {
   const _Workspace();
@@ -54,6 +58,7 @@ class _WorkspaceState extends State<_Workspace> {
   final _storage = SharedPreferencesAsync();
   Future<void> _pendingSave = Future.value();
   late WorkspaceData _data;
+  List<GymSession>? _gymSessions;
   var _calendarDate = dateOnly(DateTime.now());
   DateTime get _today => dateOnly(DateTime.now());
   var _destination = _Destination.today;
@@ -70,15 +75,18 @@ class _WorkspaceState extends State<_Workspace> {
   }
 
   Future<void> _load() async {
+    final gymSessions = _readGymSessions();
     try {
       final raw = await _storage.getString(_storageKey);
       final data = raw == null
           ? WorkspaceData.samples(_today)
           : WorkspaceData.decode(raw);
       if (raw == null) await _storage.setString(_storageKey, data.encode());
+      final sessions = await gymSessions;
       if (!mounted) return;
       setState(() {
         _data = data;
+        _gymSessions = sessions;
         _loading = false;
         _loadFailed = false;
       });
@@ -87,25 +95,82 @@ class _WorkspaceState extends State<_Workspace> {
     }
   }
 
+  Future<List<GymSession>?> _readGymSessions() async {
+    try {
+      final saved = await _storage.getStringList(_gymStorageKey) ?? [];
+      return saved.map(GymSession.decode).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _update(WorkspaceData data) {
     setState(() => _data = data);
     final snapshot = data.encode();
+    _queueSave(
+      () => _storage.setString(_storageKey, snapshot),
+      () => _update(_data),
+    );
+  }
+
+  void _queueSave(Future<void> Function() write, VoidCallback retry) {
     _pendingSave = _pendingSave.then((_) async {
       try {
-        await _storage.setString(_storageKey, snapshot);
+        await write();
       } catch (_) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Changes could not be saved on this device.'),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: () => _update(_data),
-            ),
+            action: SnackBarAction(label: 'Retry', onPressed: retry),
           ),
         );
       }
     });
+  }
+
+  Future<void> _openGymSession() async {
+    final sessions = _gymSessions ?? await _readGymSessions();
+    if (!mounted) return;
+    if (sessions == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gym sessions could not be opened.')),
+      );
+      return;
+    }
+    _gymSessions = sessions;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => GymSessionPage(
+          session: sessions.lastOrNull,
+          onChanged: _saveGymSession,
+        ),
+      ),
+    );
+  }
+
+  void _saveGymSession(GymSession? session) {
+    if (session == null || !mounted) return;
+    final sessions = _gymSessions!;
+    final index = sessions.indexWhere(
+      (value) => value.startedAt == session.startedAt,
+    );
+    final updated = [...sessions];
+    if (index == -1) {
+      updated.add(session);
+    } else {
+      updated[index] = session;
+    }
+    setState(() => _gymSessions = updated);
+    _persistGymSessions();
+  }
+
+  void _persistGymSessions() {
+    final snapshot = _gymSessions!.map((session) => session.encode()).toList();
+    _queueSave(
+      () => _storage.setStringList(_gymStorageKey, snapshot),
+      _persistGymSessions,
+    );
   }
 
   void _navigate(_Destination destination) {
@@ -226,36 +291,80 @@ class _WorkspaceState extends State<_Workspace> {
     );
   }
 
-  Future<void> _editRecord([Object? existing]) async {
-    final kind = existing == null
-        ? switch (_destination) {
-            _Destination.calendar => RecordKind.event,
-            _Destination.notes => RecordKind.note,
-            _ => RecordKind.task,
-          }
-        : _recordKind(existing);
-    final editor = RecordEditor(
-      date: _destination == _Destination.calendar ? _calendarDate : _today,
-      kind: kind,
-      initialTaskDate: _destination == _Destination.today ? _today : null,
-      initialCategory: _space,
-      event: existing is CalendarEvent ? existing : null,
-      task: existing is TaskItem ? existing : null,
-      note: existing is NoteItem ? existing : null,
+  NoteItem? _homeNote() {
+    NoteItem? latest;
+    for (final note in _data.notes) {
+      if (note.category?.toLowerCase() != _space) continue;
+      if (_space == null && !note.noteToSelf) continue;
+      if (latest == null ||
+          (note.noteToSelf && !latest.noteToSelf) ||
+          (note.noteToSelf == latest.noteToSelf &&
+              note.updated.isAfter(latest.updated))) {
+        latest = note;
+      }
+    }
+    return latest;
+  }
+
+  Future<Object?> _showEditor(Widget editor) {
+    if (MediaQuery.sizeOf(context).width < 720) {
+      return showModalBottomSheet<Object>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: paper,
+        builder: (_) => editor,
+      );
+    }
+    return showDialog<Object>(
+      context: context,
+      builder: (_) => Dialog(backgroundColor: paper, child: editor),
     );
-    final result = MediaQuery.sizeOf(context).width < 720
-        ? await showModalBottomSheet<Object>(
-            context: context,
-            isScrollControlled: true,
-            useSafeArea: true,
-            backgroundColor: paper,
-            builder: (_) => editor,
-          )
-        : await showDialog<Object>(
-            context: context,
-            builder: (_) => Dialog(backgroundColor: paper, child: editor),
-          );
+  }
+
+  Future<void> _capture({RecordKind? kind, bool noteToSelf = false}) async {
+    final destination = _destination;
+    final result = await _showEditor(
+      QuickCapture(
+        date: destination == _Destination.calendar ? _calendarDate : _today,
+        kind:
+            kind ??
+            switch (destination) {
+              _Destination.calendar => RecordKind.event,
+              _Destination.notes => RecordKind.note,
+              _ => RecordKind.task,
+            },
+        initialTaskDate: _today,
+        initialCategory: _space,
+        noteToSelf: noteToSelf,
+      ),
+    );
+    if (result == null || !mounted) return;
+    _saveRecord(result);
+    if (result is CalendarEvent && destination == _Destination.calendar) {
+      _changeDate(result.start);
+    }
+  }
+
+  Future<void> _editRecord(Object existing) async {
+    final result = await _showEditor(
+      RecordEditor(
+        date: _destination == _Destination.calendar ? _calendarDate : _today,
+        kind: _recordKind(existing),
+        event: existing is CalendarEvent ? existing : null,
+        task: existing is TaskItem ? existing : null,
+        note: existing is NoteItem ? existing : null,
+      ),
+    );
     if (result != null && mounted) _saveRecord(result);
+  }
+
+  Future<void> _openHomeNote(NoteItem? note) async {
+    if (note == null) {
+      await _capture(kind: RecordKind.note, noteToSelf: true);
+    } else {
+      await _openRecord(note);
+    }
   }
 
   Future<void> _openRecord(Object record) async {
@@ -339,20 +448,67 @@ class _WorkspaceState extends State<_Workspace> {
         : _data.tasks
               .where((item) => item.category.toLowerCase() == space)
               .toList();
+    final notes = space == null
+        ? _data.notes
+        : _data.notes
+              .where((item) => item.category?.toLowerCase() == space)
+              .toList();
+    final todayNote = mobile ? _homeNote() : null;
     final page = PageStorage(
       bucket: _pageStorage,
       child: IndexedStack(
         index: _destination.index,
         sizing: StackFit.expand,
         children: [
-          TodayPage(
-            date: _today,
-            events: events,
-            tasks: tasks,
-            onEventTap: _openRecord,
-            onTaskTap: _openRecord,
-            onTaskToggle: _toggleTask,
-          ),
+          if (mobile)
+            MobileHome(
+              date: _today,
+              mode: space,
+              modeControl: _ModeControl(
+                mode: space,
+                showCurrentMode: false,
+                onModeChanged: _changeSpace,
+              ),
+              note: todayNote,
+              modeAction: space == 'gym'
+                  ? Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: FilledButton.tonalIcon(
+                        onPressed: _openGymSession,
+                        icon: const Icon(
+                          Icons.fitness_center_outlined,
+                          size: 17,
+                        ),
+                        label: Text(
+                          switch (_gymSessions?.lastOrNull?.finished) {
+                            false => 'Resume session',
+                            true => 'Gym session',
+                            null => 'Start session',
+                          },
+                        ),
+                      ),
+                    )
+                  : null,
+              events: events,
+              tasks: tasks,
+              onNoteTap: () => _openHomeNote(todayNote),
+              onEventTap: _openRecord,
+              onTaskTap: _openRecord,
+              onTaskToggle: _toggleTask,
+              onCalendarTap: () {
+                _changeDate(_today);
+                _navigate(_Destination.calendar);
+              },
+            )
+          else
+            TodayPage(
+              date: _today,
+              events: events,
+              tasks: tasks,
+              onEventTap: _openRecord,
+              onTaskTap: _openRecord,
+              onTaskToggle: _toggleTask,
+            ),
           CalendarPage(
             date: _calendarDate,
             events: events,
@@ -364,7 +520,7 @@ class _WorkspaceState extends State<_Workspace> {
             onToggle: _toggleTask,
             onTaskTap: _openRecord,
           ),
-          NotesPage(notes: _data.notes, onNoteTap: _openRecord),
+          NotesPage(notes: notes, onNoteTap: _openRecord),
         ],
       ),
     );
@@ -386,8 +542,9 @@ class _WorkspaceState extends State<_Workspace> {
                     children: [
                       Column(
                         children: [
-                          if (_destination != _Destination.calendar ||
-                              space != null)
+                          if (_destination != _Destination.today &&
+                              (_destination != _Destination.calendar ||
+                                  space != null))
                             _MobileHeader(
                               space: space,
                               displayBrand:
@@ -404,7 +561,7 @@ class _WorkspaceState extends State<_Workspace> {
                         child: FloatingActionButton(
                           heroTag: 'capture',
                           tooltip: 'Add item',
-                          onPressed: _editRecord,
+                          onPressed: _capture,
                           backgroundColor: accent,
                           foregroundColor: Colors.white,
                           shape: const CircleBorder(),
@@ -432,7 +589,7 @@ class _WorkspaceState extends State<_Workspace> {
                   )
                 : Column(
                     children: [
-                      _DesktopHeader(onSearch: _search, onCapture: _editRecord),
+                      _DesktopHeader(onSearch: _search, onCapture: _capture),
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(12, 0, 14, 14),
@@ -456,7 +613,7 @@ class _WorkspaceState extends State<_Workspace> {
                                       record: _inspected!,
                                       onClose: () =>
                                           setState(() => _inspected = null),
-                                      onEdit: () => _editRecord(_inspected),
+                                      onEdit: () => _editRecord(_inspected!),
                                       onDelete: () =>
                                           _deleteRecord(_inspected!),
                                     ),
@@ -660,39 +817,7 @@ class _MobileHeader extends StatelessWidget {
                 ? const _Brand(dark: false)
                 : const SizedBox.shrink(),
           ),
-          MenuAnchor(
-            builder: (context, controller, _) => TextButton.icon(
-              onPressed: () =>
-                  controller.isOpen ? controller.close() : controller.open(),
-              icon: Icon(
-                Icons.expand_more_rounded,
-                size: 17,
-                color: space == null ? muted : spaceColor(space!),
-              ),
-              iconAlignment: IconAlignment.end,
-              label: Text(
-                space == null ? 'All spaces' : spaceName(space!),
-                overflow: TextOverflow.ellipsis,
-              ),
-              style: TextButton.styleFrom(
-                foregroundColor: space == null ? muted : spaceColor(space!),
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                textStyle: Theme.of(context).textTheme.labelLarge
-                    ?.copyWith(fontSize: 13, fontWeight: FontWeight.w500),
-              ),
-            ),
-            menuChildren: [
-              MenuItemButton(
-                onPressed: () => onSpaceChanged(null),
-                child: const Text('All spaces'),
-              ),
-              for (final category in spaceColors.keys)
-                MenuItemButton(
-                  onPressed: () => onSpaceChanged(category),
-                  child: Text(spaceName(category)),
-                ),
-            ],
-          ),
+          _ModeControl(mode: space, onModeChanged: onSpaceChanged),
           IconButton(
             tooltip: 'Search workspace',
             onPressed: onSearch,
@@ -700,6 +825,60 @@ class _MobileHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ModeControl extends StatelessWidget {
+  const _ModeControl({
+    required this.mode,
+    required this.onModeChanged,
+    this.showCurrentMode = true,
+  });
+
+  final String? mode;
+  final ValueChanged<String?> onModeChanged;
+  final bool showCurrentMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = mode;
+    final foreground = current == null ? muted : spaceColor(current);
+    return MenuAnchor(
+      builder: (context, controller, _) => TextButton.icon(
+        onPressed: () =>
+            controller.isOpen ? controller.close() : controller.open(),
+        icon: const Icon(Icons.expand_more_rounded, size: 17),
+        iconAlignment: IconAlignment.end,
+        label: Text(
+          showCurrentMode && current != null ? spaceName(current) : 'Mode',
+          overflow: TextOverflow.ellipsis,
+        ),
+        style: TextButton.styleFrom(
+          foregroundColor: foreground,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          textStyle: Theme.of(context).textTheme.labelLarge
+              ?.copyWith(fontSize: 13, fontWeight: FontWeight.w500),
+        ),
+      ),
+      menuChildren: [
+        MenuItemButton(
+          onPressed: () => onModeChanged(null),
+          trailingIcon: current == null
+              ? const Icon(Icons.check, size: 18)
+              : null,
+          child: const Text('No mode'),
+        ),
+        for (final mode in spaceColors.keys)
+          MenuItemButton(
+            onPressed: () => onModeChanged(mode),
+            leadingIcon: Icon(Icons.circle, color: spaceColor(mode), size: 8),
+            trailingIcon: current == mode
+                ? const Icon(Icons.check, size: 18)
+                : null,
+            child: Text(spaceName(mode)),
+          ),
+      ],
     );
   }
 }
