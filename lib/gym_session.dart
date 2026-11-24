@@ -1661,8 +1661,8 @@ class _GymSessionPageState extends State<GymSessionPage> {
                           ? _editing
                                 ? 'Enter actual'
                                 : _session?.structured == true
-                                ? 'Add a note or extra'
-                                : 'Add an exercise or note'
+                                ? 'Add a note'
+                                : 'Add an entry'
                           : metric.unit,
                       errorText: _error,
                       errorMaxLines: 3,
