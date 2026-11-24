@@ -55,17 +55,44 @@ def check_heading(window, scratch, expected, crop, x11_capture, tesseract):
     }
 
 
-def wait_for_resize(window, wide, x11_capture):
-    deadline = time.monotonic() + 8
+def pixel_at(window, x, y, x11_capture):
+    pixel = subprocess.run(
+        [x11_capture, "-window", window, "-crop", f"1x1+{x}+{y}", "-depth", "8", "rgb:-"],
+        capture_output=True, check=True, timeout=8,
+    ).stdout
+    return list(pixel) if len(pixel) == 3 else None
+
+
+def wait_for_resize(window, wide, x11_capture, timeout=8):
+    deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        pixel = subprocess.run(
-            [x11_capture, "-window", window, "-crop", "1x1+15+82", "-depth", "8", "rgb:-"],
-            capture_output=True, check=True, timeout=8,
-        ).stdout
-        if len(pixel) == 3 and (max(pixel) < 100 if wide else min(pixel) > 160):
+        pixel = pixel_at(window, 15, 82, x11_capture)
+        if pixel is not None and (max(pixel) < 100 if wide else min(pixel) > 160):
             return
         time.sleep(0.15)
     raise RuntimeError("The expected layout did not render after resize.")
+
+
+def check_desktop_route(window, scratch, y, heading, args, timeout=5):
+    # Sample the selected surface away from the icon, title and pointer.
+    deadline = time.monotonic() + timeout
+    while True:
+        pixel = pixel_at(window, 191, y, args.x11_capture)
+        selected = pixel is not None and all(
+            abs(actual - expected) <= 5 for actual, expected in zip(pixel, (42, 52, 43))
+        )
+        if selected or time.monotonic() >= deadline:
+            break
+        time.sleep(0.2)
+    visible = check_heading(
+        window, scratch, heading, "830x210+240+42", args.x11_capture, args.tesseract,
+    )
+    return {
+        "selected": selected,
+        "sidebar_pixel_rgb": pixel,
+        "heading_visible": visible["matched"],
+        "screenshot_sha256": visible["screenshot_sha256"],
+    }
 
 
 def check_visible_page(window, scratch, heading, args, crop="830x210+240+42"):
@@ -99,8 +126,8 @@ def workspace_state(path):
         }
 
 
-def wait_for_workspace(path):
-    deadline = time.monotonic() + 15
+def wait_for_workspace(path, timeout=15):
+    deadline = time.monotonic() + timeout
     while True:
         try:
             return workspace_state(path)
@@ -132,8 +159,8 @@ def run_cycle(args, window, scratch, index):
     for (name, y, heading) in PAGES:
         navigate(y)
         if index % args.check_every == 0:
-            time.sleep(0.18)
-            page_checks[name] = check_visible_page(window, scratch, heading, args)
+            send("mousemove", "--window", window, 1256, 49)
+            page_checks[name] = check_desktop_route(window, scratch, y, heading, args)
         if name != "Today":
             scroll(665, 530, 5)
             scroll(665, 530, 4)
@@ -214,7 +241,7 @@ def main():
                         "cycle": index + 1,
                         "elapsed_seconds": elapsed,
                         "memory_kib": memory,
-                        "desktop_headings": checks,
+                        "desktop_routes": checks,
                         "mobile_orbit_calendar": orbit,
                     })
                     print(f"cycle {index + 1} at {elapsed:.0f}s", flush=True)
@@ -230,15 +257,14 @@ def main():
             evidence["final_memory_kib"] = process_rss(pid)
         except OSError:
             evidence["final_memory_kib"] = None
-        evidence["heading_checks"] = sum(
-            len(observation["desktop_headings"])
+        desktop_checks = [
+            check
             for observation in evidence["observations"]
-        )
-        evidence["heading_mismatches"] = sum(
-            not check["matched"]
-            for observation in evidence["observations"]
-            for check in observation["desktop_headings"].values()
-        )
+            for check in observation["desktop_routes"].values()
+        ]
+        evidence["desktop_route_checks"] = len(desktop_checks)
+        evidence["desktop_route_mismatches"] = sum(not check["selected"] for check in desktop_checks)
+        evidence["desktop_headings_visible"] = sum(check["heading_visible"] for check in desktop_checks)
         orbit_checks = [
             observation["mobile_orbit_calendar"]
             for observation in evidence["observations"]
@@ -256,7 +282,7 @@ def main():
             except (OSError, ValueError, RuntimeError, sqlite3.Error) as error:
                 evidence.update(workspace_verified=False, workspace_check_error=str(error))
         args.output.write_text(json.dumps(evidence, indent=2) + "\n")
-    if (evidence["status"] != "complete" or evidence["heading_mismatches"]
+    if (evidence["status"] != "complete" or evidence["desktop_route_mismatches"]
             or evidence["orbit_mismatches"] or evidence.get("workspace_verified") is False):
         return 1
     return 0

@@ -103,3 +103,39 @@ cc -std=c17 -O2 -Wall -Wextra -Werror tool/benchmark/deny_ip_sockets.c -o /tmp/e
 strace -ff -qq -e trace=socket,connect,sendto,sendmsg,sendmmsg \
   -o "$easy_ui_dir/network.trace" /tmp/easy-deny-ip-sockets "$easy_bundle/easy"
 ```
+
+## Sustained Linux navigation
+
+The same frozen release completed 269 navigation cycles in 1,801 seconds on one virtual CPU. Each cycle switched desktop sections, issued scroll inputs and resized to one of five phone or tablet layouts. The sampled mobile hold-and-drag gesture opened Calendar 24 times out of 24. The original desktop probe found the expected heading in 127 of 156 samples. All 29 misses were on Today. A screenshot during a miss showed Today selected with the task list scrolled below the heading. Later observations record selected sidebar state independently of heading visibility.
+
+The 11,721-record synthetic workspace had the same revision and digest at both ends and both SQLite integrity checks passed. Process RSS moved from 294 to 449 MiB and peak RSS was 487 MiB. Sampled RSS was 385 to 394 MiB in the middle and last third of the loop. These measurements describe this run, with software rendering on a shared host. [Original navigation soak](benchmark-results/native-soak-heading-probes-epyc-20261124.json)
+
+On a disposable X11 display, launch the release with one permitted CPU and an isolated synthetic workspace. Run the probe in the same display after the window appears. It requires `xdotool`, ImageMagick and Tesseract.
+
+```sh
+python3 tool/benchmark/native_ui_soak.py \
+  --seconds 1800 --minimum-cycles 100 --check-every 7 \
+  --app-revision 8670be647657925862931c2b3b58683656ca2ef7 \
+  --workspace-database "$easy_ui_dir/data/app.launchsites.easy/easy/workspace.sqlite3" \
+  --output "$easy_ui_dir/native-soak.json"
+```
+
+## Large workspace startup and navigation baseline
+
+Two fresh Linux release launches compared verified legacy workspace migrations under one virtual CPU. The standard fixture serialized 3.07 MB of data. The larger fixture serialized 21.37 MB and included 30,000 calendar events, 100,000 tasks and 3,001 notes. Both launches used isolated X11 displays. Sharing the host with other work adds timing variance.
+
+| Fixture | Visible window | Verified Today | Calendar check | Tasks check | Notes check | Peak RSS |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 11,721 records | 2.13 s | 8.58 s | 1.90 s | 0.69 s | 0.85 s | 404 MiB |
+| 133,001 records | 1.93 s | 19.50 s | 17.45 s | 16.26 s | 7.75 s | 1,006 MiB |
+
+The window column measures appearance of a blank or rendered window from process launch. The Today column adds the selected-route and OCR heading checks. Each navigation column measures a new click and its selected-route and heading checks. Both runs rendered the expected heading on all four routes and kept the same SQLite digest and revision between checks. A separate large-workspace observation found a verified database at 7.69 seconds and a blank shell at 18.32 seconds, with Today visible by 23.46 seconds. [Workspace scale baseline](benchmark-results/native-workspace-scale-before-epyc-20261124.json)
+
+The scale probe creates two disposable profiles and isolated displays. It uses the frozen release palette to sample sidebar selection. It requires Xvfb, `xdotool`, ImageMagick and Tesseract.
+
+```sh
+dbus-run-session -- python3 tool/benchmark/native_workspace_scale.py \
+  --binary "$easy_bundle/easy" \
+  --app-revision 8670be647657925862931c2b3b58683656ca2ef7 \
+  --today 2026-11-24 --output "$easy_ui_dir/workspace-scale.json"
+```

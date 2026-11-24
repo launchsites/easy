@@ -94,6 +94,20 @@ python3 tool/benchmark/local_inference.py \
   --profile one-cpu-6144mib --output "$easy_bench_dir/qwen4b-results.json"
 ```
 
+The one-CPU, 6 GiB profile also ran continuously for 1,818 seconds after one warm pass. All 98 requests completed within the 30-second timeout, all returned schema-valid responses and 24 matched all intended fields. Latency p50 was 17.46 seconds and p95 was 27.76 seconds. Median decode speed was 5.69 tokens per second. The 25 memory samples showed 4.04–4.07 GiB resident and a 4.13 GiB peak. The runtime remained alive at completion, with zero cgroup OOM kills. This establishes sustained operation under that specific resource ceiling and the limits of the isolated model's interpretation accuracy. [Raw Qwen3-4B soak](benchmark-results/local-inference-epyc-qwen4b-soak-20261124.json)
+
+Repeat with the same runtime and model by selecting the single-CPU profile and adding a 30-minute measurement window.
+
+```sh
+taskset -c 1 python3 tool/benchmark/local_inference.py \
+  --server "$easy_bench_dir/llama-b12657/llama-server" \
+  --model "$easy_bench_dir/Qwen3-4B-Q4_K_M.gguf" \
+  --model-sha256 7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5 \
+  --disable-thinking --profile one-cpu-6144mib --warm-rounds 1 \
+  --soak-seconds 1800 --soak-progress "$easy_bench_dir/qwen4b-soak-progress.jsonl" \
+  --output "$easy_bench_dir/qwen4b-soak-results.json"
+```
+
 ## Offline speech pilot
 
 The tested whisper.cpp b5907 Linux x86-64 CPU archive has SHA-256 `a6199027fe5b4239c84171d2bca4c0ff44ec86a515494d5a39b237b212d429bd`. The MIT model repository at revision `5359861c739e955e79d9a303bcbc70fb988958b1` supplied English `ggml-tiny.en.bin` at SHA-256 `921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f` and `ggml-base.en.bin` at SHA-256 `a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002`. [whisper.cpp b5907 release](https://github.com/ggml-org/whisper.cpp/releases/tag/b5907) · [Model files](https://huggingface.co/ggerganov/whisper.cpp/tree/5359861c739e955e79d9a303bcbc70fb988958b1) · [OpenAI Whisper license](https://github.com/openai/whisper/blob/main/LICENSE)

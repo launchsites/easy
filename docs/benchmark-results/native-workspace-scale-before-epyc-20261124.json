@@ -1,0 +1,219 @@
+{
+  "run_at_utc": "2026-11-24T03:07:12.183775+00:00",
+  "app_revision": "8670be647657925862931c2b3b58683656ca2ef7",
+  "executable_sha256": "17ea2f4d7ec1eac78813e45047a26ed157eb2bb37191eb3c493e282ad4ec5d59",
+  "aot_library_sha256": "9dd33c7c56043d49d244f8b9ead29cdf5a500f844f17a2eeccb595ca04d8d11f",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "host_memory_kib": 18440100,
+    "cgroup_cpu_max": "400000 100000",
+    "cgroup_memory_max": "17179869184",
+    "cgroup_memory_events_before": "low 0\nhigh 0\nmax 48400\noom 0\noom_kill 0\noom_group_kill 0"
+  },
+  "profiles": [
+    {
+      "profile": "standard",
+      "fixture_bytes": 3069796,
+      "fixture_counts": {
+        "events": 7320,
+        "tasks": 3100,
+        "notes": 1301
+      },
+      "cpu": 0,
+      "routes": [
+        {
+          "name": "Today",
+          "check_ms": 902.07,
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+        },
+        {
+          "name": "Calendar",
+          "check_ms": 1899.25,
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "ef07a8cc895de0461ed13a56860cbbe981661214f6e9ad114aec206bdcc19cac"
+        },
+        {
+          "name": "Tasks",
+          "check_ms": 685.88,
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            44,
+            57,
+            46
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "bbafdad9088e4536fc81f02b5c4649ac28284059e6b55b15101bde54be57dd61"
+        },
+        {
+          "name": "Notes",
+          "check_ms": 852.15,
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "693195fac09e3787359e87b10f67740b9a5c72cf0cda50fd01687a34dc93c1a6"
+        }
+      ],
+      "window_visible_ms": 2129.09,
+      "today_initial": {
+        "selected": true,
+        "sidebar_pixel_rgb": [
+          42,
+          52,
+          43
+        ],
+        "heading_visible": true,
+        "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+      },
+      "today_check_ms_from_launch": 8583.62,
+      "workspace_before": {
+        "revision": 1,
+        "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+        "counts": {
+          "events": 7320,
+          "tasks": 3100,
+          "notes": 1301
+        },
+        "quick_check": "ok"
+      },
+      "workspace_verified_ms_from_launch": 8666.07,
+      "workspace_after": {
+        "revision": 1,
+        "digest": "467597a7f2e0b880b45fad55a89ffe1a25fb9a2bf411e6b7e9bfce19d2ee7058",
+        "counts": {
+          "events": 7320,
+          "tasks": 3100,
+          "notes": 1301
+        },
+        "quick_check": "ok"
+      },
+      "process_memory_kib": {
+        "VmHWM": 414072,
+        "VmRSS": 390704
+      },
+      "workspace_verified": true
+    },
+    {
+      "profile": "large",
+      "fixture_bytes": 21366671,
+      "fixture_counts": {
+        "events": 30000,
+        "tasks": 100000,
+        "notes": 3001
+      },
+      "cpu": 0,
+      "routes": [
+        {
+          "name": "Today",
+          "check_ms": 349.2,
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+        },
+        {
+          "name": "Calendar",
+          "check_ms": 17454.44,
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "6927560604e2f1e1a798480a37b03a1ac09e5ff229b45b0febd1376776db5696"
+        },
+        {
+          "name": "Tasks",
+          "check_ms": 16263.57,
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "97d9490c2f5fd23dfde6cb456010e77197042420e36657a23499638464c0a25a"
+        },
+        {
+          "name": "Notes",
+          "check_ms": 7754.1,
+          "selected": true,
+          "sidebar_pixel_rgb": [
+            42,
+            52,
+            43
+          ],
+          "heading_visible": true,
+          "screenshot_sha256": "cefea1b78023adbe1783727e74fd3d4431de3f50edd31eddb1b530d7b1e3d5c3"
+        }
+      ],
+      "window_visible_ms": 1930.24,
+      "today_initial": {
+        "selected": true,
+        "sidebar_pixel_rgb": [
+          42,
+          52,
+          43
+        ],
+        "heading_visible": true,
+        "screenshot_sha256": "05ed751aeb9ba7e310dbf710ac6a6ceee3e9b3b6dd424ffebc82f91c0f345540"
+      },
+      "today_check_ms_from_launch": 19502.71,
+      "workspace_before": {
+        "revision": 1,
+        "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+        "counts": {
+          "events": 30000,
+          "tasks": 100000,
+          "notes": 3001
+        },
+        "quick_check": "ok"
+      },
+      "workspace_verified_ms_from_launch": 19656.46,
+      "workspace_after": {
+        "revision": 1,
+        "digest": "a1d9a7aa666d1dd224b44087a6a8ef5c46816083582e9377e78480d02cbdf195",
+        "counts": {
+          "events": 30000,
+          "tasks": 100000,
+          "notes": 3001
+        },
+        "quick_check": "ok"
+      },
+      "process_memory_kib": {
+        "VmHWM": 1030192,
+        "VmRSS": 990224
+      },
+      "workspace_verified": true
+    }
+  ]
+}
