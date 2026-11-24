@@ -26,3 +26,14 @@ python3 tool/benchmark/native_release_smoke.py \
 A Flutter widget probe on one logical CPU opened a synthetic 1,200-exercise workout with six sets per exercise, then marked its first set done. The eager list read all 1,200 exercise names on each action. The lazy list read two. Across three warm runs, the median dropped from 757 to 377 ms when opening and from 647 to 349 ms when marking the set. These intervals include the widget test harness and rendering. [Raw measurements](benchmark-results/workout-viewport-build-epyc-20261124.json)
 
 The regression checks verify that a reordered exercise keeps its set progress and original targets while the list builds nearby cards. Portrait and landscape at 200% text scale tested the capture control and scroll path. The same focused run exercised live, cross-Focus capture and session persistence.
+
+A separate Linux AOT replay alternated the baseline and candidate across six fresh profiles on one logical CPU. Each run opened the 1,200-exercise workout and checked or cleared the first set six times. All 36 actions produced exactly one SQLite revision each, with the original target intact. The median time to the first workout frame was 1,819 ms before the list change and 751 ms with it. The median of the warm per-launch save timings moved from 642 to 261 ms. Other work shared the core during the replay, and the individual save timings varied. [Native measurements](benchmark-results/native-gym-scale-epyc-20261124.json)
+
+The native comparison used `68fecf8` as the baseline and the same revision with `lib/gym_session.dart` from `29c841a` as the candidate. Build each snapshot with `flutter build linux --release`, then pass the two executables to the runner.
+
+```sh
+python3 tool/benchmark/native_gym_scale.py \
+  --baseline /tmp/easy-baseline/bundle/easy \
+  --candidate /tmp/easy-candidate/bundle/easy \
+  --output /tmp/easy-native-gym-scale
+```

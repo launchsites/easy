@@ -1,0 +1,115 @@
+{
+  "cpu": 4,
+  "width": 390,
+  "height": 844,
+  "exercises": 1200,
+  "sets_per_exercise": 6,
+  "builds": {
+    "baseline": {
+      "exe": "f707e6e3a581e5cc642288df8daf85f3890c1594e420a0937d4e3808bf89648e",
+      "aot": "028d356b855b5577cafc2475c22d4d32ea105f453b16e3ede267af6f621eff9b"
+    },
+    "candidate": {
+      "exe": "05b8155f0d095e85dd8d56489b2d09c996142a18c71fe96f01aea1d7caa3092c",
+      "aot": "0346b579176de5bc0c722792ac9657a1ff46c1cb9ba037b727268f922621dc41"
+    }
+  },
+  "results": {
+    "baseline": [
+      {
+        "label": "baseline-1",
+        "open_ms": 1387.67,
+        "durable_edit_ms": [
+          1078.66,
+          1067.01,
+          982.11,
+          455.74,
+          1238.26,
+          749.6
+        ],
+        "warm_durable_edit_ms": 982.11
+      },
+      {
+        "label": "baseline-2",
+        "open_ms": 1930.89,
+        "durable_edit_ms": [
+          653.07,
+          331.38,
+          1091.22,
+          576.68,
+          510.64,
+          765.13
+        ],
+        "warm_durable_edit_ms": 576.68
+      },
+      {
+        "label": "baseline-3",
+        "open_ms": 1818.66,
+        "durable_edit_ms": [
+          656.0,
+          677.58,
+          614.29,
+          642.19,
+          601.81,
+          809.91
+        ],
+        "warm_durable_edit_ms": 642.19
+      }
+    ],
+    "candidate": [
+      {
+        "label": "candidate-1",
+        "open_ms": 480.84,
+        "durable_edit_ms": [
+          283.36,
+          987.33,
+          166.39,
+          198.96,
+          239.84,
+          430.84
+        ],
+        "warm_durable_edit_ms": 239.84
+      },
+      {
+        "label": "candidate-2",
+        "open_ms": 751.32,
+        "durable_edit_ms": [
+          356.48,
+          260.53,
+          291.94,
+          303.56,
+          224.6,
+          186.31
+        ],
+        "warm_durable_edit_ms": 260.53
+      },
+      {
+        "label": "candidate-3",
+        "open_ms": 1152.72,
+        "durable_edit_ms": [
+          861.02,
+          1021.35,
+          1032.23,
+          508.16,
+          846.87,
+          396.09
+        ],
+        "warm_durable_edit_ms": 846.87
+      }
+    ]
+  },
+  "medians": {
+    "baseline": {
+      "open_ms": 1818.66,
+      "warm_durable_edit_ms": 642.19
+    },
+    "candidate": {
+      "open_ms": 751.32,
+      "warm_durable_edit_ms": 260.53
+    }
+  },
+  "baseline_revision": "68fecf80a3c9da48e2d81252322efe4c0e19bbc2",
+  "candidate_overlay": "lib/gym_session.dart from 29c841a over the baseline",
+  "candidate_overlay_sha256": "838c03e2d42243cb2f7fcea50c17ec3324b105919e5dbc42f5e6b693bdee3c05",
+  "verified_durable_edits": 36
+}
