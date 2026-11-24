@@ -108,16 +108,20 @@ class TaskWorkspaceFeed {
 
   List<TaskItem> planningTasks(List<TaskItem> tasks, DateTime day) {
     if (series.isEmpty) return tasks;
-    final start = _civilDay(day);
-    final next = start.add(const Duration(days: 1));
     final available = standalone(tasks).toList();
     final occupied = {for (final task in available) task.id};
-    for (final row in _rows(start, next)) {
-      if (row.occurrence.canSchedule && occupied.add(row.task.id)) {
-        available.add(row.task);
-      }
+    for (final task in planningOccurrences(day)) {
+      if (occupied.add(task.id)) available.add(task);
     }
     return available;
+  }
+
+  Iterable<TaskItem> planningOccurrences(DateTime day) sync* {
+    final start = _civilDay(day);
+    final end = start.add(const Duration(days: 1));
+    for (final row in _rows(start, end)) {
+      if (row.occurrence.canSchedule) yield row.task;
+    }
   }
 
   Iterable<TaskSeriesRow> _rows(DateTime start, DateTime end) sync* {

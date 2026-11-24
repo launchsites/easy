@@ -73,6 +73,8 @@ import 'scheduling/availability_settings.dart';
 import 'scheduling/availability_settings_page.dart';
 import 'scheduling/plan_day_sheet.dart';
 import 'scheduling/planner.dart';
+import 'scheduling/weekly_plan_sheet.dart';
+import 'scheduling/weekly_planner.dart';
 import 'search/search.dart';
 import 'settings_page.dart';
 import 'storage/attachment_store.dart';
@@ -96,6 +98,7 @@ part 'workspace_category_views.dart';
 part 'workspace_search.dart';
 part 'workspace_task_actions.dart';
 part 'workspace_reminders.dart';
+part 'workspace_planner.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -908,6 +911,16 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                       title: 'Availability and travel',
                       onTap: _openSchedulingSettings,
                     ),
+                  if (features.allows(EasyFeature.planning))
+                    SettingsItem(
+                      icon: Icons.view_week_outlined,
+                      title: 'Plan week',
+                      subtitle: 'Review suggested blocks across seven days',
+                      onTap: () {
+                        Navigator.pop(context);
+                        unawaited(_planWeek());
+                      },
+                    ),
                   if (features.allows(EasyFeature.insights))
                     SettingsItem(
                       icon: Icons.insights_outlined,
@@ -1586,11 +1599,35 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     );
   }
 
-  SchedulingSettings? _planningPreferences() {
+  SchedulingSettings? _planningPreferences({bool expandCategories = false}) {
     final raw = _data.sections[_scheduleSettingsKey];
-    return raw == null
-        ? null
-        : SchedulingSettings.fromJson(raw as Map<String, Object?>);
+    if (raw == null) return null;
+    final settings = SchedulingSettings.fromJson(raw as Map<String, Object?>);
+    if (!expandCategories ||
+        settings.availability.every((window) => window.categories == null)) {
+      return settings;
+    }
+    return SchedulingSettings(
+      timeZoneId: settings.timeZoneId,
+      places: settings.places,
+      routes: settings.routes,
+      beforeMinutes: settings.beforeMinutes,
+      afterMinutes: settings.afterMinutes,
+      availability: [
+        for (final window in settings.availability)
+          if (window.categories case final categories?)
+            WeeklyAvailability(
+              id: window.id,
+              weekdays: window.weekdays,
+              startMinute: window.startMinute,
+              endMinute: window.endMinute,
+              kind: window.kind,
+              categories: _expandCategoryReferences(categories),
+            )
+          else
+            window,
+      ],
+    );
   }
 
   Future<void> _openSchedulingSettings() async {
@@ -2843,7 +2880,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final prior = _data;
     final SchedulingSettings? settings;
     try {
-      settings = _planningPreferences();
+      settings = _planningPreferences(expandCategories: true);
     } catch (_) {
       _inform('Your scheduling settings could not be opened.');
       return;
@@ -2866,9 +2903,13 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final checkedSeries = _internalFeed.events;
     final beforeAcceptance = _data;
     if (!identical(
-      prior.sections[_scheduleSettingsKey],
-      beforeAcceptance.sections[_scheduleSettingsKey],
-    )) {
+          prior.sections[_scheduleSettingsKey],
+          beforeAcceptance.sections[_scheduleSettingsKey],
+        ) ||
+        !identical(
+          prior.sections[_categorySettingsKey],
+          beforeAcceptance.sections[_categorySettingsKey],
+        )) {
       _inform('Availability changed. Preview the day again.');
       return;
     }
@@ -2913,44 +2954,16 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       return;
     }
 
-    final operationId = 'schedule-${now.microsecondsSinceEpoch}';
-    var index = 0;
-    final events = [
-      ...beforeAcceptance.events,
-      for (final entry in result.tasks)
-        for (final block in available[entry.task.id]!.blocks)
-          CalendarEvent(
-            id: '$operationId-${index++}',
-            title: available[entry.task.id]!.task.title,
-            start: block.start,
-            end: block.end,
-            category: available[entry.task.id]!.task.category,
-            plannedTaskId: entry.task.id,
-            initialPlannedStart: block.start,
-            initialPlannedEnd: block.end,
-          ),
-    ];
-    try {
-      await _commitReviewedData(
-        beforeAcceptance,
-        beforeAcceptance.copyWith(events: events),
-        operationId: operationId,
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('The plan could not be saved. Preview it again.'),
-        ),
-      );
-      return;
-    }
-    if (!mounted) return;
-    _changeDate(result.window.start);
-    _navigate(_Destination.calendar);
+    await _storeReviewedBlocks(beforeAcceptance, [
+      for (final proposed in result.tasks) available[proposed.task.id]!,
+    ]);
   }
 
-  Future<List<CalendarEvent>?> _planningCalendar(DateTime day) async {
+  Future<List<CalendarEvent>?> _planningCalendar(
+    DateTime day, {
+    DateTime? firstDay,
+    DateTime? lastDay,
+  }) async {
     final apple = _selectedAppleCalendars;
     final imports = _selectedIcsCalendars;
     final series = _eventSeries;
@@ -2961,18 +2974,20 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       if (series.isNotEmpty) _internalFeed.refresh(day: day, sources: series),
     ]);
     if (!mounted) return null;
+    bool covered(bool Function(DateTime) covers) =>
+        covers(firstDay ?? day) && covers(lastDay ?? day);
     if (apple.isNotEmpty &&
-        (_appleFeed.problem != null || !_appleFeed.covers(day))) {
+        (_appleFeed.problem != null || !covered(_appleFeed.covers))) {
       _inform(_appleFeed.problem ?? 'Apple calendars could not be refreshed.');
       return null;
     }
     if (imports.isNotEmpty &&
-        (_icsFeed.problem != null || !_icsFeed.covers(day))) {
+        (_icsFeed.problem != null || !covered(_icsFeed.covers))) {
       _inform(_icsFeed.problem ?? 'Imported calendars could not be refreshed.');
       return null;
     }
     if (series.isNotEmpty &&
-        (_internalFeed.problem != null || !_internalFeed.covers(day))) {
+        (_internalFeed.problem != null || !covered(_internalFeed.covers))) {
       _inform(
         _internalFeed.problem ?? 'Repeating events could not be refreshed.',
       );

@@ -70,7 +70,7 @@ List<TaskItem> weeklyWorkspaceTasks({
   final local = weekStart.toLocal();
   for (var index = 0; index < 7; index++) {
     final day = DateTime(local.year, local.month, local.day + index);
-    for (final task in feed.planningTasks(tasks, day)) {
+    for (final task in feed.planningOccurrences(day)) {
       if (added.add(task.id)) output.add(_onOrAfter(task, day));
     }
   }

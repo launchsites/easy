@@ -51,7 +51,10 @@ extension _WorkspaceCategoryViews on _WorkspaceState {
 
   Set<String>? _expandCategoryScope(FocusMode? mode) {
     final selected = mode?.categories;
-    if (selected == null) return null;
+    return selected == null ? null : _expandCategoryReferences(selected);
+  }
+
+  Set<String> _expandCategoryReferences(Set<String> selected) {
     final catalog = _catalog;
     final roots = selected.map(catalog.canonicalId).nonNulls.toSet();
     final categories = {...roots};
