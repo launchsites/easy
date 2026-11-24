@@ -1,0 +1,15 @@
+{
+  "source_revision": "8e3dbac429f6f61a472a22513a16f4db547a8855",
+  "transport": "synthetic",
+  "client_processes": 2,
+  "elapsed_seconds": 14.2,
+  "checks": {
+    "distinct_os_processes": true,
+    "reverse_order_actual_micros": 11,
+    "no_dispatch_for_previous_month_reservation": true,
+    "first_new_month_dispatch_reserved_micros": 9216,
+    "new_month_dispatches_after_exact_charge": 0,
+    "dispatches_after_policy_disabled_during_ack": 0,
+    "unused_reservation_released_after_policy_change": true
+  }
+}
