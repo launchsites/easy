@@ -114,6 +114,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   final _outputRate = TextEditingController();
   final _inputTokens = TextEditingController();
   final _outputTokens = TextEditingController();
+  final _imageTokens = TextEditingController();
   bool _loading = true;
   bool _saving = false;
   bool _hasKey = false;
@@ -122,6 +123,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _confirmLocal = true;
   bool _estimates = false;
   bool _automatic = false;
+  bool _mealVision = false;
   bool _completionTokens = true;
   String? _error;
 
@@ -148,6 +150,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       _outputRate,
       _inputTokens,
       _outputTokens,
+      _imageTokens,
     ]) {
       field.dispose();
     }
@@ -170,6 +173,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       _confirmLocal = settings.confirmLocal;
       _estimates = settings.allowEstimates;
       _automatic = settings.automaticEstimates;
+      _mealVision = settings.allowMealVision;
       _completionTokens = settings.apiUsesCompletionTokenLimit;
       _apiUrl.text = settings.apiBaseUrl;
       _apiModel.text = settings.apiModel;
@@ -180,6 +184,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       _outputRate.text = _poundsValue(settings.outputMicrosPerMillion);
       _inputTokens.text = '${settings.maxInputTokens}';
       _outputTokens.text = '${settings.maxOutputTokens}';
+      _imageTokens.text = settings.imageInputTokenCeiling?.toString() ?? '';
       _hasKey = key;
     });
   }
@@ -190,7 +195,10 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   void _selectRoute(AiRoute route) {
     setState(() {
       if (route != AiRoute.api) _apiKey.clear();
-      if (route == AiRoute.offline) _automatic = false;
+      if (route == AiRoute.offline) {
+        _automatic = false;
+        _mealVision = false;
+      }
       _route = route;
       _error = null;
     });
@@ -227,6 +235,19 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       setState(() => _error = 'Enter positive token limits.');
       return;
     }
+    final imageCeiling = paid && _mealVision
+        ? int.tryParse(_imageTokens.text.trim())
+        : prior.imageInputTokenCeiling;
+    if (paid &&
+        _mealVision &&
+        (imageCeiling == null ||
+            imageCeiling < 1 ||
+            imageCeiling >= inputTokens)) {
+      setState(
+        () => _error = 'Enter an image token limit below the input limit.',
+      );
+      return;
+    }
     final next = AiRuntimeSettings(
       route: _route,
       apiBaseUrl: paid ? _apiUrl.text.trim() : prior.apiBaseUrl,
@@ -242,6 +263,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       confirmLocal: _confirmLocal,
       allowEstimates: _estimates,
       automaticEstimates: _automatic,
+      allowMealVision: _mealVision,
+      imageInputTokenCeiling: imageCeiling,
       apiUsesCompletionTokenLimit: _completionTokens,
     );
     setState(() {
@@ -495,7 +518,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             value: _metadata,
             title: const Text('Include optional context'),
             subtitle: const Text(
-              'Timezone, referred tasks and duration samples',
+              'Timezone, custom categories and duration samples',
             ),
             onChanged: (value) => setState(() => _metadata = value),
           ),
@@ -505,6 +528,24 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             value: _confirmLocal,
             title: const Text('Confirm local requests'),
             onChanged: (value) => setState(() => _confirmLocal = value),
+          ),
+        if (api || local)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _mealVision,
+            title: const Text('Meal photo suggestions'),
+            subtitle: const Text('Review the image before sending'),
+            onChanged: (value) => setState(() => _mealVision = value),
+          ),
+        if (api && _mealVision)
+          TextField(
+            controller: _imageTokens,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Maximum image input tokens',
+              helperText: 'Use the configured model’s upper image token cost.',
+              helperMaxLines: 2,
+            ),
           ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,

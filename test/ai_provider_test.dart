@@ -72,6 +72,88 @@ void main() {
   );
 
   test(
+    'capture v2 sends eligible clauses and enforces disclosed categories',
+    () async {
+      final fixture = _Fixture();
+      final config = _local();
+      final source = CaptureInput(
+        id: fixture.input.id,
+        revision: fixture.input.revision,
+        text: 'Task: Send the brief; Event: Private appointment 7–8pm',
+        context: CaptureContext(
+          anchor: _clock(),
+          revision: fixture.input.context.revision,
+          categories: const {
+            'work': 'Work',
+            'custom': 'Private custom workspace category',
+          },
+        ),
+      );
+      var proposedCategory = 'work';
+      var metadata = false;
+      final provider = fixture.provider((request) async {
+        final body = (request as http.Request).body;
+        final messages = (jsonDecode(body) as Map)['messages'] as List;
+        final fields =
+            jsonDecode((messages[1] as Map)['content'] as String) as Map;
+        expect(fields['version'], 2);
+        expect(fields['clauses'], [
+          {
+            'clause': 0,
+            'text': 'Task: Send the brief',
+            'choices': ['category'],
+            'existingKind': 'task',
+          },
+        ]);
+        expect(body, isNot(contains('Private appointment')));
+        expect(
+          fields['categoryIds'],
+          metadata
+              ? {'work': 'Work', 'custom': 'Private custom workspace category'}
+              : {'work': 'Work'},
+        );
+        return _completion({
+          'version': 2,
+          'captureId': source.id,
+          'sourceRevision': source.revision,
+          'contextRevision': source.context.revision,
+          'suggestions': [
+            {'clause': 0, 'kind': 'category', 'category': proposedCategory},
+          ],
+        });
+      });
+      Future<AiProviderResult<CaptureReview>> classify(String id) async {
+        final claim = fixture.claim(config, id: id);
+        final result = await provider.capture(
+          config: config,
+          claim: claim,
+          input: source,
+          currentRevision: fixture.currentRevision,
+          includeOptionalMetadata: metadata,
+        );
+        fixture.queue.complete(
+          claim,
+          currentRevision: fixture.currentRevision,
+          result: null,
+        );
+        return result;
+      }
+
+      final review = (await classify('v2-built-in')).value!;
+      expect(review.proposals.first.draft.category, 'work');
+      expect(review.proposals.first.requiresSelection, true);
+      expect(review.proposals.last.draft.title, 'Private appointment');
+
+      proposedCategory = 'custom';
+      final withheld = await classify('v2-withheld');
+      expect(withheld.failure, AiProviderFailure.invalidResponse);
+      metadata = true;
+      final allowed = await classify('v2-custom');
+      expect(allowed.value!.proposals.first.draft.category, 'custom');
+    },
+  );
+
+  test(
     'endpoint validation rejects insecure paid hosts and loopback lookalikes',
     () async {
       for (final address in [

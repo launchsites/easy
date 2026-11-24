@@ -101,7 +101,12 @@ void main() {
             preview.endpoint.toString(),
             'https://fixture.example.test/v1/chat/completions',
           );
-          expect(preview.fields['text'], source.text);
+          expect(preview.fields['version'], 2);
+          expect(
+            (preview.fields['clauses'] as List).single['text'],
+            source.text,
+          );
+          expect(preview.fields, isNot(contains('text')));
           expect(preview.fields, isNot(contains('timezone')));
           expect(preview.fields, isNot(contains('completionTargets')));
           expect(preview.reserveMicros, isPositive);
@@ -383,6 +388,7 @@ void main() {
     final a = _candidate('private-workspace-id');
     final b = _candidate('private-workspace-id-2');
     runtime.setForeground(false);
+    expect(runtime.canAutomaticallyEstimate(a), false);
     expect(
       (await runtime.runAutomaticEstimate(
         candidate: a,
@@ -391,6 +397,7 @@ void main() {
       AiRunStatus.blocked,
     );
     runtime.setForeground(true);
+    expect(runtime.canAutomaticallyEstimate(a), true);
     final first = await runtime.runAutomaticEstimate(
       candidate: a,
       currentRevision: _candidateRevision,
@@ -398,6 +405,7 @@ void main() {
     expect(first.status, AiRunStatus.ready);
     expect(first.value!.requiresReview, true);
     expect(first.value!.durationMinutes, 35);
+    expect(runtime.canAutomaticallyEstimate(b), false);
     expect(
       (await runtime.runAutomaticEstimate(
         candidate: b,
@@ -406,6 +414,8 @@ void main() {
       AiRunStatus.blocked,
     );
     now = now.add(const Duration(hours: 1));
+    expect(runtime.canAutomaticallyEstimate(a), false);
+    expect(runtime.canAutomaticallyEstimate(b), true);
     expect(
       (await runtime.runAutomaticEstimate(
         candidate: a,
@@ -530,12 +540,16 @@ void main() {
       ),
       'test-local',
     );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
     final outerScroll = find.byType(Scrollable).first;
     final confirmation = find.widgetWithText(
       SwitchListTile,
       'Confirm local requests',
     );
     await tester.scrollUntilVisible(confirmation, 140, scrollable: outerScroll);
+    await tester.ensureVisible(confirmation);
+    await tester.pumpAndSettle();
     await tester.tap(confirmation);
     final save = find.text('Save settings');
     await tester.scrollUntilVisible(save, 130, scrollable: outerScroll);

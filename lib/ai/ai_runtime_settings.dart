@@ -76,6 +76,8 @@ class AiRuntimeSettings {
     this.confirmLocal = true,
     this.allowEstimates = false,
     this.automaticEstimates = false,
+    this.allowMealVision = false,
+    this.imageInputTokenCeiling,
     this.apiUsesCompletionTokenLimit = true,
   });
 
@@ -93,6 +95,8 @@ class AiRuntimeSettings {
   final bool confirmLocal;
   final bool allowEstimates;
   final bool automaticEstimates;
+  final bool allowMealVision;
+  final int? imageInputTokenCeiling;
   final bool apiUsesCompletionTokenLimit;
 
   bool get valid =>
@@ -107,6 +111,14 @@ class AiRuntimeSettings {
       (apiBaseUrl.trim().isEmpty || _apiAddress != null) &&
       (localBaseUrl.trim().isEmpty || _localAddress != null) &&
       (!automaticEstimates || (allowEstimates && route != AiRoute.offline)) &&
+      (imageInputTokenCeiling == null ||
+          (imageInputTokenCeiling! > 0 &&
+              _nonnegative(imageInputTokenCeiling!))) &&
+      (!allowMealVision ||
+          (route != AiRoute.offline &&
+              (route != AiRoute.api ||
+                  (imageInputTokenCeiling != null &&
+                      imageInputTokenCeiling! < maxInputTokens)))) &&
       (route == AiRoute.offline || provider != null);
 
   AiProviderConfig? get provider => switch (route) {
@@ -206,6 +218,8 @@ class AiRuntimeSettings {
     'confirmLocal': confirmLocal,
     'allowEstimates': allowEstimates,
     'automaticEstimates': automaticEstimates,
+    'allowMealVision': allowMealVision,
+    'imageInputTokenCeiling': imageInputTokenCeiling,
     'apiUsesCompletionTokenLimit': apiUsesCompletionTokenLimit,
   };
 
@@ -225,6 +239,8 @@ class AiRuntimeSettings {
         confirmLocal: values['confirmLocal'] as bool,
         allowEstimates: values['allowEstimates'] as bool,
         automaticEstimates: values['automaticEstimates'] as bool? ?? false,
+        allowMealVision: values['allowMealVision'] as bool? ?? false,
+        imageInputTokenCeiling: values['imageInputTokenCeiling'] as int?,
         apiUsesCompletionTokenLimit:
             values['apiUsesCompletionTokenLimit'] as bool,
       );

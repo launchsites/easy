@@ -126,6 +126,7 @@ class _CaptureReviewSheetState extends State<CaptureReviewSheet> {
             review.proposals.where(
               (proposal) =>
                   proposal.isReady &&
+                  !proposal.requiresSelection &&
                   !widget.disabledKinds.contains(proposal.draft.kind),
             ),
           );
@@ -502,6 +503,7 @@ class _ProposalTile extends StatelessWidget {
               label,
               if (category != null) spaceName(category),
               if (featureDisabled) 'Feature turned off',
+              if (proposal.requiresSelection) 'AI suggestion',
               ?detail,
               if (proposal.missingRequired.isNotEmpty)
                 'Needs ${proposal.missingRequired.join(', ')}',

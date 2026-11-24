@@ -7,6 +7,7 @@ import 'task_category_hint.dart';
 export 'capture_models.dart';
 
 part 'capture_validation.dart';
+part 'capture_enrichment.dart';
 
 final _whitespace = RegExp(r'\s+');
 final _separators = RegExp(

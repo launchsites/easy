@@ -12,6 +12,9 @@ CaptureReview validateModelCapture(CaptureInput input, Object? response) {
       CaptureReview(input: input, issues: [CaptureIssue(code, message)]);
 
   final object = _modelObject(response);
+  if (object?['version'] == 2 && object!['version'] is int) {
+    return _validateModelEnrichment(input, object);
+  }
   if (object == null ||
       !_keysMatch(object, const {
         'version',

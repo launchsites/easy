@@ -101,7 +101,7 @@ class CaptureSpan {
   int get hashCode => Object.hash(start, end);
 }
 
-enum CaptureProvenance { explicit, derived, context }
+enum CaptureProvenance { explicit, derived, context, model }
 
 class CaptureEvidence {
   const CaptureEvidence({required this.provenance, this.span});
@@ -251,6 +251,7 @@ class CaptureProposal {
     Map<String, CaptureEvidence> evidence = const {},
     List<String> missingRequired = const [],
     this.suggestedCategory,
+    this.requiresSelection = false,
     List<CaptureIssue> issues = const [],
   }) : evidence = Map.unmodifiable(evidence),
        missingRequired = List.unmodifiable(missingRequired),
@@ -261,6 +262,7 @@ class CaptureProposal {
   final Map<String, CaptureEvidence> evidence;
   final List<String> missingRequired;
   final String? suggestedCategory;
+  final bool requiresSelection;
   final List<CaptureIssue> issues;
 
   bool get isReady => missingRequired.isEmpty && issues.isEmpty;

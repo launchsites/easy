@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -9,11 +10,15 @@ import 'ai_enrichment.dart';
 import 'ai_runtime_settings.dart';
 import 'inference_jobs.dart';
 import 'provider/ai_provider.dart';
+import 'vision/meal_vision.dart';
+import 'vision/vision_image.dart';
 
 export 'ai_runtime_settings.dart';
 export 'ai_enrichment.dart' show AiEnrichmentCandidate, AiPendingEstimate;
 export 'inference_jobs.dart' show AiCaptureRevision, AiRevisionLookup;
 export 'provider/ai_provider.dart' show AiEstimateInput;
+export 'vision/meal_vision.dart' show MealVisionReview, MealVisionTransmission;
+export 'vision/vision_image.dart' show AiVisionImage;
 
 class AiStoredState {
   const AiStoredState({required this.revision, required this.value});
@@ -151,7 +156,16 @@ class AiRuntime extends ChangeNotifier {
   bool get busy => _busy;
   bool get storageReady => _storageReady;
   bool get persistentVault => _vault.persistent;
+  bool get canRunMealVision =>
+      _storageReady && _settings.allowMealVision && _settings.provider != null;
   List<AiPendingEstimate> get pendingEstimates => _enrichment.pending;
+
+  bool canAutomaticallyEstimate(AiEnrichmentCandidate candidate) =>
+      _storageReady &&
+      _foreground &&
+      _settings.automaticEstimates &&
+      candidate.valid &&
+      _enrichment.permits(candidate, AiEnrichmentState.hourOf(_clock()));
 
   List<AiPendingEstimate> currentPendingEstimates(AiRevisionLookup current) =>
       List.unmodifiable(
@@ -338,15 +352,9 @@ class AiRuntime extends ChangeNotifier {
         input,
         includeOptionalMetadata: settings.includeOptionalMetadata,
       ),
-      routeBlock: (settings) {
-        if (!settings.includeOptionalMetadata &&
-            manual.proposals.any(
-              (item) => item.draft is CaptureCompleteTaskDraft,
-            )) {
-          return 'Review contextual completions on this device.';
-        }
-        return null;
-      },
+      routeBlock: (_) => captureEnrichmentChoices(input).isEmpty
+          ? 'Review the captured items on this device.'
+          : null,
       execute: (config, claim, settings) => _provider.capture(
         config: config,
         claim: claim,
@@ -389,6 +397,46 @@ class AiRuntime extends ChangeNotifier {
       uncertainty: 'Provider estimate for review.',
     ),
   );
+
+  Future<AiRuntimeOutcome<MealVisionReview>> runMealVision({
+    required CaptureInput source,
+    required AiVisionImage image,
+    required AiRevisionLookup currentRevision,
+    required Future<bool> Function(MealVisionTransmission preview) authorize,
+  }) {
+    final random = Random.secure();
+    final requestId = base64Url
+        .encode(List.generate(16, (_) => random.nextInt(256)))
+        .replaceAll('=', '');
+    return _run(
+      source: source,
+      currentRevision: currentRevision,
+      authorize: (preview) => authorize(
+        MealVisionTransmission(
+          image: image,
+          endpoint: preview.endpoint,
+          model: preview.model,
+          reserveMicros: preview.reserveMicros,
+        ),
+      ),
+      work: AiWorkKind.interactive,
+      fallback: () => null,
+      payload: (_) => {'requestId': requestId},
+      routeBlock: (settings) => settings.allowMealVision
+          ? null
+          : 'Enable meal photo suggestions in AI settings.',
+      execute: (config, claim, settings) => _provider.mealVision(
+        config: config,
+        claim: claim,
+        requestId: requestId,
+        image: image,
+        imageInputTokenCeiling: _imageTokenCeiling(settings),
+        currentRevision: currentRevision,
+      ),
+      convert: (review) => review,
+      vision: (image: image, requestId: requestId),
+    );
+  }
 
   Future<AiRuntimeOutcome<AiPendingEstimate>> runAutomaticEstimate({
     required AiEnrichmentCandidate candidate,
@@ -477,6 +525,7 @@ class AiRuntime extends ChangeNotifier {
     required T Function(P result) convert,
     AiEnrichmentCandidate? automatic,
     Future<bool> Function(T result)? persistReview,
+    ({AiVisionImage image, String requestId})? vision,
   }) async {
     final ready = await load();
     AiRuntimeOutcome<T> status(AiRunStatus state, [String? message]) =>
@@ -508,13 +557,7 @@ class AiRuntime extends ChangeNotifier {
     if (_busy) return status(AiRunStatus.busy);
     if (!_current(source, currentRevision)) return status(AiRunStatus.stale);
     final activeSettings = settings;
-    if (automatic != null &&
-        (!activeSettings.automaticEstimates ||
-            !_foreground ||
-            !_enrichment.permits(
-              automatic,
-              AiEnrichmentState.hourOf(_clock()),
-            ))) {
+    if (automatic != null && !canAutomaticallyEstimate(automatic)) {
       return status(AiRunStatus.blocked);
     }
     final discretionary = work == AiWorkKind.discretionary;
@@ -542,7 +585,15 @@ class AiRuntime extends ChangeNotifier {
         return localReview(message);
       }
       final fields = payload(activeSettings);
-      if (!_provider.fitsRequest(config, fields, estimate: discretionary)) {
+      final fits = vision == null
+          ? _provider.fitsRequest(config, fields, estimate: discretionary)
+          : _provider.fitsMealVision(
+              config,
+              requestId: vision.requestId,
+              image: vision.image,
+              imageInputTokenCeiling: _imageTokenCeiling(activeSettings),
+            );
+      if (!fits) {
         return localReview('This input exceeds the configured request limit.');
       }
       final paid = config.execution == AiExecution.paidApi;
@@ -571,7 +622,8 @@ class AiRuntime extends ChangeNotifier {
       }
       if (!_current(source, currentRevision)) return status(AiRunStatus.stale);
       if (_cancelRequested || !_foreground) return status(AiRunStatus.declined);
-      if (automatic == null && (paid || activeSettings.confirmLocal)) {
+      if (automatic == null &&
+          (paid || activeSettings.confirmLocal || vision != null)) {
         var allowed = false;
         try {
           allowed =
@@ -672,7 +724,11 @@ class AiRuntime extends ChangeNotifier {
       if (_cancelRequested || reply.failure == AiProviderFailure.cancelled) {
         return status(AiRunStatus.declined);
       }
-      return localReview('Review this input using the offline tools.');
+      return localReview(
+        vision == null
+            ? 'Review this input using the offline tools.'
+            : 'The provider could not review this photo.',
+      );
     } finally {
       _queue = null;
       _runningId = null;
@@ -838,6 +894,9 @@ bool _current(CaptureInput input, AiRevisionLookup lookup) {
             contextRevision: input.context.revision,
           );
 }
+
+int _imageTokenCeiling(AiRuntimeSettings settings) =>
+    settings.route == AiRoute.api ? settings.imageInputTokenCeiling ?? 0 : 0;
 
 bool _automaticNeedsConsent(AiRuntimeSettings before, AiRuntimeSettings after) {
   if (!after.automaticEstimates) return false;
