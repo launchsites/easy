@@ -6,6 +6,8 @@ enum ActivityStatus { planned, running, paused, finished }
 
 enum ActivityTargetKind { task, event }
 
+enum ActivityTimeSource { timer, manual, confirmedSchedule }
+
 class ActivityWindow {
   ActivityWindow(this.start, this.end) {
     if (!end.isAfter(start)) {
@@ -152,6 +154,7 @@ class ActivityRecord {
     List<RoutineStep> steps = const [],
     Set<String> checkedStepIds = const {},
     this.finishedAt,
+    this.timeSource,
   }) : spans = List.unmodifiable(spans),
        steps = List.unmodifiable(steps),
        checkedStepIds = Set.unmodifiable(checkedStepIds) {
@@ -199,6 +202,7 @@ class ActivityRecord {
         .cast<String>()
         .toSet(),
     finishedAt: _optionalDate(json['finishedAt']),
+    timeSource: ActivityTimeSource.values.asNameMap()[json['timeSource']],
   );
 
   final String id;
@@ -211,6 +215,7 @@ class ActivityRecord {
   final List<RoutineStep> steps;
   final Set<String> checkedStepIds;
   final DateTime? finishedAt;
+  final ActivityTimeSource? timeSource;
 
   ActivityStatus get status {
     if (finishedAt != null) return ActivityStatus.finished;
@@ -233,6 +238,7 @@ class ActivityRecord {
     List<ActivitySpan>? spans,
     Set<String>? checkedStepIds,
     DateTime? finishedAt,
+    ActivityTimeSource? timeSource,
   }) => ActivityRecord(
     id: id,
     title: title ?? this.title,
@@ -244,6 +250,7 @@ class ActivityRecord {
     steps: steps,
     checkedStepIds: checkedStepIds ?? this.checkedStepIds,
     finishedAt: finishedAt ?? this.finishedAt,
+    timeSource: timeSource ?? this.timeSource,
   );
 
   Map<String, Object?> toJson() => {
@@ -257,6 +264,7 @@ class ActivityRecord {
     'steps': [for (final step in steps) step.toJson()],
     'checkedStepIds': checkedStepIds.toList()..sort(),
     if (finishedAt != null) 'finishedAt': _timestamp(finishedAt!),
+    if (timeSource != null) 'timeSource': timeSource!.name,
   };
 }
 
@@ -312,6 +320,7 @@ class ActivityData {
         plan: target?.plan,
         target: target,
         spans: [ActivitySpan(start: now)],
+        timeSource: ActivityTimeSource.timer,
       ),
     );
   }
@@ -345,7 +354,12 @@ class ActivityData {
     if (record.status != ActivityStatus.planned) {
       throw StateError('This plan has already started.');
     }
-    return _saveRecord(record._change(spans: [ActivitySpan(start: now)]));
+    return _saveRecord(
+      record._change(
+        spans: [ActivitySpan(start: now)],
+        timeSource: ActivityTimeSource.timer,
+      ),
+    );
   }
 
   ActivityData beginRoutine(String id, DateTime now) {
@@ -360,6 +374,7 @@ class ActivityData {
         routineId: id,
         spans: [ActivitySpan(start: now)],
         steps: routine.steps,
+        timeSource: ActivityTimeSource.timer,
       ),
     );
   }
@@ -417,6 +432,7 @@ class ActivityData {
     required String category,
     required List<ActivitySpan> spans,
     ActivityTarget? target,
+    ActivityTimeSource timeSource = ActivityTimeSource.manual,
   }) {
     if (spans.isEmpty || spans.any((span) => span.end == null)) {
       throw const FormatException(
@@ -433,6 +449,7 @@ class ActivityData {
             category: category,
             spans: spans,
             finishedAt: spans.last.end,
+            timeSource: timeSource,
           ) ??
           ActivityRecord(
             id: newActivityId(),
@@ -442,6 +459,7 @@ class ActivityData {
             plan: target?.plan,
             spans: spans,
             finishedAt: spans.last.end,
+            timeSource: timeSource,
           ),
     );
   }
