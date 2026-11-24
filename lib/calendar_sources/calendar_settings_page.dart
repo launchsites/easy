@@ -61,6 +61,18 @@ class CalendarSourcePreferences {
     defaultWriteCalendar: calendar,
   );
 
+  CalendarSourcePreferences withoutCalendars(Set<CalendarIdentity> removed) =>
+      CalendarSourcePreferences(
+        allCalendars: allCalendars.difference(removed),
+        memberships: CalendarModeMemberships({
+          for (final entry in memberships.byMode.entries)
+            entry.key: entry.value.difference(removed),
+        }),
+        defaultWriteCalendar: removed.contains(defaultWriteCalendar)
+            ? null
+            : defaultWriteCalendar,
+      );
+
   Map<String, Object?> toJson() => {
     'allCalendars': [for (final calendar in allCalendars) calendar.toJson()],
     'memberships': memberships.toJson(),
@@ -80,6 +92,7 @@ class CalendarSettingsPage extends StatefulWidget {
     required this.onChanged,
     required this.modes,
     this.localSources = const [],
+    this.isAppleCalendar,
     this.adapter = const EventKitCalendarAdapter(),
     super.key,
   });
@@ -88,6 +101,7 @@ class CalendarSettingsPage extends StatefulWidget {
   final ValueChanged<CalendarSourcePreferences> onChanged;
   final Map<String, String> modes;
   final Iterable<CalendarSource> localSources;
+  final bool Function(CalendarIdentity)? isAppleCalendar;
   final EventKitCalendarAdapter adapter;
 
   @override
@@ -173,6 +187,31 @@ class _CalendarSettingsPageState extends State<CalendarSettingsPage>
   void _update(CalendarSourcePreferences value) {
     setState(() => _preferences = value);
     widget.onChanged(value);
+  }
+
+  Set<CalendarIdentity> _unavailableAppleSelections(
+    Iterable<CalendarSource> sources,
+  ) {
+    final isAppleCalendar = widget.isAppleCalendar;
+    if (isAppleCalendar == null ||
+        _loading ||
+        _failed ||
+        (widget.adapter.isAvailable && _access == null)) {
+      return const {};
+    }
+    final present = sources.map((source) => source.id).toSet();
+    final selected = {
+      ..._preferences.allCalendars,
+      for (final calendars in _preferences.memberships.byMode.values)
+        ...calendars,
+      ?_preferences.defaultWriteCalendar,
+    };
+    return selected
+        .where(
+          (calendar) =>
+              isAppleCalendar(calendar) && !present.contains(calendar),
+        )
+        .toSet();
   }
 
   Iterable<MapEntry<String?, String>> get _views sync* {
@@ -304,6 +343,7 @@ class _CalendarSettingsPageState extends State<CalendarSettingsPage>
     }.values;
     final readable = sources.where((source) => source.canRead).toList();
     final writable = sources.where((source) => source.canWrite).toList();
+    final unavailable = _unavailableAppleSelections(sources);
     final defaultSource = writable
         .where((source) => source.id == _preferences.defaultWriteCalendar)
         .firstOrNull;
@@ -325,6 +365,22 @@ class _CalendarSettingsPageState extends State<CalendarSettingsPage>
                 ),
                 const SizedBox(height: 8),
                 _accessSection(context),
+                if (unavailable.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Unavailable Apple calendars',
+                    style: palette.sectionHeadingStyle,
+                  ),
+                  const SizedBox(height: 8),
+                  _accessAction(
+                    context,
+                    unavailable.length == 1
+                        ? 'One saved Apple calendar is unavailable on this device.'
+                        : '${unavailable.length} saved Apple calendars are unavailable on this device.',
+                    'Clear unavailable selections',
+                    () => _update(_preferences.withoutCalendars(unavailable)),
+                  ),
+                ],
                 if (readable.isNotEmpty) ...[
                   const SizedBox(height: 28),
                   const Text(
@@ -410,6 +466,8 @@ class _CalendarSettingsPageState extends State<CalendarSettingsPage>
         context,
         _appleSources.isEmpty
             ? 'No Apple calendars found.'
+            : _appleSources.any((source) => source.canWrite)
+            ? 'Calendar access granted'
             : 'Read-only access',
         'Refresh calendars',
         _refresh,

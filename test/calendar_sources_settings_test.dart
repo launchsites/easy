@@ -172,6 +172,53 @@ void main() {
   });
 
   testWidgets(
+    'clearing unavailable Apple choices preserves available and non-Apple selections',
+    (tester) async {
+      const missingImport = CalendarIdentity(
+        accountId: 'easy-ics',
+        calendarId: 'archive',
+      );
+      for (final available in [true, false]) {
+        CalendarSourcePreferences? changed;
+        final preferences = CalendarSourcePreferences(
+          allCalendars: [_localId, _appleId, _unknownId, missingImport],
+          memberships: CalendarModeMemberships({
+            'work': [_appleId, _unknownId],
+            'gym': [_localId, _unknownId, missingImport],
+          }),
+          defaultWriteCalendar: _unknownId,
+        );
+        await _showSettings(
+          tester,
+          adapter: _CalendarAdapter(
+            supported: available,
+            access: EventKitCalendarAccess.full,
+          ),
+          localSources: [_localSource],
+          initialPreferences: preferences,
+          isAppleCalendar: (calendar) =>
+              calendar == _appleId || calendar == _unknownId,
+          onChanged: (value) => changed = value,
+        );
+        final clear = find.text('Clear unavailable selections');
+        expect(clear, findsOneWidget);
+        expect(changed, isNull);
+        await tester.tap(clear);
+        await tester.pumpAndSettle();
+        expect(changed?.allCalendars, {
+          _localId,
+          missingImport,
+          if (available) _appleId,
+        });
+        expect(changed?.calendarsFor('work'), {if (available) _appleId});
+        expect(changed?.calendarsFor('gym'), {_localId, missingImport});
+        expect(changed?.defaultWriteCalendar, isNull);
+        expect(clear, findsNothing);
+      }
+    },
+  );
+
+  testWidgets(
     'source account and mode choices fit a small screen with large text',
     (tester) async {
       tester.view.physicalSize = const Size(320, 570);
@@ -206,6 +253,8 @@ Future<void> _showSettings(
   WidgetTester tester, {
   required _CalendarAdapter adapter,
   Iterable<CalendarSource> localSources = const [],
+  CalendarSourcePreferences? initialPreferences,
+  bool Function(CalendarIdentity)? isAppleCalendar,
   ValueChanged<CalendarSourcePreferences>? onChanged,
   bool settle = true,
   double textScale = 1,
@@ -218,10 +267,11 @@ Future<void> _showSettings(
         child: child!,
       ),
       home: CalendarSettingsPage(
-        initialPreferences: CalendarSourcePreferences(),
+        initialPreferences: initialPreferences ?? CalendarSourcePreferences(),
         onChanged: onChanged ?? (_) {},
         modes: const {'work': 'Work', 'gym': 'Gym'},
         localSources: localSources,
+        isAppleCalendar: isAppleCalendar,
         adapter: adapter,
       ),
     ),

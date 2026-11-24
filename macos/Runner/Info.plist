@@ -25,9 +25,11 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Easy displays events from the calendars you choose on this device.</string>
+	<string>Easy shows calendars you choose and adds events only after you review and confirm them.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Easy displays events from the calendars you choose on this device.</string>
+	<string>Easy shows calendars you choose and adds events only after you review and confirm them.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Record a voice capture and save it as a local draft.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>

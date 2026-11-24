@@ -43,12 +43,14 @@ class CalendarSource {
     required this.id,
     required this.name,
     required this.accountName,
+    this.color,
     Iterable<CalendarCapability> capabilities = const [CalendarCapability.read],
   }) : capabilities = Set.unmodifiable(capabilities);
 
   final CalendarIdentity id;
   final String name;
   final String accountName;
+  final int? color;
   final Set<CalendarCapability> capabilities;
 
   bool get canRead => capabilities.contains(CalendarCapability.read);

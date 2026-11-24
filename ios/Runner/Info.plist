@@ -27,9 +27,15 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Easy displays events from the calendars you choose on this device.</string>
+	<string>Easy shows calendars you choose and adds events only after you review and confirm them.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Easy displays events from the calendars you choose on this device.</string>
+	<string>Easy shows calendars you choose and adds events only after you review and confirm them.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo to attach to a meal in your local log.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a photo to attach to a meal in your local log.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Record a voice capture and save it as a local draft.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
