@@ -2,7 +2,7 @@
 
 ## Native and platform evidence
 
-The frozen Flutter suite at `96dc0f3` passed 830 tests under `TZ=Europe/London`. Seven checks for other host time zones skipped by design. Strict analysis and four native project declaration checks passed. An earlier hosted run passed full Linux verification including 53 New York and 34 Lord Howe daylight-saving checks. [Hosted verification](https://github.com/launchsites/easy/actions/runs/45334600558)
+The frozen Flutter suite at `7c18361` passed 881 tests under `TZ=Europe/London`. Seven checks for other host time zones skipped by design. Strict analysis and four native project declaration checks passed. A separate run passed 30 focused New York tests for calendar source freshness and availability. [Hosted verification](https://github.com/launchsites/easy/actions/runs/45334600558)
 
 | Check | Result |
 |---|---|
@@ -11,7 +11,8 @@ The frozen Flutter suite at `96dc0f3` passed 830 tests under `TZ=Europe/London`.
 | Native release soak | The pinned route test ran for 1,801 seconds. All 156 desktop route probes and 24 hold-and-drag navigation probes passed. The recorded workspace digest was unchanged. |
 | Native viewport review | Home, Tasks and Settings exercised at twelve sizes. The compact 320 × 568 Home layout lifted the first visible checkbox above the navigation dock. A Tasks regression covers 568 × 320 landscape. |
 | Android API 36 | Offline review APKs built for ARMv7, ARM64 and x86-64. Checks inspect development signatures, compiled backup and network rules, and 16 KiB ZIP and ELF load alignment. A hosted AOSP emulator launched the non-debuggable x86-64 release and verified its private empty workspace. [Emulator run](https://github.com/launchsites/easy/actions/runs/45337863946) |
-| macOS and iOS | Hosted Xcode built the iOS simulator target and unsigned macOS release. Dart channel and Swift syntax checks also passed. Provisioning, physical device permissions and real EventKit account verification remain open. [Apple SDK run](https://github.com/launchsites/easy/actions/runs/45334132108) |
+| macOS and iOS | Hosted Xcode 26.4.1 built the iOS simulator target and unsigned macOS release. The iPhone 17 simulator launched Easy and verified its first private SQLite revision. Provisioning, physical device permissions and real EventKit account verification remain open. [Apple runtime run](https://github.com/launchsites/easy/actions/runs/45341653863) |
+| Browser setup smoke | A local Flutter web release at `7c18361` displayed and saved initial setup in Chromium 156 at 1440 × 900, 390 × 844 and 320 × 568. The choice survived reload, with zero nonlocal page requests or unhandled page errors during the probe. |
 
 [Native performance report](native-performance-benchmark.md) · [Release smoke](native-release-smoke.md) · [Android checks](android-validation.md) · [Appearance previews](DESIGN_PREVIEWS.md)
 
@@ -26,6 +27,7 @@ The frozen Flutter suite at `96dc0f3` passed 830 tests under `TZ=Europe/London`.
 - Sync checks cover authenticated local transfer, replay, ordering, revocation, conflicts and transactional rollback. A five-device benchmark replayed 1,024 generated schedules. Two paired Linux profiles exchanged a reviewed file, applied only the selected task, and recovered it after restart. [Native sync transfer](manual-sync.md)
 - Task completion tests inject a rejected write and verify that the saved task stays open. A retry saves once. An older Undo cannot change a newer completion.
 - A live Linux workout kept its recorded actuals and open logger when Finish hit a real SQLite WAL write failure. Retrying saved the finished workout and its follow-up draft together. [Native release checks](native-release-smoke.md)
+- The Android 36 emulator reopened the app with a synthetic saved picker result. Easy saved one local draft and verified the managed attachment. Replaying the result with another cold launch kept the exact database revision and digest. [Android recovery run](https://github.com/launchsites/easy/actions/runs/45343142083)
 - A Linux release run under inherited `0022` verified that the app profile and new database files were private, and that earlier synthetic records reopened correctly.
 
 [Storage validation](storage-validation.md) · [Manual sync validation](manual-sync.md) · [Profile and permission checks](privacy-and-threat-model.md)
