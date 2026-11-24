@@ -1,0 +1,717 @@
+{
+  "run_at_utc": "2026-11-24T02:56:10.075284Z",
+  "model_label": "qwen-0.5b-benchmark",
+  "json_object_mode": false,
+  "experimental_json_schema": true,
+  "experimental_category_meanings": true,
+  "clock_anchor": "2026-11-24T12:00:00.000",
+  "timezone": "Europe/London",
+  "cases": [
+    {
+      "id": "running_from_work",
+      "model_status": "no_eligible_clause",
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "gym",
+          "title": "Go for a run",
+          "model_fields": []
+        }
+      ],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Go for a run",
+            "category": "gym",
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "running_the_tests",
+      "wall_ms": 5091.075,
+      "model_status": "reviewed",
+      "offered_clauses": 1,
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "work",
+          "title": "Run the project build tests before releasing",
+          "model_fields": [
+            "category"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Run the project build tests before releasing",
+            "category": null,
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      },
+      "model": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Run the project build tests before releasing",
+            "category": "study",
+            "ready": true,
+            "model_fields": [
+              "category"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "biology_homework",
+      "model_status": "no_eligible_clause",
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "study",
+          "title": "Finish the biology homework",
+          "model_fields": []
+        }
+      ],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Finish the biology homework",
+            "category": "study",
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "client_follow_up",
+      "wall_ms": 3679.145,
+      "model_status": "reviewed",
+      "offered_clauses": 1,
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "work",
+          "title": "Follow up with the website client about the invoice",
+          "model_fields": [
+            "category"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Follow up with the website client about the invoice",
+            "category": null,
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      },
+      "model": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Follow up with the website client about the invoice",
+            "category": "work",
+            "ready": true,
+            "model_fields": [
+              "category"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "social_campaign",
+      "model_status": "no_eligible_clause",
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "work",
+          "title": "Make the social media plan for the shop launch",
+          "model_fields": []
+        }
+      ],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Make the social media plan for the shop launch",
+            "category": "work",
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "library_exam",
+      "wall_ms": 4026.315,
+      "model_status": "reviewed",
+      "offered_clauses": 1,
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "study",
+          "title": "Print the revision sheets for my chemistry exam",
+          "model_fields": [
+            "category"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Print the revision sheets for my chemistry exam",
+            "category": null,
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      },
+      "model": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Print the revision sheets for my chemistry exam",
+            "category": "work",
+            "ready": true,
+            "model_fields": [
+              "category"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "workout_supplies",
+      "wall_ms": 5341.743,
+      "model_status": "reviewed",
+      "offered_clauses": 1,
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "gym",
+          "title": "Find my lifting belt and chalk for the gym",
+          "model_fields": [
+            "category"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Find my lifting belt and chalk for the gym",
+            "category": null,
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      },
+      "model": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Find my lifting belt and chalk for the gym",
+            "category": "gym",
+            "ready": true,
+            "model_fields": [
+              "category"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "family_birthday",
+      "wall_ms": 4215.471,
+      "model_status": "reviewed",
+      "offered_clauses": 1,
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "personal",
+          "title": "Buy a birthday card for my cousin",
+          "model_fields": [
+            "category"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Buy a birthday card for my cousin",
+            "category": null,
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      },
+      "model": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Buy a birthday card for my cousin",
+            "category": "personal",
+            "ready": true,
+            "model_fields": [
+              "category"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "meal_tracker",
+      "wall_ms": 6892.415,
+      "model_status": "reviewed",
+      "offered_clauses": 1,
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "health",
+          "title": "Weigh the lunch portions for my nutrition log",
+          "model_fields": [
+            "category"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Weigh the lunch portions for my nutrition log",
+            "category": null,
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      },
+      "model": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Weigh the lunch portions for my nutrition log",
+            "category": "study",
+            "ready": true,
+            "model_fields": [
+              "category"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "health_appointment",
+      "wall_ms": 5704.478,
+      "model_status": "reviewed",
+      "offered_clauses": 1,
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "health",
+          "title": "Ask the dentist about my follow-up appointment",
+          "model_fields": [
+            "category"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Ask the dentist about my follow-up appointment",
+            "category": null,
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      },
+      "model": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Ask the dentist about my follow-up appointment",
+            "category": "study",
+            "ready": true,
+            "model_fields": [
+              "category"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "explicit_scope_kept",
+      "model_status": "no_eligible_clause",
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "personal",
+          "title": "Pick up a birthday card",
+          "model_fields": []
+        }
+      ],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Pick up a birthday card",
+            "category": "personal",
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "bulk_destruction_held",
+      "model_status": "no_eligible_clause",
+      "expected_ready": [],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [],
+        "issues": [
+          "unsupportedCommand"
+        ]
+      }
+    },
+    {
+      "id": "appointment_missing_times",
+      "model_status": "no_eligible_clause",
+      "expected_ready": [],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "event",
+            "title": "Dentist",
+            "category": "personal",
+            "ready": false,
+            "model_fields": [],
+            "missing": [
+              "start",
+              "end"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "question_no_draft",
+      "model_status": "no_eligible_clause",
+      "expected_ready": [],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [],
+        "issues": [
+          "unrecognizedIntent"
+        ]
+      }
+    },
+    {
+      "id": "opaque_task",
+      "wall_ms": 4126.117,
+      "model_status": "reviewed",
+      "offered_clauses": 1,
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": null,
+          "title": "Check the list",
+          "model_fields": []
+        }
+      ],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Check the list",
+            "category": null,
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      },
+      "model": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Check the list",
+            "category": "study",
+            "ready": true,
+            "model_fields": [
+              "category"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "quoted_unknown_record",
+      "model_status": "no_eligible_clause",
+      "expected_ready": [],
+      "offline": {
+        "strict_ready_match": true,
+        "unexpected_ready": false,
+        "proposals": [],
+        "issues": [
+          "unrecognizedIntent"
+        ]
+      }
+    },
+    {
+      "id": "literal_note_body",
+      "wall_ms": 4308.164,
+      "model_status": "reviewed",
+      "offered_clauses": 1,
+      "expected_ready": [
+        {
+          "kind": "note",
+          "category": "study",
+          "contains": [
+            "chapter three introduces induction over a tree"
+          ],
+          "model_fields": [
+            "category"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "note",
+            "title": "Chapter three introduces induction over a tree",
+            "category": null,
+            "ready": true,
+            "model_fields": [],
+            "detail": ""
+          }
+        ],
+        "issues": []
+      },
+      "model": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "note",
+            "title": "Chapter three introduces induction over a tree",
+            "category": "study",
+            "ready": true,
+            "model_fields": [
+              "category"
+            ],
+            "detail": ""
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "literal_untyped_study_note",
+      "wall_ms": 5198.919,
+      "model_status": "reviewed",
+      "offered_clauses": 1,
+      "expected_ready": [
+        {
+          "kind": "note",
+          "category": "study",
+          "contains": [
+            "conservation of momentum"
+          ],
+          "model_fields": [
+            "intent",
+            "category"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [],
+        "issues": [
+          "unrecognizedIntent"
+        ]
+      },
+      "model": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "The lecture explained orbital motion using conservation of momentum",
+            "category": "study",
+            "ready": true,
+            "model_fields": [
+              "category",
+              "intent"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "id": "known_two_actions",
+      "wall_ms": 5112.648,
+      "model_status": "reviewed",
+      "offered_clauses": 2,
+      "expected_ready": [
+        {
+          "kind": "task",
+          "category": "study",
+          "title": "Review my lecture notes",
+          "model_fields": [
+            "category"
+          ]
+        },
+        {
+          "kind": "task",
+          "category": "work",
+          "title": "Send the client invoice",
+          "model_fields": [
+            "category"
+          ]
+        }
+      ],
+      "offline": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Review my lecture notes",
+            "category": null,
+            "ready": true,
+            "model_fields": []
+          },
+          {
+            "kind": "task",
+            "title": "Send the client invoice",
+            "category": null,
+            "ready": true,
+            "model_fields": []
+          }
+        ],
+        "issues": []
+      },
+      "model": {
+        "strict_ready_match": false,
+        "unexpected_ready": false,
+        "proposals": [
+          {
+            "kind": "task",
+            "title": "Review my lecture notes",
+            "category": "study",
+            "ready": true,
+            "model_fields": [
+              "category"
+            ]
+          },
+          {
+            "kind": "task",
+            "title": "Send the client invoice",
+            "category": "study",
+            "ready": true,
+            "model_fields": [
+              "category"
+            ]
+          }
+        ],
+        "issues": []
+      }
+    }
+  ],
+  "cpu_affinity": [
+    2
+  ],
+  "context_tokens": 4096,
+  "request_deadline_seconds": 60,
+  "thinking_disabled": false,
+  "runtime_start_ms": 1230.77,
+  "model_sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+  "provider_source_revision": "db1a78ff7f69314534a569585a65a21b2dbf977a",
+  "cases_sha256": "dce6f5fcfd0e5c6cfb1fed1f6bb971079ea0ca28de73c949efa3463e1f078065"
+}

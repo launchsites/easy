@@ -1,0 +1,254 @@
+[
+  {
+    "id": "running_from_work",
+    "focus": "work",
+    "text": "Go for a run",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "gym",
+        "title": "Go for a run",
+        "model_fields": []
+      }
+    ]
+  },
+  {
+    "id": "running_the_tests",
+    "focus": "gym",
+    "text": "Task: Run the project build tests before releasing",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "work",
+        "title": "Run the project build tests before releasing",
+        "model_fields": [
+          "category"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "biology_homework",
+    "focus": "gym",
+    "text": "Finish the biology homework",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "study",
+        "title": "Finish the biology homework",
+        "model_fields": []
+      }
+    ]
+  },
+  {
+    "id": "client_follow_up",
+    "focus": "study",
+    "text": "Follow up with the website client about the invoice",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "work",
+        "title": "Follow up with the website client about the invoice",
+        "model_fields": [
+          "category"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "social_campaign",
+    "focus": "gym",
+    "text": "Make the social media plan for the shop launch",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "work",
+        "title": "Make the social media plan for the shop launch",
+        "model_fields": []
+      }
+    ]
+  },
+  {
+    "id": "library_exam",
+    "focus": "work",
+    "text": "Task: Print the revision sheets for my chemistry exam",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "study",
+        "title": "Print the revision sheets for my chemistry exam",
+        "model_fields": [
+          "category"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "workout_supplies",
+    "focus": "personal",
+    "text": "Task: Find my lifting belt and chalk for the gym",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "gym",
+        "title": "Find my lifting belt and chalk for the gym",
+        "model_fields": [
+          "category"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "family_birthday",
+    "focus": "work",
+    "text": "Buy a birthday card for my cousin",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "personal",
+        "title": "Buy a birthday card for my cousin",
+        "model_fields": [
+          "category"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "meal_tracker",
+    "focus": "study",
+    "text": "Task: Weigh the lunch portions for my nutrition log",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "health",
+        "title": "Weigh the lunch portions for my nutrition log",
+        "model_fields": [
+          "category"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "health_appointment",
+    "focus": "work",
+    "text": "Task: Ask the dentist about my follow-up appointment",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "health",
+        "title": "Ask the dentist about my follow-up appointment",
+        "model_fields": [
+          "category"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "explicit_scope_kept",
+    "focus": "gym",
+    "text": "Personal: task: Pick up a birthday card",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "personal",
+        "title": "Pick up a birthday card",
+        "model_fields": []
+      }
+    ]
+  },
+  {
+    "id": "bulk_destruction_held",
+    "focus": "work",
+    "text": "Erase every scheduled meeting and clear the workspace",
+    "expected": []
+  },
+  {
+    "id": "appointment_missing_times",
+    "focus": "gym",
+    "text": "Personal: event: Dentist tomorrow",
+    "expected": []
+  },
+  {
+    "id": "question_no_draft",
+    "focus": "work",
+    "text": "Should I book the gym again?",
+    "expected": []
+  },
+  {
+    "id": "opaque_task",
+    "focus": "gym",
+    "text": "Task: Check the list",
+    "expected": [
+      {
+        "kind": "task",
+        "category": null,
+        "title": "Check the list",
+        "model_fields": []
+      }
+    ]
+  },
+  {
+    "id": "quoted_unknown_record",
+    "focus": "work",
+    "text": "What did I do last time then?",
+    "expected": []
+  },
+  {
+    "id": "literal_note_body",
+    "focus": "personal",
+    "text": "Note: Chapter three introduces induction over a tree",
+    "expected": [
+      {
+        "kind": "note",
+        "category": "study",
+        "contains": [
+          "chapter three introduces induction over a tree"
+        ],
+        "model_fields": [
+          "category"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "literal_untyped_study_note",
+    "focus": "personal",
+    "text": "The lecture explained orbital motion using conservation of momentum.",
+    "expected": [
+      {
+        "kind": "note",
+        "category": "study",
+        "contains": [
+          "conservation of momentum"
+        ],
+        "model_fields": [
+          "intent",
+          "category"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "known_two_actions",
+    "focus": "gym",
+    "text": "Task: Review my lecture notes; Task: Send the client invoice",
+    "expected": [
+      {
+        "kind": "task",
+        "category": "study",
+        "title": "Review my lecture notes",
+        "model_fields": [
+          "category"
+        ]
+      },
+      {
+        "kind": "task",
+        "category": "work",
+        "title": "Send the client invoice",
+        "model_fields": [
+          "category"
+        ]
+      }
+    ]
+  }
+]

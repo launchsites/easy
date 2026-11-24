@@ -1,0 +1,12 @@
+[
+  {
+    "mode": "plain",
+    "content": "```json\n{\n  \"version\": 2,\n  \"captureId\": \"running_the_tests\",\n  \"sourceRevision\": 2,\n  \"contextRevision\": 1,\n  \"categoryIds\": {\n    \"work\": \"Work\",\n    \"personal\": \"Personal\",\n    \"study\": \"Study\",\n    \"gym\": \"Gym\",\n    \"health\": \"Health\"\n  },\n  \"clauses\": [\n    {\n      \"clause\": 0,\n      \"text\": \"Task: Run the project build tests before releasing\",\n      \"kind\": \"task\",\n      \"category\": \"Work\"\n    }\n  ]\n}\n```",
+    "finish_reason": "stop"
+  },
+  {
+    "mode": "json-object",
+    "content": "{\n  \"version\": 2,\n  \"captureId\": \"running_the_tests\",\n  \"sourceRevision\": 2,\n  \"contextRevision\": 1,\n  \"categoryIds\": {\n    \"work\": \"Work\",\n    \"personal\": \"Personal\",\n    \"study\": \"Study\",\n    \"gym\": \"Gym\",\n    \"health\": \"Health\"\n  },\n  \"clauses\": [\n    {\n      \"clause\": 0,\n      \"text\": \"Task: Run the project build tests before releasing\",\n      \"kind\": \"task\",\n      \"category\": \"Work\"\n    }\n  ]\n}",
+    "finish_reason": "stop"
+  }
+]

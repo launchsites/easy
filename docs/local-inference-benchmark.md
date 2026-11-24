@@ -120,3 +120,35 @@ python3 tool/benchmark/local_speech.py \
   --model "$easy_bench_dir/ggml-base.en.bin" \
   --output "$easy_bench_dir/speech-results.json"
 ```
+
+## Application provider V2 metadata pilot
+
+The standalone Dart harness exercises the real loopback provider and validator at `db1a78f`. The frozen 19-case fixture checks cross-focus categories, explicit titles, a literal note, two-item capture, missing event details and unresolved or destructive inputs. Eight cases had no eligible model clause and made zero provider calls. The device parser handled the running, biology homework and shop social-plan examples in those controls. The remaining cases offered 11 model requests per profile. [V2 fixture](../tool/benchmark/provider_metadata_cases.json)
+
+| Model on one CPU | Response mode | Responses accepted by the app | Median request time |
+| --- | --- | ---: | ---: |
+| Qwen2.5 0.5B | Plain | 0/11 | 8.37 s |
+| Qwen2.5 0.5B | JSON object | 0/11 | 12.65 s |
+| Qwen2.5 1.5B | Plain | 0/11 | 10.00 s |
+| Qwen2.5 1.5B | JSON object | 0/11 | 10.09 s |
+
+In the one-case diagnostic, the 0.5B model emitted Markdown fences in plain mode and a parseable object in JSON-object mode. Both objects echoed the supplied category table and clause list. Both omitted the required suggestions array and used the display label `Work` where the wire contract required a permitted ID. The application withheld every invalid result. [0.5B plain](benchmark-results/provider-metadata-v2-qwen05-plain-20261124.json) · [0.5B JSON object](benchmark-results/provider-metadata-v2-qwen05-json-20261124.json) · [1.5B plain](benchmark-results/provider-metadata-v2-qwen15-plain-20261124.json) · [1.5B JSON object](benchmark-results/provider-metadata-v2-qwen15-json-20261124.json) · [Diagnostic response](benchmark-results/provider-metadata-v2-qwen05-wire-20261124.json)
+
+The test harness also supplied llama.cpp with an experimental response schema generated from the available clause numbers, kinds, category IDs and request revision. Each candidate still went through the production validator. The category-meanings variant replaced the prompt with short category descriptions while using the same grammar and fixture.
+
+| Model on one CPU | Experimental mode | Accepted by validator | Exact intended items | Median request time |
+| --- | --- | ---: | ---: | ---: |
+| Qwen2.5 0.5B | Schema | 11/11 | 3/11 | 5.39 s |
+| Qwen2.5 0.5B | Schema and category meanings | 11/11 | 3/11 | 5.09 s |
+| Qwen2.5 1.5B | Schema | 11/11 | 6/11 | 7.25 s |
+| Qwen2.5 1.5B | Schema and category meanings | 11/11 | 5/11 | 6.77 s |
+
+The grammar improved structural validity and reduced median request time on these fixtures. The 0.5B model still assigned Work to multiple captures about other categories. The meanings variant left exact matches unchanged on 0.5B and reduced them by one on 1.5B. The tested outputs continue to require individual review. [0.5B schema](benchmark-results/provider-metadata-v2-qwen05-schema-20261124.json) · [1.5B schema](benchmark-results/provider-metadata-v2-qwen15-schema-20261124.json) · [0.5B meanings](benchmark-results/provider-metadata-v2-qwen05-meanings-20261124.json) · [1.5B meanings](benchmark-results/provider-metadata-v2-qwen15-meanings-20261124.json)
+
+Run the benchmark against an explicitly started local llama.cpp endpoint. The optional `--json-object`, `--json-schema` and `--json-schema-meanings` flags reproduce the tested formats.
+
+```sh
+TZ=Europe/London dart run tool/benchmark/provider_capture_bench.dart \
+  http://127.0.0.1:17860/v1 local-model-alias \
+  tool/benchmark/provider_metadata_cases.json /tmp/easy-v2-metadata.json
+```
