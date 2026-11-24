@@ -302,6 +302,57 @@ void main() {
     expect(capture.recorder.disposals, 1);
   });
 
+  testWidgets('removing the capture button discards an unlocked hold', (
+    tester,
+  ) async {
+    final capture = await _HeldCapture.mount(tester);
+    final pointer = await capture.hold();
+    await capture.feedAudio();
+    await capture.hideButton();
+    expect(find.text('Voice capture'), findsNothing);
+    expect(await capture.result.future, isNull);
+    expect(capture.savedBytes, isEmpty);
+    expect(capture.recorder.cancels, 1);
+    await pointer.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('locked recording survives removal of the capture button', (
+    tester,
+  ) async {
+    final capture = await _HeldCapture.mount(tester);
+    final pointer = await capture.hold();
+    await pointer.moveBy(const Offset(0, -85));
+    await pointer.up();
+    await tester.pumpAndSettle();
+    await capture.hideButton();
+    expect(find.text('Recording'), findsOneWidget);
+    expect(capture.result.isCompleted, isFalse);
+    await capture.feedAudio();
+    await tester.tap(find.text('Stop and save'));
+    await tester.pumpAndSettle();
+    expect(capture.savedBytes, [8044]);
+    expect(capture.recorder.stops, 1);
+  });
+
+  testWidgets('removing the button preserves a recording awaiting retry', (
+    tester,
+  ) async {
+    final capture = await _HeldCapture.mount(tester)
+      ..rejectSaves = true;
+    final pointer = await capture.hold();
+    await capture.feedAudio();
+    await pointer.up();
+    await tester.pumpAndSettle();
+    await capture.hideButton();
+    expect(capture.result.isCompleted, isFalse);
+    expect(capture.recorder.cancels, 0);
+    capture.rejectSaves = false;
+    await tester.tap(find.text('Retry save'));
+    await tester.pumpAndSettle();
+    expect(capture.savedBytes, [8044]);
+  });
+
   testWidgets('a stalled recording reaches the five-minute limit', (
     tester,
   ) async {
@@ -325,11 +376,14 @@ class _HeldCapture {
   final result = Completer<CaptureArchiveEntry?>();
   final savedBytes = <int>[];
   final overlay = HeldVoiceCaptureOverlay();
+  final buttonVisible = ValueNotifier(true);
   var workspaceTaps = 0;
+  var rejectSaves = false;
 
   static Future<_HeldCapture> mount(WidgetTester tester) async {
     final capture = _HeldCapture(tester);
     addTearDown(capture.overlay.dispose);
+    addTearDown(capture.buttonVisible.dispose);
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
@@ -340,23 +394,32 @@ class _HeldCapture {
                 child: const Text('Workspace'),
               ),
             ),
-            floatingActionButton: HoldCaptureButton(
-              onTap: () => fail('the held gesture must not tap'),
-              onHeldRecord: (action) async => capture.result.complete(
-                await capture.overlay.show(
-                  context,
-                  action: action,
-                  openRecorder: () => capture.recorder,
-                  onSave: (bytes, time) async {
-                    capture.savedBytes.add(bytes.length);
-                    return CaptureArchiveEntry(
-                      id: 'held',
-                      text: '',
-                      capturedAt: time,
-                    );
-                  },
-                ),
-              ),
+            floatingActionButton: ValueListenableBuilder<bool>(
+              valueListenable: capture.buttonVisible,
+              builder: (_, visible, _) {
+                if (!visible) return const SizedBox.shrink();
+                return HoldCaptureButton(
+                  onTap: () => fail('the held gesture must not tap'),
+                  onHeldRecord: (action) async => capture.result.complete(
+                    await capture.overlay.show(
+                      context,
+                      action: action,
+                      openRecorder: () => capture.recorder,
+                      onSave: (bytes, time) async {
+                        if (capture.rejectSaves) {
+                          throw StateError('Fixture save failure');
+                        }
+                        capture.savedBytes.add(bytes.length);
+                        return CaptureArchiveEntry(
+                          id: 'held',
+                          text: '',
+                          capturedAt: time,
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -377,6 +440,11 @@ class _HeldCapture {
   Future<void> feedAudio() async {
     recorder.audio.add(Uint8List(8000));
     await tester.pump();
+  }
+
+  Future<void> hideButton() async {
+    buttonVisible.value = false;
+    await tester.pumpAndSettle();
   }
 }
 

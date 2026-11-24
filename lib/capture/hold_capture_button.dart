@@ -61,9 +61,18 @@ class _HoldCaptureButtonState extends State<HoldCaptureButton> {
 
   void _cancel() {
     final action = _gesture;
-    if (action != null && action.value != HeldVoiceAction.lock) {
+    if (action != null &&
+        (action.value == HeldVoiceAction.holding ||
+            action.value == HeldVoiceAction.cancelOnRelease)) {
       action.value = HeldVoiceAction.cancel;
     }
+  }
+
+  @override
+  void dispose() {
+    // Responsive layouts can remove the control while its pointer is held.
+    if (_gesture != null) scheduleMicrotask(_cancel);
+    super.dispose();
   }
 
   @override
