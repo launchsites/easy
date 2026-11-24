@@ -5,6 +5,7 @@ import '../calendar_page.dart';
 import '../task_model.dart';
 import '../ui_theme.dart';
 import 'availability_settings.dart';
+import 'plan_review_frame.dart';
 import 'planner.dart';
 
 class PlanSelection {
@@ -214,6 +215,8 @@ class PlanDaySheet extends StatefulWidget {
 }
 
 class _PlanDaySheetState extends State<PlanDaySheet> {
+  static const _inlineBlockLimit = 6;
+
   late final DateTime _day;
   late TimeOfDay _start;
   late TimeOfDay _end;
@@ -223,6 +226,8 @@ class _PlanDaySheetState extends State<PlanDaySheet> {
   ({TimeSpan window, DateTime reservationStart, ScheduleProposal proposal})?
   _previewResult;
   final _selected = <String>{};
+  Map<String, Set<String>> _required = const {};
+  Map<String, String>? _taskTitles;
 
   DateTime get _now => (widget.clock ?? DateTime.now)().toLocal();
 
@@ -263,6 +268,8 @@ class _PlanDaySheetState extends State<PlanDaySheet> {
       _previewResult = null;
       _showUnscheduled = false;
       _selected.clear();
+      _required = const {};
+      _taskTitles = null;
     });
   }
 
@@ -308,6 +315,7 @@ class _PlanDaySheetState extends State<PlanDaySheet> {
         _selected.addAll(
           proposal.scheduled.map((schedule) => schedule.task.id),
         );
+        _required = requiredPlanSelections(proposal);
       });
     } catch (_) {
       if (!mounted) return;
@@ -341,6 +349,69 @@ class _PlanDaySheetState extends State<PlanDaySheet> {
     );
   }
 
+  Widget _scheduledRow(ScheduledTask schedule, String Function(DateTime) time) {
+    String range(TimeSpan block) => '${time(block.start)} – ${time(block.end)}';
+    final tile = CheckboxListTile(
+      title: Text(
+        schedule.task.title,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: contentTitleStyle,
+      ),
+      subtitle: Text(
+        schedule.blocks.take(_inlineBlockLimit).map(range).join('\n'),
+        style: contentMetadataStyle,
+      ),
+      value: _selected.contains(schedule.task.id),
+      onChanged: (checked) => _toggle(schedule.task.id, checked),
+    );
+    if (schedule.blocks.length <= _inlineBlockLimit) {
+      return KeyedSubtree(key: ValueKey(schedule.task.id), child: tile);
+    }
+    return Column(
+      key: ValueKey(schedule.task.id),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        tile,
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton(
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (_) => Dialog(
+                child: PlanReviewFrame(
+                  title: 'Block times',
+                  subtitle: schedule.task.title,
+                  maxWidth: 440,
+                  closeTooltip: 'Close block times',
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        18,
+                        4,
+                        18,
+                        12,
+                      ),
+                      sliver: SliverList.builder(
+                        itemCount: schedule.blocks.length,
+                        itemBuilder: (_, index) => ListTile(
+                          title: Text(range(schedule.blocks[index])),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            child: Text('Show all ${schedule.blocks.length} block times'),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final locale = MaterialLocalizations.of(context);
@@ -352,262 +423,165 @@ class _PlanDaySheetState extends State<PlanDaySheet> {
     final proposal = _previewResult?.proposal;
     final scheduled = proposal?.scheduled ?? const <ScheduledTask>[];
     final unscheduled = proposal?.unscheduled ?? const <UnscheduledTask>[];
-    final proposedIds = {for (final item in scheduled) item.task.id};
-    final missingPrerequisite = scheduled.any(
-      (schedule) =>
-          _selected.contains(schedule.task.id) &&
-          schedule.task.prerequisites.any(
-            (id) => proposedIds.contains(id) && !_selected.contains(id),
-          ),
+    final missingPrerequisite = hasUnselectedPlanPrerequisites(
+      _required,
+      _selected,
     );
     final date = locale.formatFullDate(_day);
     final titles = _showUnscheduled
-        ? {for (final task in widget.tasks) task.id: task.title}
+        ? (_taskTitles ??= planPrerequisiteTitles(widget.tasks, unscheduled))
         : const <String, String>{};
-    return SafeArea(
-      top: false,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: 540,
-          maxHeight: MediaQuery.sizeOf(context).height * .86,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(20, 12, 10, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Semantics(
-                          header: true,
-                          child: const Text(
-                            'Plan day',
-                            style: sectionHeadingStyle,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(date, style: contentMetadataStyle),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close plan',
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: muted),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: CustomScrollView(
-                shrinkWrap: true,
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 8,
-                    ),
-                    sliver: SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _AvailabilityButton(
-                                  label: 'Available from',
-                                  time: time(_start),
-                                  onPressed: _loading
-                                      ? null
-                                      : () => _pickTime(start: true),
-                                ),
-                              ),
-                              const SizedBox(width: 9),
-                              Expanded(
-                                child: _AvailabilityButton(
-                                  label: 'Available until',
-                                  time: time(_end),
-                                  onPressed: _loading
-                                      ? null
-                                      : () => _pickTime(start: false),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_error case final error?)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 10),
-                              child: Semantics(
-                                liveRegion: true,
-                                child: Text(
-                                  error,
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.error,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          if (proposal != null && scheduled.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 15),
-                              child: Text(
-                                'No blocks to add.',
-                                style: contentMetadataStyle,
-                              ),
-                            ),
-                          for (final advisory
-                              in proposal?.advisories ?? const <String>[])
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                advisory,
-                                style: contentMetadataStyle,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    sliver: SliverList.builder(
-                      itemCount: scheduled.length,
-                      itemBuilder: (context, index) {
-                        final schedule = scheduled[index];
-                        return CheckboxListTile(
-                          key: ValueKey(schedule.task.id),
-                          title: Text(
-                            schedule.task.title,
-                            style: contentTitleStyle,
-                          ),
-                          subtitle: Text(
-                            schedule.blocks
-                                .map(
-                                  (block) =>
-                                      '${blockTime(block.start)} – ${blockTime(block.end)}',
-                                )
-                                .join('\n'),
-                            style: contentMetadataStyle,
-                          ),
-                          value: _selected.contains(schedule.task.id),
-                          onChanged: (checked) =>
-                              _toggle(schedule.task.id, checked),
-                        );
-                      },
-                    ),
-                  ),
-                  if (unscheduled.isNotEmpty) ...[
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 15),
-                      sliver: SliverToBoxAdapter(
-                        child: Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Semantics(
-                            expanded: _showUnscheduled,
-                            child: TextButton.icon(
-                              iconAlignment: IconAlignment.end,
-                              icon: Icon(
-                                _showUnscheduled
-                                    ? Icons.expand_less_rounded
-                                    : Icons.expand_more_rounded,
-                              ),
-                              onPressed: () => setState(
-                                () => _showUnscheduled = !_showUnscheduled,
-                              ),
-                              label: Text(
-                                'Unscheduled (${unscheduled.length})',
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (_showUnscheduled)
-                      SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        sliver: SliverList.builder(
-                          itemCount: unscheduled.length,
-                          itemBuilder: (context, index) {
-                            final issue = unscheduled[index];
-                            return ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(
-                                issue.task.title,
-                                style: contentTitleStyle,
-                              ),
-                              subtitle: Text(
-                                _reason(issue, titles),
-                                style: contentMetadataStyle,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                  ],
-                ],
-              ),
-            ),
-            if (proposal == null || scheduled.isNotEmpty) ...[
-              const Divider(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+    return PlanReviewFrame(
+      title: 'Plan day',
+      subtitle: date,
+      maxWidth: 540,
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   children: [
-                    if (missingPrerequisite)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Semantics(
-                          liveRegion: true,
-                          child: const Text(
-                            'Select the prerequisite tasks first.',
-                            style: contentMetadataStyle,
-                          ),
-                        ),
+                    Expanded(
+                      child: _AvailabilityButton(
+                        label: 'Available from',
+                        time: time(_start),
+                        onPressed: _loading
+                            ? null
+                            : () => _pickTime(start: true),
                       ),
-                    FilledButton(
-                      onPressed: proposal == null
-                          ? (_loading ? null : _preview)
-                          : (_selected.isEmpty || missingPrerequisite
-                                ? null
-                                : () => _accept(scheduled)),
-                      child: Text(
-                        proposal == null
-                            ? (_loading ? 'Previewing…' : 'Preview plan')
-                            : 'Add selected tasks',
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: _AvailabilityButton(
+                        label: 'Available until',
+                        time: time(_end),
+                        onPressed: _loading
+                            ? null
+                            : () => _pickTime(start: false),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ],
+                if (_error case final error?)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        error,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (proposal != null && scheduled.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 15),
+                    child: Text(
+                      'No blocks to add.',
+                      style: contentMetadataStyle,
+                    ),
+                  ),
+                for (final advisory in proposal?.advisories ?? const <String>[])
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(advisory, style: contentMetadataStyle),
+                  ),
+              ],
+            ),
+          ),
         ),
-      ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          sliver: SliverList.builder(
+            itemCount: scheduled.length,
+            itemBuilder: (_, index) =>
+                _scheduledRow(scheduled[index], blockTime),
+          ),
+        ),
+        if (unscheduled.isNotEmpty) ...[
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            sliver: SliverToBoxAdapter(
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Semantics(
+                  expanded: _showUnscheduled,
+                  child: TextButton.icon(
+                    iconAlignment: IconAlignment.end,
+                    icon: Icon(
+                      _showUnscheduled
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                    ),
+                    onPressed: () =>
+                        setState(() => _showUnscheduled = !_showUnscheduled),
+                    label: Text('Unscheduled (${unscheduled.length})'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (_showUnscheduled)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverList.builder(
+                itemCount: unscheduled.length,
+                itemBuilder: (context, index) {
+                  final issue = unscheduled[index];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(issue.task.title, style: contentTitleStyle),
+                    subtitle: Text(
+                      planningIssueMessage(issue, titles),
+                      style: contentMetadataStyle,
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ],
+      footer: proposal == null || scheduled.isNotEmpty
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (missingPrerequisite)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Semantics(
+                        liveRegion: true,
+                        child: const Text(
+                          'Select the prerequisite tasks first.',
+                          style: contentMetadataStyle,
+                        ),
+                      ),
+                    ),
+                  FilledButton(
+                    onPressed: proposal == null
+                        ? (_loading ? null : _preview)
+                        : (_selected.isEmpty || missingPrerequisite
+                              ? null
+                              : () => _accept(scheduled)),
+                    child: Text(
+                      proposal == null
+                          ? (_loading ? 'Previewing…' : 'Preview plan')
+                          : 'Add selected tasks',
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : null,
     );
   }
 }
-
-String _reason(UnscheduledTask issue, Map<String, String> titles) =>
-    switch (issue.problem) {
-      PlannerProblem.needsDuration => 'Add an estimated duration',
-      PlannerProblem.needsDetails =>
-        issue.task.needsDetailsMessage ?? 'Needs more details',
-      PlannerProblem.unavailableDependency =>
-        switch (titles[issue.prerequisiteId]) {
-          final title? => 'Waiting on $title',
-          null => 'Prerequisite unavailable',
-        },
-      PlannerProblem.dependencyCycle => 'Prerequisite cycle',
-      PlannerProblem.deadlinePassed => 'Due before this window',
-      PlannerProblem.noFeasibleTime => 'No available block fits',
-    };
 
 class _AvailabilityButton extends StatelessWidget {
   const _AvailabilityButton({
