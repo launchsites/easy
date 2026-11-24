@@ -3,6 +3,7 @@ part of 'main.dart';
 typedef _TodayFitInput = ({
   List<TaskItem> tasks,
   List<CalendarEvent> events,
+  List<InternalRecurringEvent> series,
   SchedulingSettings settings,
   Set<String>? categories,
   Set<String> excludedTasks,
@@ -35,7 +36,20 @@ _TodayFitResult _projectTodayFit(_TodayFitInput input) {
   }
   final scopes = {for (final task in eligible.values) task.category};
   final settings = input.settings;
-  final events = input.events;
+  final coverage = input.series.isEmpty
+      ? null
+      : TimeSpan(plusDays(day, -1), plusDays(day, 2));
+  final events = coverage == null
+      ? input.events
+      : [
+          ...input.events,
+          for (final row in expandInternalWorkspace((
+            sources: input.series,
+            start: coverage.start,
+            end: coverage.end,
+          )))
+            row.event,
+        ];
   for (final event in events) {
     consider(event.start.subtract(Duration(minutes: settings.beforeMinutes)));
     consider(event.end.add(Duration(minutes: settings.afterMinutes)));
@@ -70,7 +84,8 @@ _TodayFitResult _projectTodayFit(_TodayFitInput input) {
     settings: settings,
     confirmedEvents: events,
     categories: scopes,
-    calendarComplete: true,
+    calendarComplete: coverage == null,
+    verifiedCalendarSpan: coverage,
   );
   if (!available.byCategory.values.any((gap) => gap > Duration.zero)) {
     return (id: null, at: now, checkAt: checkAt);
@@ -145,7 +160,6 @@ extension _WorkspaceTodayFit on _WorkspaceState {
       !_taskSeriesUnreadable &&
       _selectedAppleCalendars.isEmpty &&
       _selectedIcsCalendars.isEmpty &&
-      _eventSeries.isEmpty &&
       (!_allows(EasyFeature.workouts) || _gymSessions != null) &&
       _gymSessions?.lastOrNull?.finished != false;
 
@@ -198,7 +212,10 @@ extension _WorkspaceTodayFit on _WorkspaceState {
       }
       final input = (
         tasks: _workspaceTasks,
-        events: _data.events,
+        events: _eventSeries.isEmpty
+            ? _data.events
+            : _standaloneEvents(_data.events).toList(),
+        series: _eventSeries,
         settings: settings,
         categories: _expandCategoryScope(_focus),
         excludedTasks: excludedTasks,
@@ -206,7 +223,8 @@ extension _WorkspaceTodayFit on _WorkspaceState {
       );
       final next = manualUntil != null
           ? (id: null, at: now, checkAt: manualUntil)
-          : input.tasks.length + input.events.length > 2000
+          : input.series.isNotEmpty ||
+                input.tasks.length + input.events.length > 2000
           ? await compute(_projectTodayFit, input)
           : _projectTodayFit(input);
       if (!_maySuggestTodayFit || source != _todayFitRevision) return;
