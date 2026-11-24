@@ -76,8 +76,9 @@ jobs:
                       source = output / (name + '.png')
                       source.write_bytes(png)
                       destination = output / (name + '.webp')
-                      subprocess.run(['convert', str(source), '-strip', '-resize', f'{width}x>', '-quality', '80',
-                                      str(destination)], check=True)
+                      subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-i', str(source),
+                                      '-frames:v', '1', '-vf', f'scale={min(width, source_width)}:-1',
+                                      '-c:v', 'libwebp', '-quality', '80', str(destination)], check=True)
                       data = destination.read_bytes()
                       assert len(data) <= 100_000 and data.startswith(b'RIFF') and data[8:12] == b'WEBP'
                       print('UI_META', json.dumps({'name': name + '.webp', 'platform': platform,
