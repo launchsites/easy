@@ -106,4 +106,171 @@ void main() {
     expect(ready.value!.proposals.single.draft.category, 'work');
     expect(runtime.budget.committedMicros, 0);
   });
+
+  test(
+    'a transient automatic Local failure allows one paced retry after reopen',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      var ready = false;
+      var requests = 0;
+      server.listen((request) async {
+        requests++;
+        final envelope =
+            jsonDecode(await utf8.decoder.bind(request).join()) as Map;
+        final user = (envelope['messages'] as List)[1] as Map;
+        final fields = jsonDecode(user['content'] as String) as Map;
+        request.response.headers.contentType = ContentType.json;
+        if (ready) {
+          request.response.write(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'content': jsonEncode({
+                      'captureId': fields['captureId'],
+                      'sourceRevision': fields['sourceRevision'],
+                      'contextRevision': fields['contextRevision'],
+                      'minutes': 18,
+                    }),
+                  },
+                },
+              ],
+            }),
+          );
+        } else {
+          request.response.statusCode = HttpStatus.serviceUnavailable;
+          request.response.write(
+            jsonEncode({'error': 'The fixture is still loading.'}),
+          );
+        }
+        await request.response.close();
+      });
+
+      var now = DateTime.utc(2026, 11, 24, 10);
+      AiStoredState? persisted;
+      AiRuntime open() {
+        final runtime = AiRuntime(
+          read: () async => persisted,
+          compareAndSwap: (expected, value) async {
+            final revision = persisted?.revision ?? 0;
+            if (expected != revision) return null;
+            persisted = AiStoredState(revision: revision + 1, value: value);
+            return revision + 1;
+          },
+          clock: () => now,
+        );
+        addTearDown(runtime.dispose);
+        return runtime;
+      }
+
+      AiRuntimeSettings settings({bool automatic = true}) => AiRuntimeSettings(
+        route: AiRoute.local,
+        localBaseUrl: 'http://127.0.0.1:${server.port}/v1',
+        localModel: 'fixture-model',
+        allowEstimates: true,
+        automaticEstimates: automatic,
+        adaptiveEstimatePacing: automatic,
+      );
+
+      AiEnrichmentCandidate task(String id) => AiEnrichmentCandidate(
+        taskId: id,
+        title: 'Draft the next planning note',
+        sourceRevision: 1,
+        contextRevision: 2,
+      );
+      Future<AiRuntimeOutcome<AiPendingEstimate>> run(
+        AiRuntime runtime,
+        AiEnrichmentCandidate input,
+      ) => runtime.runAutomaticEstimate(
+        candidate: input,
+        currentRevision: (id) => id == input.taskId ? input.revision : null,
+      );
+
+      final first = open();
+      expect(
+        await first.saveSettings(
+          settings(),
+          authorizeAutomatic: (_) async => true,
+        ),
+        AiSettingsSaveStatus.saved,
+      );
+      final original = task('transient');
+      expect((await run(first, original)).status, AiRunStatus.blocked);
+      expect(requests, 1);
+      expect(first.pendingEstimates, isEmpty);
+
+      ready = true;
+      now = now.add(const Duration(minutes: 29, seconds: 59));
+      final reopened = open();
+      expect(await reopened.load(), isTrue);
+      expect(reopened.canAutomaticallyEstimate(original), isFalse);
+      expect((await run(reopened, original)).status, AiRunStatus.blocked);
+
+      now = now.add(const Duration(seconds: 1));
+      reopened.setForeground(false);
+      expect((await run(reopened, original)).status, AiRunStatus.blocked);
+      reopened.setForeground(true);
+      expect(
+        await reopened.saveSettings(settings(automatic: false)),
+        AiSettingsSaveStatus.saved,
+      );
+      expect((await run(reopened, original)).status, AiRunStatus.blocked);
+      expect(requests, 1);
+      expect(
+        await reopened.saveSettings(
+          settings(),
+          authorizeAutomatic: (_) async => true,
+        ),
+        AiSettingsSaveStatus.saved,
+      );
+
+      final peer = open();
+      expect(await peer.load(), isTrue);
+      expect(reopened.canAutomaticallyEstimate(original), isTrue);
+      expect(peer.canAutomaticallyEstimate(original), isTrue);
+      final outcomes = await Future.wait([
+        run(reopened, original),
+        run(peer, original),
+      ]);
+      expect(
+        outcomes
+            .where((outcome) => outcome.status == AiRunStatus.ready)
+            .single
+            .value!
+            .durationMinutes,
+        18,
+      );
+      expect(requests, 2);
+
+      final finalRuntime = open();
+      expect(await finalRuntime.load(), isTrue);
+      expect(finalRuntime.pendingEstimates.single.taskId, original.taskId);
+      final enrichment =
+          (jsonDecode(persisted!.value) as Map)['enrichment'] as Map;
+      expect(enrichment['attemptsOnLastDay'], 2);
+      now = now.add(const Duration(days: 2));
+      expect(finalRuntime.canAutomaticallyEstimate(original), isFalse);
+
+      ready = false;
+      final unavailable = task('still-unavailable');
+      expect(
+        (await run(finalRuntime, unavailable)).status,
+        AiRunStatus.blocked,
+      );
+      now = now.add(const Duration(minutes: 30));
+      expect(
+        (await run(finalRuntime, unavailable)).status,
+        AiRunStatus.blocked,
+      );
+      expect(requests, 4);
+      now = now.add(const Duration(days: 2));
+      expect(finalRuntime.canAutomaticallyEstimate(unavailable), isFalse);
+      expect(
+        (await run(finalRuntime, unavailable)).status,
+        AiRunStatus.blocked,
+      );
+      expect(requests, 4);
+    },
+  );
 }
