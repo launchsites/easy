@@ -3,7 +3,7 @@
 Easy brings your calendar, tasks, notes, and activity into one device-first workspace. Start with a blank workspace or try sample data. Minimal, Planner, and Full presets let you choose which features to see. [Appearance previews](docs/DESIGN_PREVIEWS.md)
 
 - **Today** shows a note to self, upcoming events, and tasks due today. A focus mode can bring forward a workout, meal log, or a different group of tasks.
-- **Planning** uses your saved hours, calendar commitments, prerequisites, and task estimates. Open What fits now to review a suggestion or plan the day. Calendar time blocks are saved after you review them.
+- **Planning** uses your saved hours, calendar commitments, prerequisites, and task estimates. Today can flag a task that fits a verified free window. Open What fits now to see alternatives or plan the day. Calendar time blocks are saved after you review them.
 - **Calendar** puts the schedule below a tappable date. On a phone, swipe sideways for the next day or scroll vertically through days. Wide windows show a week.
 - **Tasks and notes** use lightweight lists and a contextual detail pane on wider screens. Tasks support nesting, effort and prerequisite fields. Notes support folders, tags, pins, Markdown preview and links to workspace records.
 - **Navigation** starts at the bottom-left button on a phone. Hold, drag toward a destination and release, or tap and choose a destination. The plus opens a single capture field. Hold it to record. Slide up to lock recording or left to cancel.
@@ -61,4 +61,4 @@ python3 tool/set_display_name.py 'My Workspace'
 
 ## Verification
 
-This repository is a development build. Linux has native release, offline, restart, and performance evidence. Android review APKs were built and inspected for ARMv7, ARM64, and x86-64. Apple Calendar has fake-channel and static Swift checks. Apple SDK builds, physical phone tests, and live paid billing verification remain open. [Test evidence](docs/TEST_EVIDENCE.md) · [Acceptance status](docs/ACCEPTANCE.md)
+This repository is a development build. Linux has native release, offline, restart, and performance evidence. Android review APKs were built and inspected for ARMv7, ARM64, and x86-64. Hosted Apple SDK builds passed for the iOS simulator and macOS. Physical phone tests, real EventKit account interoperability, and live paid billing verification remain open. [Test evidence](docs/TEST_EVIDENCE.md) · [Acceptance status](docs/ACCEPTANCE.md)

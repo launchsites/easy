@@ -11,7 +11,7 @@ The frozen Flutter suite at `8b18bcf` passed 794 tests under `TZ=America/New_Yor
 | Native release soak | The pinned route test ran for 1,801 seconds. All 156 desktop route probes and 24 hold-and-drag navigation probes passed. The recorded workspace digest was unchanged. |
 | Native viewport review | Home, Tasks and Settings exercised at twelve sizes. The compact 320 × 568 Home layout lifted the first visible checkbox above the navigation dock. A Tasks regression covers 568 × 320 landscape. |
 | Android API 36 | Offline review APKs built for ARMv7, ARM64 and x86-64. The checks inspect signatures, compiled backup and network rules, and 16 KiB ZIP and ELF load alignment. Development signing is used. |
-| macOS and iOS | Dart channel and Swift syntax checks ran on Linux. Apple SDK build, provisioning, device permission and real EventKit verification remain open. |
+| macOS and iOS | Hosted Xcode built the iOS simulator target and unsigned macOS release. Dart channel and Swift syntax checks also passed. Provisioning, physical device permissions and real EventKit account verification remain open. [Apple SDK run](https://github.com/launchsites/easy/actions/runs/45334132108) |
 
 [Native performance report](native-performance-benchmark.md) · [Release smoke](native-release-smoke.md) · [Android checks](android-validation.md) · [Appearance previews](DESIGN_PREVIEWS.md)
 
@@ -20,9 +20,10 @@ The frozen Flutter suite at `8b18bcf` passed 794 tests under `TZ=America/New_Yor
 - Native SQLite exercised migration and version history with 100,000 tasks, 30,000 events, 50,000 gym sessions, 3,000 notes and 10,000 meal metadata records.
 - A one-CPU run of 10,000 edits verified four close-and-reopen checkpoints, a named version and an old idempotency key. Save p50 was 53.36 ms and p95 was 112.89 ms.
 - A real process interruption stopped a synthetic fixture during its SQLite write. Reopen retained the acknowledged revision, the retry completed once, and integrity checks passed.
+- A Linux file-size ceiling and owner permissions produced actual write errors. The packaged task inspector acknowledged completion only after a successful retry. [Native storage faults](native-storage-faults.md)
 - Backup checks cover encrypted wrong-password rejection, stale preview rejection, source-aware selected restores and a separately preserved pre-restore recovery point.
 - Native media archives streamed a 256 MiB fixture under a bounded memory profile. Attachment recovery retained the referenced content hash and the prior workspace revision.
-- Sync checks cover authenticated local transfer, replay, ordering, revocation, conflicts and transactional rollback. A five-device benchmark replayed 1,024 generated schedules. The Linux Settings route reopened a passphrase-protected journal after process restart.
+- Sync checks cover authenticated local transfer, replay, ordering, revocation, conflicts and transactional rollback. A five-device benchmark replayed 1,024 generated schedules. Two paired Linux profiles exchanged a reviewed file, applied only the selected task, and recovered it after restart. [Native sync transfer](manual-sync.md)
 - Task completion tests inject a rejected write and verify that the saved task stays open. A retry saves once. An older Undo cannot change a newer completion.
 - A Linux release run under inherited `0022` verified that the app profile and new database files were private, and that earlier synthetic records reopened correctly.
 
