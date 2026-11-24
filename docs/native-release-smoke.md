@@ -7,6 +7,8 @@ The Linux x64 release at `908c53adcbe53369c4cd11426dbec25367b0147c` passed all 2
 - Gym displayed the two synthetic body-weight records with Health notes enabled. Disabling Health notes removed the body-weight option after restart. Both measurements remained stored.
 - The blank workspace stayed empty after Skip and restart. Choosing Full with samples in a separate profile saved six events, eight tasks, five notes, and one workout plan. Reopening kept the same revision and checksum in each profile.
 
+The live workout check passed nine visual checkpoints in 76.81 seconds on `68fecf80a3c9da48e2d81252322efe4c0e19bbc2`. From the live Gym screen, one capture logged a stretch after the treadmill, updated the bench press to 60 kg × 8, 8, 6, and created a Work task. The explicit mark-done choice kept the three original targets of 50 kg × 8 and the treadmill settings. Two transactions saved the captured text and then the reviewed changes. The session refreshed in place and showed the same result after restarting. The SQLite workspace stayed at revision 3 with the same checksum after reopening. [Live capture report](benchmark-results/native-live-gym-68fecf8-epyc-20261124.json)
+
 The runner uses Flutter's Linux x64 release bundle, Python 3, Xvfb, xdotool, ImageMagick, and Tesseract. It checks simulated pointer and keyboard input at desktop and phone dimensions. Android, iOS, and physical touch use require separate checks.
 
 ```sh
@@ -16,5 +18,5 @@ python3 tool/benchmark/native_release_smoke.py \
   --binary build/linux/x64/release/bundle/easy \
   --app-revision "$(git rev-parse HEAD)" \
   --output /tmp/easy-release-smoke-report.json \
-  --health-scope --onboarding
+  --health-scope --onboarding --live-gym-capture
 ```

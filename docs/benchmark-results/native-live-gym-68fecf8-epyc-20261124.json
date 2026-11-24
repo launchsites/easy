@@ -1,0 +1,61 @@
+{
+  "recorded_at_utc": "2026-11-24T05:07:02.971046+00:00",
+  "app_revision": "68fecf80a3c9da48e2d81252322efe4c0e19bbc2",
+  "executable_sha256": "f707e6e3a581e5cc642288df8daf85f3890c1594e420a0937d4e3808bf89648e",
+  "aot_library_sha256": "028d356b855b5577cafc2475c22d4d32ea105f453b16e3ede267af6f621eff9b",
+  "status": "passed",
+  "checks": {
+    "live-gym-resumable": {
+      "screenshot_sha256": "3c878578930e53e4ac2a2a65f315e9eccf36ac7b3fcf898f95898dfc3f5c83c2"
+    },
+    "live-gym-session": {
+      "screenshot_sha256": "6d03e7a4b4e333a4ff51ef996c70d47277cd8a8da807d5db127ccbec77d859e5"
+    },
+    "live-gym-capture": {
+      "screenshot_sha256": "3a21bfe696a0c5e3d8fbc68d0e1fbf22f5f65effd4b68ff9ed4e35d7a6285ed5"
+    },
+    "live-gym-completion-choice": {
+      "screenshot_sha256": "7db45ea6ab344f7a29dd3ce396ec7092ee970da18adc61658000320e3bfe0f38"
+    },
+    "live-gym-capture-returns": {
+      "screenshot_sha256": "4b3c75f403d7cb71df64fdf0185d350f696124d7e1eca26e047e8642a92b9b6d"
+    },
+    "live-gym-refreshed": {
+      "screenshot_sha256": "4b3c75f403d7cb71df64fdf0185d350f696124d7e1eca26e047e8642a92b9b6d"
+    },
+    "live-gym-reopened-resumable": {
+      "screenshot_sha256": "ec163d12b28e1663f724476d3d140261c151e6469840cd86e4174be5ab1dfc26"
+    },
+    "live-gym-reopened-session": {
+      "screenshot_sha256": "0ee8dcbc3786871a75b2154533a20d3e20e813060801755b2b75a0b582b7f3a9"
+    },
+    "live-gym-reopened-result": {
+      "screenshot_sha256": "0ee8dcbc3786871a75b2154533a20d3e20e813060801755b2b75a0b582b7f3a9"
+    }
+  },
+  "live_workout_capture": {
+    "after": {
+      "revision": 3,
+      "digest": "2273bf1af7de5e77b62ec20bdb1d01b8454851c8e0396c9d19edb610b8a4cea9",
+      "storage_format": "chunked",
+      "counts": {
+        "events": 2,
+        "tasks": 2,
+        "notes": 2
+      },
+      "quick_check": "ok"
+    },
+    "reopened": {
+      "revision": 3,
+      "digest": "2273bf1af7de5e77b62ec20bdb1d01b8454851c8e0396c9d19edb610b8a4cea9",
+      "storage_format": "chunked",
+      "counts": {
+        "events": 2,
+        "tasks": 2,
+        "notes": 2
+      },
+      "quick_check": "ok"
+    }
+  },
+  "elapsed_seconds": 76.81
+}

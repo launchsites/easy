@@ -31,9 +31,14 @@ TASK = "Order saffron folders"
 INITIAL_TASK = "File copper receipts"
 CURRENT_EVENT = "Tangerine booking"
 NEXT_EVENT = "Jasmine appointment"
+LIVE_WORKOUT = "Upper body fixture"
+WORKOUT_TASK = "Write session handoff"
+WORKOUT_STRETCH = "After treadmill, I stretched"
+WORKOUT_BENCH = "I did bench press 60kg x8,8,6"
+WORKOUT_CAPTURE = f"Work: task: {WORKOUT_TASK}; {WORKOUT_STRETCH}; {WORKOUT_BENCH}"
 
 
-def initial_profile(profile):
+def initial_profile(profile, *, live_workout=False):
     profile.mkdir()
     today = date.today()
     state = workspace(today, 0, 0, 1)
@@ -74,6 +79,23 @@ def initial_profile(profile):
             "finishedAt": (at + timedelta(minutes=30)).isoformat(),
             "exercises": [exercise], "entries": [],
             "progress": {json.dumps(["smoke-bench", "smoke-set"], separators=(",", ":")): "done"},
+        }))
+    if live_workout:
+        exercises = [
+            {"id": "treadmill", "name": "Treadmill", "kind": "cardio",
+             "distanceKm": 0.5, "inclinePercent": 2, "minutes": 5},
+            {
+                "id": "bench", "name": "Bench press", "kind": "strength",
+                "sets": [
+                    {"id": item, "weightKg": 50, "reps": 8}
+                    for item in ("first", "second", "third")
+                ],
+            },
+        ]
+        sessions.append(json.dumps({
+            "planned": True, "planId": "live-fixture", "planName": LIVE_WORKOUT,
+            "startedAt": (datetime.now() - timedelta(minutes=3)).isoformat(),
+            "exercises": exercises, "plannedExercises": exercises, "entries": [],
         }))
     (profile / "shared_preferences.json").write_text(json.dumps({
         "easy.workspace.v1": json.dumps(state),
@@ -354,7 +376,98 @@ def run(args, stage, report):
                     raise RuntimeError(f"The {option} profile setup was not stable across reopening.")
                 report["onboarding"][option] = {"before": before, "after": after}
                 stop(app)
+
+        if args.live_gym_capture:
+            live_env, live_profile = new_profile(stage / "live-gym", env)
+            initial_profile(live_profile, live_workout=True)
+            live_db = live_profile / "easy" / "workspace.sqlite3"
+            app, screen = open_app("live-gym", live_env)
+            resize(screen, PHONE)
+            screen.tap("Mode")
+            screen.tap("Gym")
+            check("live-gym-resumable", LIVE_WORKOUT)
+            resume_live_fixture(screen)
+            check("live-gym-session", "Finish")
+            before = until(lambda: stored_workspace(live_db), "the initial live workout")
+            click_at(screen, PHONE[0] - 44, PHONE[1] - 38)
+            check("live-gym-capture", "Capture review")
+            screen.tap("Capture text")
+            screen.send("type", "--delay", 2, WORKOUT_CAPTURE)
+            screen.tap_footer()
+            check("live-gym-completion-choice", "Mark these sets done")
+            screen.tap("Mark these sets done")
+            screen.tap_footer()
+            screen.move(PHONE[0] - 6, 558)
+            check("live-gym-capture-returns", "Finish")
+            after = until(lambda: captured_workout_state(live_db), "the captured workout and task")
+            if after["revision"] != before["revision"] + 2:
+                raise RuntimeError("Expected one capture draft and one reviewed transaction.")
+            reveal_record(screen, "Stretched")
+            check("live-gym-refreshed", "Stretched")
+            stop(app)
+
+            app, screen = open_app("live-gym-reopened", live_env)
+            resize(screen, PHONE)
+            screen.tap("Mode")
+            screen.tap("Gym")
+            check("live-gym-reopened-resumable", LIVE_WORKOUT)
+            resume_live_fixture(screen, last_pending="Treadmill")
+            check("live-gym-reopened-session", "Finish")
+            reveal_record(screen, "Stretched")
+            check("live-gym-reopened-result", "Stretched")
+            reopened = captured_workout_state(live_db)
+            if after != reopened:
+                raise RuntimeError("The reviewed result changed after reopening.")
+            report["live_workout_capture"] = {"after": after, "reopened": reopened}
+            stop(app)
         report.pop("current_step", None)
+
+
+def resume_live_fixture(screen, last_pending="Bench press"):
+    _, exercise_y = until(lambda: screen.find(last_pending), "the live workout preview")
+    click_at(screen, 106, exercise_y + 48)
+    screen.move(PHONE[0] - 6, 558)
+
+
+def captured_workout_state(database):
+    state = stored_workspace(database)
+    if state is None:
+        return None
+    data = state.pop("document")
+    tasks = [item for item in data["tasks"] if item["title"] == WORKOUT_TASK]
+    if not tasks:
+        return None
+    captures = data.get("captures", [])
+    sessions = workout_documents(database)["gym_sessions"]
+    active = [item for item in sessions if item["planId"] == "live-fixture"]
+    if (len(tasks) != 1 or tasks[0]["category"] != "work" or
+            len(captures) != 1 or captures[0]["text"] != WORKOUT_CAPTURE or not captures[0]["applied"] or
+            len(active) != 1 or
+            state["quick_check"] != "ok" or active[0].get("finishedAt") is not None):
+        raise RuntimeError("Capture altered the source, task category, workout identity, or database health.")
+    active = active[0]
+    actual = [(item["id"], item["weightKg"], item["reps"]) for item in active["exercises"][1]["sets"]]
+    planned = [(item["id"], item["weightKg"], item["reps"]) for item in active["plannedExercises"][1]["sets"]]
+    set_ids = ("first", "second", "third")
+    done = {json.dumps(["bench", item], separators=(",", ":")): "done" for item in set_ids}
+    cardio = active["exercises"][0]
+    if (actual != list(zip(set_ids, (60, 60, 60), (8, 8, 6))) or
+            planned != [(item, 50, 8) for item in set_ids] or active.get("progress") != done or
+            (cardio["distanceKm"], cardio["inclinePercent"], cardio["minutes"]) != (0.5, 2, 5) or
+            [entry["captureText"] for entry in active["entries"]] != [WORKOUT_STRETCH, WORKOUT_BENCH] or
+            active["entries"][0]["afterExerciseId"] != "treadmill"):
+        raise RuntimeError("The workout actuals, source text, completion, or planned sets changed unexpectedly.")
+    return state
+
+
+def reveal_record(screen, label):
+    for _ in range(4):
+        if screen.find(label):
+            return
+        screen.move(185, 550)
+        screen.send("click", "--repeat", 4, 5)
+        clock.sleep(0.25)
+    until(lambda: screen.find(label), f"the reviewed {label!r} entry")
 
 
 def _has_task(database):
@@ -392,6 +505,7 @@ def main():
     parser.add_argument("--gym-progress", action="store_true", help="require the progress chart on builds that include it")
     parser.add_argument("--health-scope", action="store_true", help="verify health data is visible only while its feature is enabled")
     parser.add_argument("--onboarding", action="store_true", help="check Skip and Full with samples in independent blank profiles")
+    parser.add_argument("--live-gym-capture", action="store_true", help="review live workout results and a cross-Focus task together")
     args = parser.parse_args()
     args.binary = args.binary.resolve(strict=True)
     app_library = args.binary.parent / "lib" / "libapp.so"
