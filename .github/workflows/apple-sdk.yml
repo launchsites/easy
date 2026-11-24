@@ -59,7 +59,7 @@ jobs:
 
       - name: Verify iPhone simulator first launch
         if: ${{ inputs.ios_simulator_smoke }}
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
           python3 tool/benchmark/ios_simulator_smoke.py \
             build/ios/iphonesimulator/Runner.app \
