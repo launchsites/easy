@@ -142,6 +142,20 @@ part 'workspace_today_fit.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
+SystemUiOverlayStyle _systemBars({bool darkBackground = false}) {
+  final icons = darkBackground ? Brightness.light : Brightness.dark;
+  return SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarBrightness: darkBackground ? Brightness.dark : Brightness.light,
+    statusBarIconBrightness: icons,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness: icons,
+    systemStatusBarContrastEnforced: false,
+    systemNavigationBarContrastEnforced: false,
+  );
+}
+
 void main() => runApp(const EasyApp());
 
 typedef WorkspaceStoreOpener = Future<WorkspaceStore> Function({
@@ -169,6 +183,10 @@ class EasyApp extends StatelessWidget {
       title: appName,
       debugShowCheckedModeBanner: false,
       theme: easyTheme(),
+      builder: (_, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: _systemBars(),
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: _Workspace(
         openStore: openStore,
         calendarAdapter: calendarAdapter,
@@ -4539,7 +4557,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       const SingleActivator(LogicalKeyboardKey.keyK, control: true): _search,
       const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _search,
     };
-    return _categoryScope(
+    final workspaceView = _categoryScope(
       Listener(
         onPointerDown: (_) => _lastWorkspaceInput = DateTime.now(),
         onPointerSignal: (_) => _lastWorkspaceInput = DateTime.now(),
@@ -4771,6 +4789,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         ),
       ),
     );
+    return mobile
+        ? workspaceView
+        : AnnotatedRegion<SystemUiOverlayStyle>(
+            value: _systemBars(darkBackground: true),
+            child: workspaceView,
+          );
   }
 }
 
