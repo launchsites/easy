@@ -22,6 +22,8 @@ extension _WorkspaceReviewAvailability on _WorkspaceState {
     _data.events,
     _data.sections[_scheduleSettingsKey],
     _data.sections[_categorySettingsKey],
+    _data.sections[_calendarPreferencesKey],
+    _data.sections[_recurringEventsKey],
     _calendarPreferences,
     _eventSeries,
     _icsCalendars,
@@ -31,6 +33,7 @@ extension _WorkspaceReviewAvailability on _WorkspaceState {
   Future<ReviewDayAvailability?> _reviewAvailabilityFor(DateTime day) async {
     if (!_allows(EasyFeature.planning) ||
         !identical(_data, _savedWorkspace) ||
+        !_calendarSourcesReadable ||
         _selectedAppleCalendars.isNotEmpty ||
         _selectedIcsCalendars.isNotEmpty ||
         _eventSeries.isNotEmpty) {

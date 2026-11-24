@@ -138,6 +138,7 @@ part 'workspace_apple_access.dart';
 part 'workspace_task_completion.dart';
 part 'workspace_review_availability.dart';
 part 'workspace_automatic_estimates.dart';
+part 'workspace_today_fit.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -295,6 +296,11 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   AutomationData? _cachedAutomation;
   Object? _reviewAvailabilityKey;
   final _reviewAvailabilityCache = <DateTime, Future<ReviewDayAvailability?>>{};
+  Timer? _todayFitTimer;
+  Object? _todayFitSource;
+  _TodayFitResult? _todayFit;
+  var _todayFitChecking = false;
+  var _todayFitQueued = false;
   var _planningDay = false;
   var _recordingVoice = false;
   final _heldVoiceOverlay = HeldVoiceCaptureOverlay();
@@ -422,6 +428,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     _estimateTimer?.cancel();
     _focusSuggestionBoundary?.cancel();
     _automationCalendarTimer?.cancel();
+    _todayFitTimer?.cancel();
     _reminderDebounce?.cancel();
     _voiceTranscriber.cancel();
     _heldVoiceOverlay.dispose();
@@ -451,6 +458,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }
     if (!_loading && state == AppLifecycleState.resumed) {
       _queueAutomationCalendarCheck();
+      _queueTodayFit();
       unawaited(_refreshExternalCalendars(force: true));
       if (_reminderWorkspace case final saved?) {
         _queueReminderSync(saved, force: true);
@@ -459,7 +467,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         when _reminderDebounce?.isActive == true) {
       _queueReminderSync(saved, force: true, immediate: true);
     }
-    if (state != AppLifecycleState.resumed) _automationCalendarTimer?.cancel();
+    if (state != AppLifecycleState.resumed) {
+      _automationCalendarTimer?.cancel();
+      _todayFitTimer?.cancel();
+    }
   }
 
   Future<void> _load() async {
@@ -516,6 +527,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     });
     _refreshCalendarViews();
     _queueAutomationCalendarCheck();
+    _queueTodayFit();
     if (!_requiresWorkspaceSetup) _queueReminderSync(data, force: true);
     if (!_allows(EasyFeature.ai)) _ai?.setForeground(false);
     if (!_requiresWorkspaceSetup &&
@@ -865,6 +877,22 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     yield* preferences.memberships.byMode.values.expand((ids) => ids);
   }
 
+  bool get _calendarSourcesReadable {
+    final recurrence = _data.sections[_recurringEventsKey];
+    if ((_data.sections[_calendarPreferencesKey] != null &&
+            _calendarPreferences == null) ||
+        (recurrence != null &&
+            (recurrence is! List ||
+                recurrence.length != _eventSeries.length))) {
+      return false;
+    }
+    return !_selectedCalendars.any(
+      (id) =>
+          id.accountId == workspaceIcsAccountId &&
+          !_icsCalendars.any((source) => source.identity == id),
+    );
+  }
+
   List<WorkspaceIcsCalendar> get _selectedIcsCalendars {
     final selected = _selectedCalendars
         .where((id) => id.accountId == workspaceIcsAccountId)
@@ -899,6 +927,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         }
       });
       _queueAutomationCalendarCheck();
+      _queueTodayFit();
     }
   }
 
@@ -2433,6 +2462,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _savedWorkspace = data;
       _queueReminderSync(data);
       _queueAutomationCalendarCheck();
+      _queueTodayFit();
     }, () => _update(_data));
   }
 
@@ -2542,7 +2572,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       } finally {
         if (mounted) {
           setState(() => _reviewSaving = false);
-          if (saved) _queueAutomationCalendarCheck();
+          if (saved) {
+            _queueAutomationCalendarCheck();
+            _queueTodayFit();
+          }
         }
       }
     });
@@ -2801,6 +2834,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     _queueSave(() async {
       await _saveMutation(WorkspaceMutation.gymSessions(snapshot));
       _savedGymSessions = sessions;
+      _queueTodayFit();
     }, _persistGymSessions);
   }
 
@@ -2810,6 +2844,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _mountedDestinations.add(destination);
       _inspected = null;
     });
+    _queueTodayFit();
   }
 
   void _changeDate(DateTime date) {
@@ -2825,6 +2860,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _space = space;
       _inspected = null;
     });
+    _queueTodayFit();
   }
 
   List<T> _upsert<T>(List<T> records, T updated, String Function(T) id) => [
@@ -3168,6 +3204,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     DateTime? lastDay,
     bool reportProblem = true,
   }) async {
+    if (!_calendarSourcesReadable) {
+      if (reportProblem) _inform('Some saved calendars could not be read.');
+      return null;
+    }
     final apple = _selectedAppleCalendars;
     final imports = _selectedIcsCalendars;
     final series = _eventSeries;
@@ -4360,6 +4400,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final showSchedule = mode?.sections.contains(FocusSection.schedule) ?? true;
     final showTasks = mode?.sections.contains(FocusSection.tasks) ?? true;
     final focusedContent = _focusedContent(context, mode);
+    final fitsNow = _todayFitsNowTaskId;
     final inspectedAppleAction = _appleActionFor(_inspected);
     final visibleCalendars =
         _calendarPreferences?.calendarsFor(space) ?? const <CalendarIdentity>{};
@@ -4401,6 +4442,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
               showTasks: showTasks,
               showSchedule: showSchedule,
               onWhatFitsNow: canReviewObjectives ? _openTaskObjectives : null,
+              fitsNowTaskId: fitsNow,
               events: events,
               tasks: tasks,
               onNoteTap: () => _openHomeNote(todayNote),
@@ -4420,6 +4462,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
               showTasks: showTasks,
               focusedContent: focusedContent,
               onWhatFitsNow: canReviewObjectives ? _openTaskObjectives : null,
+              fitsNowTaskId: fitsNow,
               events: events,
               tasks: tasks,
               onEventTap: _openRecord,

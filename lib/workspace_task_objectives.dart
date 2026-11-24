@@ -150,7 +150,8 @@ extension _WorkspaceTaskObjectives on _WorkspaceState {
       verifiedSpan: refreshed != null && !unconfirmed
           ? TimeSpan(first, coverageEnd)
           : null,
-      calendarComplete: !hasApple && !hasImports && !hasSeries,
+      calendarComplete:
+          refreshed != null && !hasApple && !hasImports && !hasSeries,
     ));
     if (!mounted || !_allows(EasyFeature.planning) || _reviewSaving) return;
     if (!identical(workspace, _data) ||

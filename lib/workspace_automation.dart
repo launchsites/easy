@@ -254,6 +254,7 @@ extension _WorkspaceAutomation on _WorkspaceState {
       _savedGymSessions = sessions;
       _queueReminderSync(workspace);
       _queueAutomationCalendarCheck();
+      _queueTodayFit();
     }, _persistWorkoutWithAutomation);
   }
 
