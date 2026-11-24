@@ -85,6 +85,14 @@ class TaskWorkspaceFeed {
     ).where((row) => row.task.id == id).firstOrNull;
   }
 
+  Iterable<RecurringTaskOccurrence> workspaceOccurrences(
+    List<TaskItem> tasks,
+    DateTime today,
+  ) {
+    workspaceTasks(tasks, today);
+    return _lastRows.values.map((row) => row.occurrence);
+  }
+
   Iterable<TaskItem> reviewTasks(List<TaskItem> tasks, DateTime day) sync* {
     yield* standalone(tasks);
     if (series.isEmpty) return;

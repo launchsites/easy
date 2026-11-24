@@ -262,6 +262,12 @@ class RecurringTaskSeries {
     }
   }
 
+  Iterable<TimeSpan> get pendingManualSchedules sync* {
+    for (final entry in _placements.entries) {
+      if (!_outcomes.containsKey(entry.key)) yield entry.value.span;
+    }
+  }
+
   int? get maximumReminderLeadDays {
     int? result;
     for (final details in [..._templates.values, ..._edits.values]) {

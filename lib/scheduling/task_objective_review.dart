@@ -91,12 +91,14 @@ final class TaskObjectiveReview {
 
 /// Ranks the current snapshot without editing tasks or reserving calendar time.
 /// The optional window must represent known availability and contain [now].
+/// [candidateIds] limits the displayed results while keeping dependency context.
 TaskObjectiveReview reviewTaskObjectives({
   required List<TaskItem> tasks,
   required List<CalendarEvent> events,
   required DateTime now,
   required DateTime horizonEnd,
   Set<String>? focusCategories,
+  Set<String>? candidateIds,
   TimeSpan? workWindow,
   TaskObjectiveAvailability? verifiedAvailability,
 }) {
@@ -193,6 +195,7 @@ TaskObjectiveReview reviewTaskObjectives({
   final timesInReview = <Duration?>{};
   for (final node in open.values) {
     final category = node.task.category;
+    if (!(candidateIds?.contains(node.task.id) ?? true)) continue;
     if (!(focusCategories?.contains(category) ?? true)) continue;
     final availableTime = _confirmedGap(
       timedCategories?[category] ?? knownWindow?.end.difference(now),

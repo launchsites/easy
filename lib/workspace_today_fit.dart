@@ -5,10 +5,11 @@ typedef _TodayFitInput = ({
   List<CalendarEvent> events,
   SchedulingSettings settings,
   Set<String>? categories,
+  Set<String> excludedTasks,
   DateTime now,
 });
 
-typedef _TodayFitResult = ({String? id, DateTime checkAt});
+typedef _TodayFitResult = ({String? id, DateTime at, DateTime checkAt});
 
 _TodayFitResult _projectTodayFit(_TodayFitInput input) {
   final now = input.now;
@@ -24,11 +25,14 @@ _TodayFitResult _projectTodayFit(_TodayFitInput input) {
       if ((task.dueAt ?? task.date)?.toLocal() case final due?
           when !task.done &&
               (task.estimatedMinutes ?? 0) > 0 &&
+              !input.excludedTasks.contains(task.id) &&
               (input.categories?.contains(task.category) ?? true) &&
               sameDay(due, day))
         task.id: task,
   };
-  if (eligible.isEmpty || !end.isAfter(now)) return (id: null, checkAt: end);
+  if (eligible.isEmpty || !end.isAfter(now)) {
+    return (id: null, at: now, checkAt: end);
+  }
   final scopes = {for (final task in eligible.values) task.category};
   final settings = input.settings;
   final events = input.events;
@@ -39,6 +43,17 @@ _TodayFitResult _projectTodayFit(_TodayFitInput input) {
   for (final task in eligible.values) {
     if (task.earliestStart case final after?) consider(after);
     if (task.dueAt case final deadline?) consider(deadline);
+  }
+  final prerequisites = {
+    for (final task in eligible.values) ...task.prerequisiteIds,
+  };
+  if (prerequisites.isNotEmpty) {
+    for (final task in input.tasks) {
+      if (task.completedAt case final completed?
+          when prerequisites.contains(task.id)) {
+        consider(completed);
+      }
+    }
   }
   final horizon = TimeSpan(now, end);
   for (final window in settings.availabilityFor(
@@ -58,7 +73,7 @@ _TodayFitResult _projectTodayFit(_TodayFitInput input) {
     calendarComplete: true,
   );
   if (!available.byCategory.values.any((gap) => gap > Duration.zero)) {
-    return (id: null, checkAt: checkAt);
+    return (id: null, at: now, checkAt: checkAt);
   }
   final review = reviewTaskObjectives(
     tasks: input.tasks,
@@ -66,6 +81,7 @@ _TodayFitResult _projectTodayFit(_TodayFitInput input) {
     now: now,
     horizonEnd: end,
     focusCategories: scopes,
+    candidateIds: eligible.keys.toSet(),
     verifiedAvailability: available,
   );
   for (final objective in review.ready) {
@@ -87,9 +103,9 @@ _TodayFitResult _projectTodayFit(_TodayFitInput input) {
     }
     if (!latest.isAfter(now)) continue;
     consider(latest);
-    return (id: task.id, checkAt: checkAt);
+    return (id: task.id, at: now, checkAt: checkAt);
   }
-  return (id: null, checkAt: checkAt);
+  return (id: null, at: now, checkAt: checkAt);
 }
 
 extension _WorkspaceTodayFit on _WorkspaceState {
@@ -103,14 +119,17 @@ extension _WorkspaceTodayFit on _WorkspaceState {
     _today,
   );
 
-  String? get _todayFitsNowTaskId {
+  _TodayFitResult? _currentTodayFit(DateTime now) {
     final fit = _todayFit;
     return fit != null &&
             _todayFitSource == _todayFitRevision &&
-            DateTime.now().isBefore(fit.checkAt)
-        ? fit.id
+            !now.isBefore(fit.at) &&
+            now.isBefore(fit.checkAt)
+        ? fit
         : null;
   }
+
+  String? get _todayFitsNowTaskId => _currentTodayFit(DateTime.now())?.id;
 
   bool get _maySuggestTodayFit =>
       mounted &&
@@ -130,10 +149,17 @@ extension _WorkspaceTodayFit on _WorkspaceState {
       (!_allows(EasyFeature.workouts) || _gymSessions != null) &&
       _gymSessions?.lastOrNull?.finished != false;
 
-  void _queueTodayFit([Duration delay = const Duration(milliseconds: 40)]) {
+  void _queueTodayFit([Duration? delay]) {
     _todayFitTimer?.cancel();
     if (!_maySuggestTodayFit) return;
-    _todayFitTimer = Timer(delay, () => unawaited(_updateTodayFit()));
+    final now = DateTime.now();
+    final cached = _currentTodayFit(now);
+    _todayFitTimer = Timer(
+      delay ??
+          cached?.checkAt.difference(now) ??
+          const Duration(milliseconds: 40),
+      () => unawaited(_updateTodayFit()),
+    );
   }
 
   Future<void> _updateTodayFit() async {
@@ -151,14 +177,36 @@ extension _WorkspaceTodayFit on _WorkspaceState {
           _activityData().active != null) {
         return;
       }
+      final now = DateTime.now();
+      final day = dateOnly(now);
+      final end = plusDays(day, 1);
+      final excludedTasks = <String>{};
+      DateTime? manualUntil;
+      for (final row in _taskFeed.workspaceOccurrences(_data.tasks, day)) {
+        if (row.manualSchedule != null || row.constraintIssue != null) {
+          excludedTasks.add(row.id);
+        }
+      }
+      for (final series in _taskFeed.series) {
+        for (final schedule in series.pendingManualSchedules) {
+          if (schedule.start.isBefore(end) &&
+              schedule.end.isAfter(now) &&
+              (manualUntil == null || schedule.end.isAfter(manualUntil))) {
+            manualUntil = schedule.end.isBefore(end) ? schedule.end : end;
+          }
+        }
+      }
       final input = (
         tasks: _workspaceTasks,
         events: _data.events,
         settings: settings,
         categories: _expandCategoryScope(_focus),
-        now: DateTime.now(),
+        excludedTasks: excludedTasks,
+        now: now,
       );
-      final next = input.tasks.length + input.events.length > 2000
+      final next = manualUntil != null
+          ? (id: null, at: now, checkAt: manualUntil)
+          : input.tasks.length + input.events.length > 2000
           ? await compute(_projectTodayFit, input)
           : _projectTodayFit(input);
       if (!_maySuggestTodayFit || source != _todayFitRevision) return;
