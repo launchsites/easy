@@ -232,3 +232,26 @@ TZ=Europe/London dart run tool/benchmark/provider_capture_bench.dart \
   http://127.0.0.1:17860/v1 local-model-alias \
   tool/benchmark/provider_metadata_cases.json /tmp/easy-v2-metadata.json
 ```
+
+## Local task-duration estimates
+
+The duration provider at `4c329d2b80dfae8012646be2607bb32b7b979e05` estimated 12 synthetic tasks twice. Each pair reused its title and request identity. One request included the bounded sample durations and aggregate evidence computed by the production task-context index from completed tasks and linked timers. The other used the title alone. Two tasks had no prior records. Each fixture declares a held-out duration and tolerance. The order alternated between cases. These scores describe artificial fixtures and all model outputs still require review. [Task-duration cases](../tool/benchmark/provider_estimate_cases.json)
+
+| Local model profile | Provider-accepted, title only / with history | Within tolerance, title only / with history | Client median, title only / with history | Peak server RSS |
+| --- | ---: | ---: | ---: | ---: |
+| Qwen2.5 0.5B, one CPU and 1.5 GiB address space | 0/12 · 8/12 | 0/12 · 1/12 | 1.96 s · 3.17 s | 594 MiB |
+| Qwen2.5 1.5B, one CPU and 2.5 GiB address space | 11/12 · 12/12 | 4/12 · 8/12 | 8.26 s · 13.19 s | 1,800 MiB |
+
+Qwen2.5 0.5B returned the maximum 1,440 minutes on six tasks with history. The 1.5B model kept eight estimates within tolerance with history, including the repeated run, invoices, piano practice and one short household task. Its old cooking evidence changed a 45-minute estimate to 27 minutes against a 46-minute holdout. Broad category history led to 110 minutes for a six-minute client update and 24 minutes for a 95-minute planning task. The history median alone met tolerance on seven of the 10 tasks with prior records. [0.5B raw estimates](benchmark-results/provider-estimate-qwen05-epyc-20261124.json) · [1.5B raw estimates](benchmark-results/provider-estimate-qwen15-epyc-20261124.json)
+
+The launcher pins inference to the requested CPUs, disables GPU use and prompt caching, verifies the weights digest and starts the real provider client over literal loopback. The runs used a 160-token response ceiling, 2,048-token context and 30-second deadline. No paid requests ran. For the pinned regression, copy the Dart benchmark into an archive of `4c329d2` before compiling. [Dart benchmark](../tool/benchmark/provider_estimate_bench.dart)
+
+```sh
+dart compile exe tool/benchmark/provider_estimate_bench.dart -o /tmp/easy-estimate-bench
+python3 tool/benchmark/provider_estimate_local.py \
+  --server "$easy_bench_dir/llama-b12657/llama-server" \
+  --model "$easy_bench_dir/qwen2.5-1.5b-instruct-q4_k_m.gguf" \
+  --model-sha256 6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e \
+  --client /tmp/easy-estimate-bench --source-revision 4c329d2b80dfae8012646be2607bb32b7b979e05 \
+  --cpu 0 --address-space-mib 2560 --output /tmp/easy-provider-estimate.json
+```
