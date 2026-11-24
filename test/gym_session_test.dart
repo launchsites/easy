@@ -1,5 +1,10 @@
+import 'dart:convert';
+
+import 'package:easy/gym_mode_ui.dart';
 import 'package:easy/gym_session.dart';
+import 'package:easy/ui_theme.dart';
 import 'package:easy/workout_plan.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -119,6 +124,7 @@ void main() {
       expect(snapshot.upcomingExercises, ['Bench press']);
       expect(snapshot.exercises.first.distanceKm, .6);
       expect(plan.exercises.first.distanceKm, .5);
+      expect(find.text('Planned · 0.5 km'), findsOneWidget);
 
       await _tapTooltip(tester, 'Edit reps for Bench press, set 1');
       await _typeAndLog(tester, '6');
@@ -156,12 +162,126 @@ void main() {
       final restored = GymSession.decode(snapshot.encode());
       expect(restored.finished, true);
       expect(restored.exercises.last.sets.first.reps, 6);
+      expect(restored.plannedExercise('cardio')?.distanceKm, .5);
+      expect(restored.plannedExercise('bench')?.sets.first.reps, 8);
       expect(restored.progressFor('cardio'), GymProgress.done);
       expect(restored.progressFor('bench', setId: 'first'), GymProgress.done);
       expect(
         restored.progressFor('bench', setId: 'second'),
         GymProgress.skipped,
       );
+    },
+  );
+
+  test('original plan is explicit and old sessions keep it unknown', () {
+    final planned = GymSession.start(plan: _plan());
+    final source = jsonDecode(planned.encode()) as Map<String, dynamic>;
+    expect(source['plannedExercises'], isA<List<dynamic>>());
+    expect(planned.plannedExercises, hasLength(2));
+    expect(() => planned.plannedExercises!.clear(), throwsUnsupportedError);
+    source.remove('plannedExercises');
+    final older = GymSession.decode(jsonEncode(source));
+    expect(older.planned, isTrue);
+    expect(older.plannedExercise('bench'), isNull);
+    expect(older.exercises.last.name, 'Bench press');
+    expect(GymSession.start().plannedExercises, isNull);
+  });
+
+  testWidgets('large text steps edit without opening a keyboard in RTL', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final plan = _plan();
+    var snapshot = GymSession.start(plan: plan);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: easyTheme(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(2)),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: child!,
+          ),
+        ),
+        home: MobileModeFrame(
+          mode: 'gym',
+          child: GymSessionPage(
+            session: snapshot,
+            onChanged: (updated) => snapshot = updated!,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final edit = find.byTooltip('Edit reps for Bench press, set 1');
+    await tester.drag(find.byType(ListView), const Offset(0, -260));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(edit);
+    await tester.tap(edit);
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.isVisible, isFalse);
+    final decrease = find.byTooltip('Decrease reps');
+    expect(tester.getSize(decrease).width, greaterThanOrEqualTo(44));
+    await tester.tap(decrease);
+    await tester.tap(decrease);
+    await tester.tap(find.byTooltip('Save value'));
+    await tester.pumpAndSettle();
+    expect(snapshot.exercises.last.sets.first.reps, 6);
+
+    await _tapTooltip(tester, 'Mark Bench press set 1 done');
+    await _tapTooltip(tester, 'Set 1 options for Bench press');
+    await tester.tap(find.text('Move set down'));
+    await tester.pumpAndSettle();
+    expect(snapshot.exercises.last.sets.map((set) => set.id), [
+      'second',
+      'first',
+    ]);
+    expect(snapshot.progressFor('bench', setId: 'first'), GymProgress.done);
+    expect(snapshot.plannedExercise('bench')?.sets.map((set) => set.id), [
+      'first',
+      'second',
+    ]);
+    expect(tester.takeException(), isNull);
+
+    tester.view.physicalSize = const Size(568, 320);
+    await tester.pumpAndSettle();
+    await _tapTooltip(tester, 'Edit weight for Bench press, set 1');
+    expect(find.byTooltip('Save value').hitTestable(), findsOneWidget);
+    await _tapTooltip(tester, 'Cancel edit');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Escape closes a desktop metric editor and restores the note draft',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(920, 720);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      var snapshot = GymSession.start(plan: _plan());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GymSessionPage(
+            session: snapshot,
+            onChanged: (updated) => snapshot = updated!,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Light warm-up');
+      await _tapTooltip(tester, 'Edit distance for Treadmill');
+      await tester.enterText(find.byType(TextField), '0.7');
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.text('Light warm-up'), findsOneWidget);
+      expect(find.byTooltip('Save value'), findsNothing);
+      expect(snapshot.exercises.first.distanceKm, .5);
+      await _tapTooltip(tester, 'Log entry');
+      expect(snapshot.entries.single.title, 'Light warm-up');
     },
   );
 
@@ -318,7 +438,8 @@ WorkoutPlan _plan() => WorkoutPlan(
 Future<void> _tapTooltip(WidgetTester tester, String message) async {
   final button = find.byTooltip(message);
   await tester.ensureVisible(button);
-  await tester.tap(button);
+  await tester.pump();
+  await tester.tap(button.hitTestable());
   await tester.pumpAndSettle();
 }
 
