@@ -61,6 +61,10 @@ List<IcsOccurrence> expandIcsCalendar(
     );
   }
   if (limit < 1 || limit > 100000) throw ArgumentError.value(limit, 'limit');
+  final scale = calendar.calendarScale;
+  if (scale != null && scale.toUpperCase() != 'GREGORIAN') {
+    throw IcsExpansionException('Unsupported calendar scale $scale.');
+  }
   final expansion = _Expansion(
     firstInstant,
     lastInstant,
@@ -70,6 +74,12 @@ List<IcsOccurrence> expandIcsCalendar(
   final groups = <String, List<({int index, IcsEvent event})>>{};
   for (final (index, event) in calendar.events.indexed) {
     expansion.step(event.uid);
+    if (event.hasLegacyExclusionRule && !_cancelled(event)) {
+      throw IcsExpansionException(
+        'EXRULE expansion is unsupported.',
+        uid: event.uid,
+      );
+    }
     groups.putIfAbsent(event.uid, () => []).add((index: index, event: event));
   }
   for (final events in groups.values) {

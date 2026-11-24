@@ -418,6 +418,34 @@ void main() {
     );
   });
 
+  test('legacy exclusion rules and other calendar scales are preserved but refuse expansion', () {
+    for (final feature in ['CALSCALE:HEBREW', 'EXRULE:FREQ=DAILY']) {
+      final input = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        if (feature.startsWith('CALSCALE')) feature,
+        'BEGIN:VEVENT',
+        'UID:unsupported',
+        'DTSTART:20261124T090000Z',
+        'RRULE:FREQ=DAILY;COUNT=3',
+        if (feature.startsWith('EXRULE')) feature,
+        'END:VEVENT',
+        'END:VCALENDAR',
+        '',
+      ].join('\r\n');
+      final calendar = IcsCalendar.parse(input);
+      expect(calendar.encode(), contains(feature));
+      expect(
+        () => _expand(
+          calendar,
+          DateTime.utc(2026, 11, 24),
+          DateTime.utc(2026, 12),
+        ),
+        throwsA(isA<IcsExpansionException>()),
+      );
+    }
+  });
+
   test('far-future uncounted queries seek and historical counted rules honor a budget', () {
     final start = _utc(1, 1, 1);
     final steady = _calendar([

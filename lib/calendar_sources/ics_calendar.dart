@@ -162,6 +162,9 @@ class IcsEvent {
   List<IcsRecurrencePeriod> get recurrencePeriods => List.unmodifiable(
     _extra.where((property) => property.name == 'RDATE').expand(_readPeriods),
   );
+
+  bool get hasLegacyExclusionRule =>
+      _extra.any((property) => property.name == 'EXRULE');
 }
 
 class IcsCalendar {
@@ -220,6 +223,21 @@ class IcsCalendar {
   final List<IcsEvent> events;
   final List<_ContentLine> _extra;
   final List<_Component> _components;
+
+  String? get calendarScale => _extra
+      .where((property) => property.name == 'CALSCALE')
+      .firstOrNull
+      ?.value;
+
+  String? get method =>
+      _extra.where((property) => property.name == 'METHOD').firstOrNull?.value;
+
+  IcsCalendar withEvents(Iterable<IcsEvent> events) => IcsCalendar._(
+    name: name,
+    events: events,
+    extra: _extra,
+    components: _components,
+  );
 
   /// The fallback stamp is only used for events without an explicit DTSTAMP.
   String encode({DateTime? timestamp}) {
