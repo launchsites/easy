@@ -1178,6 +1178,88 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'Local ranges stay saved across routes and reset on Local edits',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(800, 1500);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPhysicalSize);
+      final runtime = _Store().runtime();
+      addTearDown(runtime.dispose);
+      expect(
+        await runtime.saveSettings(
+          const AiRuntimeSettings(
+            route: AiRoute.local,
+            localModel: 'capable-model',
+            localEstimateRanges: true,
+            allowEstimates: true,
+          ),
+        ),
+        AiSettingsSaveStatus.saved,
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: AiSettingsPage(runtime: runtime)),
+      );
+      await tester.pumpAndSettle();
+
+      final ranges = find.widgetWithText(
+        SwitchListTile,
+        'Suggest duration ranges',
+      );
+      bool selected() => tester.widget<SwitchListTile>(ranges).value;
+      expect(selected(), isTrue);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Model'),
+        'another-capable-model',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(selected(), isFalse);
+      await tester.tap(ranges);
+      await tester.pumpAndSettle();
+      expect(selected(), isTrue);
+
+      final save = find.widgetWithText(FilledButton, 'Save settings');
+      Future<void> saveForm() async {
+        await tester.ensureVisible(save);
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pumpAndSettle();
+      }
+
+      await saveForm();
+      expect(runtime.settings.localModel, 'another-capable-model');
+      expect(runtime.settings.localEstimateRanges, isTrue);
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Offline'));
+      await tester.pumpAndSettle();
+      expect(ranges, findsNothing);
+      await saveForm();
+      expect(runtime.settings.route, AiRoute.offline);
+      expect(runtime.settings.localEstimateRanges, isTrue);
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Local'));
+      await tester.pumpAndSettle();
+      expect(selected(), isTrue);
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Base URL'),
+        'http://127.0.0.1:11435/v1',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(selected(), isFalse);
+      await tester.tap(ranges);
+      await tester.pumpAndSettle();
+      await saveForm();
+      expect(runtime.settings.localBaseUrl, 'http://127.0.0.1:11435/v1');
+      expect(runtime.settings.localEstimateRanges, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('paid allowance can be lowered and reloaded in 320px RTL', (
     tester,
   ) async {

@@ -3,12 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('older local settings keep plain replies and point estimates', () {
-    final values = const AiRuntimeSettings(
-      route: AiRoute.local,
-      localModel: 'fixture-local',
-    ).toJson()
-      ..remove('localCaptureJsonSchema')
-      ..remove('localEstimateRanges');
+    final values =
+        const AiRuntimeSettings(
+            route: AiRoute.local,
+            localModel: 'fixture-local',
+          ).toJson()
+          ..remove('localCaptureJsonSchema')
+          ..remove('localEstimateRanges');
     final restored = AiRuntimeSettings.fromJson(values);
     expect(restored.valid, isTrue);
     expect(restored.localCaptureJsonSchema, isFalse);
