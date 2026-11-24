@@ -6,6 +6,8 @@ import '../ui_theme.dart';
 import 'nutrition_model.dart';
 import 'reference_food_catalog.dart';
 
+part 'nutrition_recipes_page.dart';
+
 typedef ReviewMealPhoto = Future<List<NutritionPortion>?> Function(
   BuildContext context,
   NutritionMeal meal,
@@ -37,6 +39,7 @@ class NutritionPage extends StatefulWidget {
     required this.foods,
     required this.meals,
     required this.onChanged,
+    this.recipes = const [],
     this.day,
     this.clock,
     this.onAttachPhoto,
@@ -48,6 +51,7 @@ class NutritionPage extends StatefulWidget {
 
   final List<NutritionFood> foods;
   final List<NutritionMeal> meals;
+  final List<NutritionRecipe> recipes;
   final ValueChanged<NutritionData> onChanged;
   final DateTime? day;
   final DateTime Function()? clock;
@@ -73,16 +77,24 @@ class _NutritionPageState extends State<NutritionPage> {
   void initState() {
     super.initState();
     _day = DateUtils.dateOnly((widget.day ?? _now).toLocal());
-    _data = NutritionData(foods: widget.foods, meals: widget.meals);
+    _data = _widgetData();
   }
 
   @override
   void didUpdateWidget(covariant NutritionPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.foods != oldWidget.foods || widget.meals != oldWidget.meals) {
-      _data = NutritionData(foods: widget.foods, meals: widget.meals);
+    if (widget.foods != oldWidget.foods ||
+        widget.meals != oldWidget.meals ||
+        widget.recipes != oldWidget.recipes) {
+      _data = _widgetData();
     }
   }
+
+  NutritionData _widgetData() => NutritionData(
+    foods: widget.foods,
+    meals: widget.meals,
+    recipes: widget.recipes,
+  );
 
   void _publish(NutritionData data) {
     setState(() => _data = data);
@@ -90,15 +102,57 @@ class _NutritionPageState extends State<NutritionPage> {
   }
 
   void _saveFoods(List<NutritionFood> foods) =>
-      _publish(NutritionData(foods: foods, meals: _data.meals));
+      _publish(_data.copyWith(foods: foods));
+
+  void _saveFood(NutritionFood food) => _saveFoods(
+    _updated(_data.foods, (record: food, removed: false), (item) => item.id),
+  );
 
   void _applyMeal(_RecordEdit<NutritionMeal> edit) {
     _publish(
-      NutritionData(
+      _data.copyWith(meals: _updated(_data.meals, edit, (meal) => meal.id)),
+    );
+  }
+
+  void _applyRecipe(_RecordEdit<NutritionRecipe> edit) => _publish(
+    _data.copyWith(
+      recipes: _updated(_data.recipes, edit, (recipe) => recipe.id),
+    ),
+  );
+
+  Future<void> _saveAsRecipe(
+    String name,
+    List<NutritionPortion> ingredients,
+  ) async {
+    final edit = await _push<_RecordEdit<NutritionRecipe>>(
+      context,
+      _RecipeEditor(
         foods: _data.foods,
-        meals: _updated(_data.meals, edit, (meal) => meal.id),
+        onFoodSaved: _saveFood,
+        initialName: name,
+        initialIngredients: ingredients,
       ),
     );
+    if (mounted && edit != null) _applyRecipe(edit);
+  }
+
+  Future<void> _openRecipes() async {
+    final recipe = await _push<NutritionRecipe>(
+      context,
+      _RecipeLibrary(
+        recipes: _data.recipes,
+        foods: _data.foods,
+        onEdited: _applyRecipe,
+        onFoodSaved: _saveFood,
+      ),
+    );
+    if (!mounted || recipe == null) return;
+    final portions = await showDialog<List<NutritionPortion>>(
+      context: context,
+      builder: (_) => _RecipePortionDialog(recipe: recipe),
+    );
+    if (!mounted || portions == null) return;
+    await _editMeal(initialName: recipe.name, initialPortions: portions);
   }
 
   void _moveDay(int offset) => setState(() {
@@ -115,19 +169,21 @@ class _NutritionPageState extends State<NutritionPage> {
     return DateTime(_day.year, _day.month, _day.day, now.hour, now.minute);
   }
 
-  Future<void> _editMeal([NutritionMeal? meal]) async {
+  Future<void> _editMeal({
+    NutritionMeal? meal,
+    String? initialName,
+    List<NutritionPortion> initialPortions = const [],
+  }) async {
     final edit = await _push<_RecordEdit<NutritionMeal>>(
       context,
       _MealEditor(
         meal: meal,
+        initialName: initialName,
+        initialPortions: initialPortions,
         date: _defaultMealTime(),
         foods: _data.foods,
-        onFoodSaved: (food) => _saveFoods(
-          _updated(_data.foods, (
-            record: food,
-            removed: false,
-          ), (item) => item.id),
-        ),
+        onFoodSaved: _saveFood,
+        onSaveRecipe: _saveAsRecipe,
         onViewPhoto: widget.onViewPhoto,
         onReviewPhoto: widget.onReviewPhoto,
         onCancelPhotoReview: widget.onCancelPhotoReview,
@@ -156,7 +212,7 @@ class _NutritionPageState extends State<NutritionPage> {
         draft: true,
       );
       _applyMeal((record: draft, removed: false));
-      await _editMeal(draft);
+      await _editMeal(meal: draft);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -175,6 +231,11 @@ class _NutritionPageState extends State<NutritionPage> {
     return _NutritionScreen(
       title: 'Nutrition',
       appBarActions: [
+        IconButton(
+          tooltip: 'Saved recipes',
+          onPressed: _openRecipes,
+          icon: const Icon(Icons.bookmarks_outlined),
+        ),
         TextButton(
           onPressed: () => _push<void>(
             context,
@@ -252,7 +313,7 @@ class _NutritionPageState extends State<NutritionPage> {
               _mealSubtitle(context, meal),
               style: contentMetadataStyle,
             ),
-            onTap: () => _editMeal(meal),
+            onTap: () => _editMeal(meal: meal),
           ),
           const Divider(),
         ],
@@ -508,18 +569,24 @@ class _FoodEditorState extends State<_FoodEditor> {
 class _MealEditor extends StatefulWidget {
   const _MealEditor({
     required this.meal,
+    required this.initialName,
+    required this.initialPortions,
     required this.date,
     required this.foods,
     required this.onFoodSaved,
+    required this.onSaveRecipe,
     required this.onViewPhoto,
     required this.onReviewPhoto,
     required this.onCancelPhotoReview,
   });
 
   final NutritionMeal? meal;
+  final String? initialName;
+  final List<NutritionPortion> initialPortions;
   final DateTime date;
   final List<NutritionFood> foods;
   final ValueChanged<NutritionFood> onFoodSaved;
+  final Future<void> Function(String, List<NutritionPortion>) onSaveRecipe;
   final Future<void> Function(AttachmentRef)? onViewPhoto;
   final ReviewMealPhoto? onReviewPhoto;
   final VoidCallback? onCancelPhotoReview;
@@ -529,8 +596,10 @@ class _MealEditor extends StatefulWidget {
 }
 
 class _MealEditorState extends State<_MealEditor> {
-  late final _name = TextEditingController(text: widget.meal?.name);
-  late final _portions = [...?widget.meal?.portions];
+  late final _name = TextEditingController(
+    text: widget.meal?.name ?? widget.initialName,
+  );
+  late final _portions = [...widget.meal?.portions ?? widget.initialPortions];
   late final _foods = [...widget.foods];
   late DateTime _eatenAt = widget.meal?.eatenAt.toLocal() ?? widget.date;
   String? _error;
@@ -731,23 +800,12 @@ class _MealEditorState extends State<_MealEditor> {
           ),
         const SizedBox(height: 20),
         const _Heading('Foods'),
-        for (final (index, portion) in _portions.indexed) ...[
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(portion.food.name, style: contentTitleStyle),
-            subtitle: Text(
-              '${portion.unit.format(portion.amount)}${portion.estimated || portion.minimumAmount != null ? ' · Estimated' : ''}',
-              style: contentMetadataStyle,
-            ),
-            onTap: () => _editPortion(index),
-            trailing: IconButton(
-              tooltip: 'Remove ${portion.food.name} from meal',
-              icon: const Icon(Icons.close_rounded, color: muted, size: 20),
-              onPressed: () => setState(() => _portions.removeAt(index)),
-            ),
-          ),
-          const Divider(),
-        ],
+        ..._portionRows(
+          _portions,
+          parentLabel: 'meal',
+          onEdit: _editPortion,
+          onRemove: (index) => setState(() => _portions.removeAt(index)),
+        ),
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: TextButton.icon(
@@ -756,6 +814,15 @@ class _MealEditorState extends State<_MealEditor> {
             label: const Text('Add food'),
           ),
         ),
+        if (_portions.isNotEmpty)
+          _RemoveAction(
+            label: 'Save as recipe',
+            onPressed: () => widget.onSaveRecipe(
+              _name.text.trim(),
+              List.unmodifiable(_portions),
+            ),
+            destructive: false,
+          ),
         if (widget.meal case final meal?)
           _RemoveAction(label: 'Remove meal', onPressed: () => _remove(meal)),
       ],

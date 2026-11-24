@@ -271,19 +271,7 @@ class NutritionMeal {
     if (!draft && this.portions.isEmpty) {
       throw const FormatException('Add at least one food to save this meal.');
     }
-    var maxEnergy = 0.0;
-    var maxMacros = 0.0;
-    for (final portion in this.portions) {
-      final factor = portion._scale(portion.maximumAmount ?? portion.amount);
-      final values = portion.food.values;
-      maxEnergy += (values.energyKcal ?? 0) * factor;
-      maxMacros +=
-          ((values.proteinGrams ?? 0) +
-              (values.carbsGrams ?? 0) +
-              (values.fatGrams ?? 0)) *
-          factor;
-    }
-    _checkMealTotals(maxEnergy, maxMacros);
+    _checkPortionTotals(this.portions);
   }
 
   factory NutritionMeal.fromJson(Map<String, dynamic> json) => NutritionMeal(
@@ -316,14 +304,102 @@ class NutritionMeal {
   };
 }
 
+/// A batch of ingredient snapshots and the yield explicitly entered by the user.
+class NutritionRecipe {
+  NutritionRecipe({
+    required this.id,
+    required this.name,
+    required this.servings,
+    required List<NutritionPortion> ingredients,
+    this.finishedWeightGrams,
+  }) : ingredients = List.unmodifiable(ingredients) {
+    _requiredText(id, 'Recipe ID');
+    _requiredText(name, 'Recipe name');
+    _checkAmount(servings, NutritionUnit.servings);
+    if (finishedWeightGrams case final weight?) {
+      _checkAmount(weight, NutritionUnit.grams);
+    }
+    if (ingredients.isEmpty) {
+      throw const FormatException('Add at least one ingredient.');
+    }
+    _checkPortionTotals(this.ingredients);
+  }
+
+  factory NutritionRecipe.fromJson(Map<String, dynamic> json) =>
+      NutritionRecipe(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        servings: _number(json['servings'])!,
+        finishedWeightGrams: _number(json['finishedWeightGrams']),
+        ingredients: _objects(json['ingredients'])
+            .map(NutritionPortion.fromJson)
+            .toList(),
+      );
+
+  final String id;
+  final String name;
+  final double servings;
+  final double? finishedWeightGrams;
+  final List<NutritionPortion> ingredients;
+
+  List<NutritionPortion> portionsForServings(double amount) {
+    _checkAmount(amount, NutritionUnit.servings);
+    return _portionShare(amount / servings);
+  }
+
+  List<NutritionPortion> portionsForWeight(double grams) {
+    final finishedWeight = finishedWeightGrams;
+    if (finishedWeight == null) {
+      throw const FormatException(
+        'Enter the finished batch weight in the recipe.',
+      );
+    }
+    _checkAmount(grams, NutritionUnit.grams);
+    return _portionShare(grams / finishedWeight);
+  }
+
+  List<NutritionPortion> _portionShare(double scale) {
+    if (scale == 1) return ingredients;
+    final portions = [
+      for (final portion in ingredients)
+        NutritionPortion(
+          food: portion.food,
+          amount: portion.amount * scale,
+          unit: portion.unit,
+          minimumAmount: portion.minimumAmount == null
+              ? null
+              : portion.minimumAmount! * scale,
+          maximumAmount: portion.maximumAmount == null
+              ? null
+              : portion.maximumAmount! * scale,
+          estimated: true,
+          estimateSource: 'Proportional share of saved recipe',
+        ),
+    ];
+    _checkPortionTotals(portions);
+    return List.unmodifiable(portions);
+  }
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'servings': servings,
+    'finishedWeightGrams': ?finishedWeightGrams,
+    'ingredients': [for (final portion in ingredients) portion.toJson()],
+  };
+}
+
 class NutritionData {
   NutritionData({
     List<NutritionFood> foods = const [],
     List<NutritionMeal> meals = const [],
+    List<NutritionRecipe> recipes = const [],
   }) : foods = List.unmodifiable(foods),
-       meals = List.unmodifiable(meals) {
+       meals = List.unmodifiable(meals),
+       recipes = List.unmodifiable(recipes) {
     if ({for (final food in foods) food.id}.length != foods.length ||
-        {for (final meal in meals) meal.id}.length != meals.length) {
+        {for (final meal in meals) meal.id}.length != meals.length ||
+        {for (final recipe in recipes) recipe.id}.length != recipes.length) {
       throw const FormatException('Duplicate nutrition record.');
     }
   }
@@ -338,11 +414,25 @@ class NutritionData {
     return NutritionData(
       foods: _objects(json['foods']).map(NutritionFood.fromJson).toList(),
       meals: _objects(json['meals']).map(NutritionMeal.fromJson).toList(),
+      recipes: _objects(json['recipes'] ?? const [])
+          .map(NutritionRecipe.fromJson)
+          .toList(),
     );
   }
 
   final List<NutritionFood> foods;
   final List<NutritionMeal> meals;
+  final List<NutritionRecipe> recipes;
+
+  NutritionData copyWith({
+    List<NutritionFood>? foods,
+    List<NutritionMeal>? meals,
+    List<NutritionRecipe>? recipes,
+  }) => NutritionData(
+    foods: foods ?? this.foods,
+    meals: meals ?? this.meals,
+    recipes: recipes ?? this.recipes,
+  );
 
   String encode() => jsonEncode(toJson());
 
@@ -350,6 +440,8 @@ class NutritionData {
     'version': 1,
     'foods': [for (final food in foods) food.toJson()],
     'meals': [for (final meal in meals) meal.toJson()],
+    if (recipes.isNotEmpty)
+      'recipes': [for (final recipe in recipes) recipe.toJson()],
   };
 
   List<NutritionMeal> mealsFor(DateTime day) => [
@@ -456,6 +548,22 @@ void _checkMealTotals(double energy, double macros) {
       macros > 20000) {
     throw const FormatException('Check the portion size and nutrition values.');
   }
+}
+
+void _checkPortionTotals(Iterable<NutritionPortion> portions) {
+  var maxEnergy = 0.0;
+  var maxMacros = 0.0;
+  for (final portion in portions) {
+    final factor = portion._scale(portion.maximumAmount ?? portion.amount);
+    final values = portion.food.values;
+    maxEnergy += (values.energyKcal ?? 0) * factor;
+    maxMacros +=
+        ((values.proteinGrams ?? 0) +
+            (values.carbsGrams ?? 0) +
+            (values.fatGrams ?? 0)) *
+        factor;
+  }
+  _checkMealTotals(maxEnergy, maxMacros);
 }
 
 double? _number(Object? value) =>

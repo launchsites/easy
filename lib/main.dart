@@ -1604,6 +1604,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         builder: (context) => NutritionPage(
           foods: nutrition.foods,
           meals: nutrition.meals,
+          recipes: nutrition.recipes,
           onChanged: (values) =>
               _update(_data.withSection(_nutritionKey, values.toJson())),
           onAttachPhoto: kIsWeb || !_allows(EasyFeature.captureMedia)
@@ -3426,8 +3427,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           if (current.meals.any((meal) => meal.id == id)) {
             return 'This meal draft was already added.';
           }
-          nutrition = NutritionData(
-            foods: current.foods,
+          nutrition = current.copyWith(
             meals: [
               ...current.meals,
               NutritionMeal(
