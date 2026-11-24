@@ -1,7 +1,10 @@
 enum EasyFeature {
   planning('Day planning', 'Preview tasks in free calendar time.'),
   workouts('Workouts', 'Plan and log gym sessions.'),
+  health('Health notes', 'Keep optional measurements and workout notes.'),
   nutrition('Nutrition', 'Keep a local food and meal log.'),
+  reviews('Daily review', 'Reflect on the day and track repeatable habits.'),
+  insights('Activity insights', 'Review recorded time and task outcomes.'),
   activity(
     'Activity and routines',
     'Track time and run repeatable checklists.',
@@ -21,12 +24,20 @@ enum EasyFeature {
 
 enum EasyPreset {
   minimal('Minimal', {}),
-  planner('Planner', {EasyFeature.planning, EasyFeature.activity}),
+  planner('Planner', {
+    EasyFeature.planning,
+    EasyFeature.activity,
+    EasyFeature.reviews,
+    EasyFeature.insights,
+  }),
   complete('Full', {
     EasyFeature.planning,
     EasyFeature.workouts,
+    EasyFeature.health,
     EasyFeature.nutrition,
     EasyFeature.activity,
+    EasyFeature.reviews,
+    EasyFeature.insights,
     EasyFeature.externalCalendars,
     EasyFeature.captureMedia,
     EasyFeature.ai,

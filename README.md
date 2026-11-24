@@ -1,35 +1,56 @@
 # Easy
 
-Easy is a local workspace for your calendar, tasks, and notes. It opens with sample entries so you can try the views and interactions right away. New entries and edits are saved on the device.
+Easy brings your calendar, tasks, notes, and activity into one device-first workspace. It opens with example entries you can edit while you try the views.
 
-- **Today** opens on the date, upcoming events, and tasks due today. On a phone it also includes a note to self. Pick a mode to focus the page. Gym brings the next workout and its note to the top.
-- **Calendar** puts the schedule below a single tappable date. On a phone, swipe sideways to jump a day or scroll through days vertically. Wide windows show the week together.
-- **Tasks** groups open and completed work by date. **Notes** is a searchable list with a title, preview, and date on each row.
-- **Mobile navigation** opens from the bottom-left button. Hold, drag toward a destination, and release to switch views. Return to the center before releasing to cancel. You can also tap to open the menu, then tap a destination. The bottom-right plus opens a single capture field.
-- **Quick capture** takes an event like `Studio review tomorrow 14:00-14:45` in one line. When a time is missing, the same field asks for it. Tasks default to today and accept a typed due date. Notes accept plain text.
-- **Gym** shows the next workout in a red-framed mode. Plan a workout once, on selected weekdays, or every few days. In a session, tap a treadmill metric or a set’s weight or reps to edit it, then mark it done or skipped. You can add and remove exercises or sets, and start freestyle.
+- **Today** shows a note to self, upcoming events, and tasks due today. A focus mode can bring forward a workout, meal log, or a different group of tasks.
+- **Calendar** puts the schedule below a tappable date. On a phone, swipe sideways for the next day or scroll vertically through days. Wide windows show a week.
+- **Tasks and notes** use lightweight lists and a contextual detail pane on wider screens. Tasks support nesting, effort and prerequisite fields. Notes support folders, tags, pins, Markdown preview and links to workspace records.
+- **Navigation** starts at the bottom-left button on a phone. Hold, drag toward a destination and release, or tap and choose a destination. The plus opens a single capture field. Hold it to record. Slide up to lock recording or left to cancel.
+- **Capture** stays available in every focus mode. A voice recording is saved as a draft. Review its transcript, category and proposed items before applying them.
+- **Gym** keeps the next exercise and its settings in reach. Plan a workout once, on weekdays or on an interval. Edit individual metrics and sets, skip an exercise, and review previous sessions.
+- **Settings** controls optional features, calendar visibility, focus modes, backups, and AI. Disabling a feature keeps its records in the workspace.
 
 ## Run
 
-Use Flutter 3.50.1 or a compatible newer version. Install the platform prerequisites for your target, then run:
+Use Flutter 3.50.1 with the checked-in dependency lockfile.
 
 ```sh
-flutter pub get
+flutter pub get --enforce-lockfile
 flutter run -d linux
 ```
 
-Use `flutter devices` to list your available targets. For automated checks, run `flutter analyze` and `flutter test`.
+On Debian-based Linux, the build uses Clang, CMake, Ninja, GTK 3, GStreamer and libsecret development packages. Audio playback uses GStreamer plugins. The microphone adapter uses PulseAudio-compatible tools and FFmpeg.
+
+```sh
+sudo apt install clang cmake ninja-build pkg-config libgtk-3-dev \
+  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libsecret-1-dev \
+  gstreamer1.0-plugins-base gstreamer1.0-plugins-good pulseaudio-utils ffmpeg
+```
+
+Run the checks from the repository root.
+
+```sh
+flutter analyze
+TZ=Europe/London flutter test
+flutter build linux
+```
+
+## AI and backups
+
+The app starts with offline capture. Optional local inference uses an explicitly configured loopback provider. Paid inference uses an explicitly configured HTTPS endpoint and a GBP ledger that reserves the configured maximum before a request. You can choose which fields to include and separately opt into automatic duration suggestions. The system credential service holds API keys on native platforms.
+
+Logical backups preserve workspace records, including local calendar series and the metadata of recordings and photos. Media files are stored separately by content hash. Native version history supports previewing a full restore or selecting records to restore. Restoring a workspace retains the separate device AI spend ledger.
 
 ## Change the name
 
-The in-app name defaults to Easy. Override it when running or building:
+Override the in-app name when running or building.
 
 ```sh
 flutter run -d linux --dart-define=APP_NAME='My Workspace'
 ```
 
-The default is declared in [lib/main.dart](lib/main.dart). The operating system’s launcher label is set in the Android manifest, Apple runner settings, and Linux runner. The browser’s initial title and install label are in `web/index.html` and `web/manifest.json`. Keep the existing bundle identifiers when changing display labels on an installed app so the platform can retain its data.
+Platform launcher labels are in the Android manifest, Apple runner settings, Linux runner, and Web manifest. Keep the installed app’s bundle identifiers when changing its display name so the operating system can retain its data. [App entry point](lib/main.dart)
 
-## Current scope
+## Verification
 
-This starter stores one workspace on the device. Calendar events are maintained inside Easy. Native calendar accounts, recurrence, and multi-device sync are outside the current build.
+This repository is a development build. Linux has native release and offline journey evidence. Android has offline release AOT evidence for ARMv7, ARM64, and x86-64. Apple Calendar code has fake-channel and static Swift checks. See the release evidence for the checks that still need native devices. [Test evidence](docs/TEST_EVIDENCE.md) · [Acceptance status](docs/ACCEPTANCE.md)

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data' show BytesBuilder;
 
+import 'package:crypto/crypto.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart'
     show compute, defaultTargetPlatform, kIsWeb, listEquals;
@@ -15,17 +16,26 @@ import 'activities/activities.dart';
 import 'ai/ai_device_state.dart';
 import 'ai/ai_runtime.dart';
 import 'ai/ai_settings_page.dart';
+import 'ai/task_estimates_page.dart';
+import 'ai/vision/vision_image.dart';
 import 'calendar_page.dart';
 import 'calendar_sources/apple_calendar_feed.dart';
 import 'calendar_sources/calendar_directory.dart';
 import 'calendar_sources/calendar_settings_page.dart';
 import 'calendar_sources/event_kit_calendar_adapter.dart'
-    show EventKitCalendarAdapter, ExternalCalendarEvent;
+    show
+        EventKitCalendarAccess,
+        EventKitCalendarAdapter,
+        EventKitEventDraft,
+        ExternalCalendarEvent;
 import 'calendar_sources/ics_calendar.dart';
 import 'calendar_sources/ics_import_export.dart';
 import 'calendar_sources/ics_transfer_page.dart';
 import 'calendar_sources/ics_workspace.dart';
 import 'calendar_sources/ics_workspace_feed.dart';
+import 'calendar_sources/internal_recurrence.dart';
+import 'calendar_sources/internal_recurrence_editor.dart';
+import 'calendar_sources/internal_workspace_feed.dart';
 import 'capture/capture_archive.dart';
 import 'capture/capture_interpreter.dart';
 import 'capture/capture_review_sheet.dart';
@@ -39,15 +49,19 @@ import 'focus/focus_modes_page.dart';
 import 'gym_history_page.dart';
 import 'gym_mode_ui.dart';
 import 'gym_session.dart';
+import 'health/health.dart';
+import 'insights/insights.dart';
 import 'list_pages.dart';
 import 'mobile_home.dart';
 import 'notes/note_preview.dart';
+import 'nutrition/meal_vision_review.dart';
 import 'nutrition/nutrition.dart';
 import 'orbit_navigation.dart';
 import 'preferences/feature_preferences.dart';
 import 'preferences/feature_preferences_page.dart';
 import 'quick_capture.dart';
 import 'record_editor.dart';
+import 'review/review.dart';
 import 'scheduling/plan_day_sheet.dart';
 import 'scheduling/planner.dart';
 import 'settings_page.dart';
@@ -69,9 +83,14 @@ typedef WorkspaceStoreOpener = Future<WorkspaceStore> Function({
 });
 
 class EasyApp extends StatelessWidget {
-  const EasyApp({super.key, this.openStore = openWorkspaceStore});
+  const EasyApp({
+    super.key,
+    this.openStore = openWorkspaceStore,
+    this.calendarAdapter = const EventKitCalendarAdapter(),
+  });
 
   final WorkspaceStoreOpener openStore;
+  final EventKitCalendarAdapter calendarAdapter;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +98,7 @@ class EasyApp extends StatelessWidget {
       title: appName,
       debugShowCheckedModeBanner: false,
       theme: easyTheme(),
-      home: _Workspace(openStore: openStore),
+      home: _Workspace(openStore: openStore, calendarAdapter: calendarAdapter),
     );
   }
 }
@@ -106,7 +125,11 @@ const _activitiesKey = 'activities';
 const _voiceSettingsKey = 'easy.voice-transcription.v1';
 const _localCalendarAccount = 'easy-local';
 const _icsCalendarsKey = 'importedCalendars';
+const _appleCopiesKey = 'appleCalendarCopies';
 const _featuresKey = 'features';
+const _reviewsKey = 'reviews';
+const _healthKey = 'health';
+const _recurringEventsKey = 'recurringEvents';
 
 CalendarIdentity _localCalendar(String category) => CalendarIdentity(
   accountId: _localCalendarAccount,
@@ -118,9 +141,10 @@ bool _isAppleCalendar(CalendarIdentity id) =>
     id.accountId != workspaceIcsAccountId;
 
 class _Workspace extends StatefulWidget {
-  const _Workspace({required this.openStore});
+  const _Workspace({required this.openStore, required this.calendarAdapter});
 
   final WorkspaceStoreOpener openStore;
+  final EventKitCalendarAdapter calendarAdapter;
 
   @override
   State<_Workspace> createState() => _WorkspaceState();
@@ -134,6 +158,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   var _reviewSaving = false;
   var _planningDay = false;
   var _recordingVoice = false;
+  var _openingGym = false;
+  var _mealReviewGeneration = 0;
+  var _reviewingMealPhoto = false;
   Future<void> _pendingSave = Future.value();
   late WorkspaceData _data;
   int _contentRevision = 0;
@@ -150,13 +177,22 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   final _features = ValueNotifier(FeaturePreferences());
   List<FocusMode> _modes = standardFocusModes();
   CalendarSourcePreferences? _calendarPreferences;
-  final _appleFeed = AppleCalendarFeed();
+  late final _appleFeed = AppleCalendarFeed(adapter: widget.calendarAdapter);
+  final _unsavedAppleCopies = <String, CalendarOccurrenceIdentity>{};
+  var _copyingApple = false;
+  int _appleCopyRevision = 0;
   final _icsFeed = IcsWorkspaceFeed();
+  final _internalFeed = InternalWorkspaceFeed();
   List<WorkspaceIcsCalendar> _icsCalendars = const [];
+  List<InternalRecurringEvent> _eventSeries = const [];
+  Set<String> _eventSeriesIds = const {};
   Future<AttachmentStore?>? _attachmentStore;
   Future<AiDeviceState>? _aiState;
   Future<AiRuntime?>? _preparingAi;
   AiRuntime? _ai;
+  final _aiViewChanges = ValueNotifier(0);
+  Timer? _estimateTimer;
+  int? _lastEstimateCheck;
   final _voiceTranscriber = LocalTranscriber();
   VoiceTranscriptionConfig? _voiceConfig;
 
@@ -183,6 +219,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _appleFeed.addListener(_appleCalendarChanged);
     _icsFeed.addListener(_appleCalendarChanged);
+    _internalFeed.addListener(_appleCalendarChanged);
     unawaited(_load());
     if (LocalTranscriber.supported) unawaited(_loadVoiceSettings());
   }
@@ -192,7 +229,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _appleFeed.dispose();
     _icsFeed.dispose();
+    _internalFeed.dispose();
     _features.dispose();
+    _aiViewChanges.dispose();
+    _estimateTimer?.cancel();
     _voiceTranscriber.cancel();
     _ai?.dispose();
     final aiState = _aiState;
@@ -211,6 +251,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     _ai?.setForeground(
       state == AppLifecycleState.resumed && _allows(EasyFeature.ai),
     );
+    _syncEstimateTimer();
     if (state != AppLifecycleState.resumed) _voiceTranscriber.cancel();
     if (!_loading && state == AppLifecycleState.resumed) {
       unawaited(_refreshExternalCalendars(force: true));
@@ -255,6 +296,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _gymSessions = sessions;
       _workoutPlans = plans;
       _inspected = null;
+      _unsavedAppleCopies.clear();
+      _appleCopyRevision++;
       _loadViewSettings();
       _loading = false;
       _loadFailed = false;
@@ -348,7 +391,222 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     } on Object {
       _icsCalendars = const [];
     }
+    try {
+      _assignEventSeries(
+        readInternalSeries(_data.sections[_recurringEventsKey]),
+      );
+    } on Object {
+      _assignEventSeries(const []);
+    }
   }
+
+  void _assignEventSeries(List<InternalRecurringEvent> series) {
+    _eventSeries = List.unmodifiable(series);
+    _eventSeriesIds = {for (final value in series) value.id};
+  }
+
+  Future<void> _saveEventSeries(List<InternalRecurringEvent> series) async {
+    if (series.length > 500) {
+      throw const FormatException('Too many repeating events.');
+    }
+    final previous = _data;
+    await _commitReviewedData(
+      previous,
+      previous.withSection(_recurringEventsKey, [
+        for (final item in series) item.toJson(),
+      ]),
+    );
+    if (!mounted) return;
+    setState(() {
+      _assignEventSeries(series);
+      if (_inspected is CalendarEvent) _inspected = null;
+    });
+    _refreshCalendarViews();
+  }
+
+  InternalWorkspaceEvent? _findOccurrence(CalendarEvent event) => _internalFeed
+      .events
+      .where(
+        (row) =>
+            row.event.id == event.id &&
+            row.series.id == event.recurringSeriesId,
+      )
+      .firstOrNull;
+
+  Future<void> _setEventRepeat(CalendarEvent event) async {
+    final occurrence = _findOccurrence(event);
+    if (event.recurringSeriesId != null && occurrence == null) return;
+    final rule = await showInternalRecurrenceRuleEditor(
+      context,
+      initialRule: occurrence?.occurrence.rule,
+      startDate: event.start,
+    );
+    if (!mounted || rule == null) return;
+    try {
+      final InternalRecurringEvent series;
+      if (occurrence == null) {
+        if (!_data.events.any((item) => identical(item, event)) ||
+            _eventSeriesIds.contains(event.id)) {
+          return;
+        }
+        series = InternalRecurringEvent(
+          id: event.id,
+          event: adaptSeriesDraft(event),
+          rule: rule,
+        );
+      } else {
+        final scope = await showDialog<InternalOccurrenceScope>(
+          context: context,
+          builder: (context) => SimpleDialog(
+            title: const Text('Change repeat rule'),
+            children: [
+              SimpleDialogOption(
+                onPressed: () =>
+                    Navigator.pop(context, InternalOccurrenceScope.future),
+                child: const Text('This and following occurrences'),
+              ),
+              SimpleDialogOption(
+                onPressed: () =>
+                    Navigator.pop(context, InternalOccurrenceScope.series),
+                child: const Text('Entire series'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted ||
+            scope == null ||
+            !_eventSeries.contains(occurrence.series)) {
+          return;
+        }
+        series = occurrence.series.edit(
+          occurrence.occurrence,
+          scope: scope,
+          event: occurrence.occurrence.event,
+          rule: rule,
+        );
+      }
+      await _saveEventSeries(_upsert(_eventSeries, series, (item) => item.id));
+    } catch (_) {
+      if (mounted) _inform('The repeat rule could not be saved.');
+    }
+  }
+
+  Future<void> _editOccurrence(CalendarEvent record) async {
+    final row = _findOccurrence(record);
+    if (row == null) return;
+    final scope = await showInternalOccurrenceScopeDialog(
+      context,
+      skipping: false,
+    );
+    if (!mounted || scope == null) return;
+    final edited = await _showEditor(
+      RecordEditor(date: record.start, kind: RecordKind.event, event: record),
+    );
+    if (!mounted ||
+        edited is! CalendarEvent ||
+        !_eventSeries.contains(row.series)) {
+      return;
+    }
+    try {
+      final changed = row.series.edit(
+        row.occurrence,
+        scope: scope,
+        event: adaptSeriesDraft(edited, original: row),
+      );
+      await _saveEventSeries(_upsert(_eventSeries, changed, (item) => item.id));
+    } catch (_) {
+      if (mounted) _inform('This repeating event could not be updated.');
+    }
+  }
+
+  Future<void> _skipOccurrence(CalendarEvent record) async {
+    final row = _findOccurrence(record);
+    if (row == null) return;
+    final scope = await showInternalOccurrenceScopeDialog(
+      context,
+      skipping: true,
+    );
+    if (!mounted || scope == null || !_eventSeries.contains(row.series)) return;
+    try {
+      final changed = row.series.skip(row.occurrence, scope: scope);
+      await _saveEventSeries(_upsert(_eventSeries, changed, (item) => item.id));
+    } catch (_) {
+      if (mounted) _inform('This repeating event could not be skipped.');
+    }
+  }
+
+  void _openEventSeries() => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) => StatefulBuilder(
+        builder: (context, rebuild) => Scaffold(
+          appBar: AppBar(title: const Text('Repeating events')),
+          body: SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 650),
+                child: ListView(
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    for (final series in _eventSeries)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(series.event.title),
+                        subtitle: Text(spaceName(series.rule.frequency.name)),
+                        trailing: TextButton(
+                          onPressed: () async {
+                            await _returnToSingleEvent(series);
+                            if (context.mounted) rebuild(() {});
+                          },
+                          child: const Text('Keep one event'),
+                        ),
+                      ),
+                    if (_eventSeries.isEmpty)
+                      const Text('No repeating events.'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Future<void> _returnToSingleEvent(InternalRecurringEvent series) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Keep the original event?'),
+        content: Text(
+          'Remove the repeating schedule for ${series.event.title} and keep the original event.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Keep one event'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true || !_eventSeries.contains(series)) return;
+    try {
+      await _saveEventSeries(
+        _eventSeries.where((item) => item.id != series.id).toList(),
+      );
+    } catch (_) {
+      if (mounted) _inform('The repeating schedule could not be removed.');
+    }
+  }
+
+  Iterable<CalendarEvent> _standaloneEvents(List<CalendarEvent> events) =>
+      _eventSeriesIds.isEmpty
+      ? events
+      : events.where((event) => !_eventSeriesIds.contains(event.id));
 
   void _changeFocusModes(List<FocusMode> modes) {
     _modes = modes;
@@ -407,8 +665,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   void _refreshCalendarViews() {
     unawaited(_refreshExternalCalendars());
     unawaited(
-      _icsFeed.refresh(day: _calendarDate, calendars: _selectedIcsCalendars),
+      _icsFeed.refresh(day: _calendarDate, sources: _selectedIcsCalendars),
     );
+    unawaited(_internalFeed.refresh(day: _calendarDate, sources: _eventSeries));
   }
 
   Future<void> _refreshExternalCalendars({DateTime? day, bool force = false}) =>
@@ -451,80 +710,114 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     MaterialPageRoute(
       builder: (context) => ValueListenableBuilder(
         valueListenable: _features,
-        builder: (context, features, _) => SettingsPage(
-          sections: [
-            SettingsSection(
-              title: 'Workspace',
-              items: [
-                SettingsItem(
-                  icon: Icons.tune_rounded,
-                  title: 'Features',
-                  onTap: _openFeatureSettings,
-                ),
-                SettingsItem(
-                  icon: Icons.adjust_rounded,
-                  title: 'Focus modes',
-                  subtitle: 'Choose what each mode brings into view',
-                  onTap: _openFocusSettings,
-                ),
-                SettingsItem(
-                  icon: Icons.calendar_today_outlined,
-                  title: 'Calendars',
-                  subtitle: 'Choose which calendars each view shows',
-                  onTap: _openCalendarSettings,
-                ),
-                SettingsItem(
-                  icon: Icons.file_copy_outlined,
-                  title: 'Calendar files',
-                  subtitle: 'Import or export iCalendar files',
-                  onTap: _openCalendarFiles,
-                ),
-                if (features.allows(EasyFeature.nutrition))
+        builder: (context, features, _) => ListenableBuilder(
+          listenable: _aiViewChanges,
+          builder: (context, _) => SettingsPage(
+            sections: [
+              SettingsSection(
+                title: 'Workspace',
+                items: [
                   SettingsItem(
-                    icon: Icons.restaurant_outlined,
-                    title: 'Nutrition',
-                    onTap: _openNutrition,
+                    icon: Icons.tune_rounded,
+                    title: 'Features',
+                    onTap: _openFeatureSettings,
                   ),
-                if (features.allows(EasyFeature.activity))
                   SettingsItem(
-                    icon: Icons.timer_outlined,
-                    title: 'Activity and routines',
-                    onTap: _openActivities,
+                    icon: Icons.adjust_rounded,
+                    title: 'Focus modes',
+                    subtitle: 'Choose what each mode brings into view',
+                    onTap: _openFocusSettings,
                   ),
-                SettingsItem(
-                  icon: Icons.inbox_outlined,
-                  title: 'Capture inbox',
-                  onTap: () => _openCaptureReview(''),
-                ),
-              ],
-            ),
-            SettingsSection(
-              title: 'Data',
-              items: [
-                SettingsItem(
-                  icon: Icons.archive_outlined,
-                  title: 'Backups',
-                  subtitle: 'Export or preview a workspace backup',
-                  onTap: _openBackups,
-                ),
-                if (!kIsWeb && features.allows(EasyFeature.ai))
                   SettingsItem(
-                    icon: Icons.auto_awesome_outlined,
-                    title: 'AI assistance',
-                    subtitle: 'Providers, monthly limit, and usage',
-                    onTap: _openAiSettings,
+                    icon: Icons.calendar_today_outlined,
+                    title: 'Calendars',
+                    subtitle: 'Choose which calendars each view shows',
+                    onTap: _openCalendarSettings,
                   ),
-                if (LocalTranscriber.supported &&
-                    features.allows(EasyFeature.captureMedia))
                   SettingsItem(
-                    icon: Icons.graphic_eq_rounded,
-                    title: 'Voice transcription',
-                    subtitle: 'Optional local speech recognition',
-                    onTap: _openVoiceSettings,
+                    icon: Icons.file_copy_outlined,
+                    title: 'Calendar files',
+                    subtitle: 'Import or export iCalendar files',
+                    onTap: _openCalendarFiles,
                   ),
-              ],
-            ),
-          ],
+                  if (_eventSeries.isNotEmpty)
+                    SettingsItem(
+                      icon: Icons.repeat_rounded,
+                      title: 'Repeating events',
+                      onTap: _openEventSeries,
+                    ),
+                  if (features.allows(EasyFeature.nutrition))
+                    SettingsItem(
+                      icon: Icons.restaurant_outlined,
+                      title: 'Nutrition',
+                      onTap: _openNutrition,
+                    ),
+                  if (features.allows(EasyFeature.health))
+                    SettingsItem(
+                      icon: Icons.favorite_border_rounded,
+                      title: 'Health log',
+                      onTap: _openHealthLog,
+                    ),
+                  if (features.allows(EasyFeature.activity))
+                    SettingsItem(
+                      icon: Icons.timer_outlined,
+                      title: 'Activity and routines',
+                      onTap: _openActivities,
+                    ),
+                  if (features.allows(EasyFeature.reviews))
+                    SettingsItem(
+                      icon: Icons.edit_calendar_outlined,
+                      title: 'Daily review',
+                      onTap: _openDailyReview,
+                    ),
+                  if (features.allows(EasyFeature.insights))
+                    SettingsItem(
+                      icon: Icons.insights_outlined,
+                      title: 'Activity insights',
+                      onTap: _openInsights,
+                    ),
+                  SettingsItem(
+                    icon: Icons.inbox_outlined,
+                    title: 'Capture inbox',
+                    onTap: () => _openCaptureReview(''),
+                  ),
+                ],
+              ),
+              SettingsSection(
+                title: 'Data',
+                items: [
+                  SettingsItem(
+                    icon: Icons.archive_outlined,
+                    title: 'Backups',
+                    subtitle: 'Export or preview a workspace backup',
+                    onTap: _openBackups,
+                  ),
+                  if (!kIsWeb && features.allows(EasyFeature.ai))
+                    SettingsItem(
+                      icon: Icons.auto_awesome_outlined,
+                      title: 'AI assistance',
+                      subtitle: 'Providers, monthly limit, and usage',
+                      onTap: _openAiSettings,
+                    ),
+                  if (features.allows(EasyFeature.ai) &&
+                      (_ai?.settings.automaticEstimates ?? false))
+                    SettingsItem(
+                      icon: Icons.timer_outlined,
+                      title: 'Duration suggestions',
+                      onTap: _openTaskEstimates,
+                    ),
+                  if (LocalTranscriber.supported &&
+                      features.allows(EasyFeature.captureMedia))
+                    SettingsItem(
+                      icon: Icons.graphic_eq_rounded,
+                      title: 'Voice transcription',
+                      subtitle: 'Optional local speech recognition',
+                      onTap: _openVoiceSettings,
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -557,6 +850,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           if (next.allows(EasyFeature.ai) && _ai == null && !kIsWeb) {
             unawaited(_prepareAi());
           }
+          _lastEstimateCheck = null;
+          _syncEstimateTimer();
           _refreshCalendarViews();
         },
       ),
@@ -582,6 +877,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             (lifecycle == null || lifecycle == AppLifecycleState.resumed),
       );
       _ai = runtime;
+      runtime.addListener(_aiChanged);
       await runtime.load();
       if (mounted) setState(() {});
       return runtime;
@@ -590,6 +886,158 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _preparingAi = null;
       return null;
     }
+  }
+
+  void _aiChanged() {
+    if (!mounted) return;
+    _aiViewChanges.value++;
+    _syncEstimateTimer();
+  }
+
+  void _syncEstimateTimer() {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    final foreground =
+        lifecycle == null || lifecycle == AppLifecycleState.resumed;
+    if (!foreground ||
+        !_allows(EasyFeature.ai) ||
+        !(_ai?.settings.automaticEstimates ?? false)) {
+      _estimateTimer?.cancel();
+      _estimateTimer = null;
+      return;
+    }
+    _estimateTimer ??= Timer.periodic(const Duration(minutes: 4), (_) {
+      unawaited(_runAutomaticEstimate());
+    });
+  }
+
+  AiEnrichmentCandidate? _estimateCandidate(TaskItem task) {
+    if (task.done || task.estimatedMinutes != null || task.title.length > 300) {
+      return null;
+    }
+    final samples =
+        (_ai?.settings.includeOptionalMetadata ?? false) &&
+            _allows(EasyFeature.activity)
+        ? _durationSamples(task)
+        : const <int>[];
+    return AiEnrichmentCandidate(
+      taskId: task.id,
+      title: task.title,
+      sourceRevision: _stableRevision([
+        task.title,
+        task.category,
+        task.date?.toIso8601String(),
+        task.dueAt?.toIso8601String(),
+        task.priority?.name,
+        task.minimumChunkMinutes,
+        task.allowSplit,
+      ]),
+      contextRevision: _stableRevision(samples),
+      sampleDurationsMinutes: samples,
+    );
+  }
+
+  AiCaptureRevision? _estimateRevision(String id) {
+    if (_loading) return null;
+    final task = _data.tasks.where((task) => task.id == id).firstOrNull;
+    return task == null ? null : _estimateCandidate(task)?.revision;
+  }
+
+  Future<void> _runAutomaticEstimate() async {
+    final runtime = _ai;
+    if (!mounted ||
+        _loading ||
+        _reviewSaving ||
+        _reviewingMealPhoto ||
+        runtime == null ||
+        runtime.busy ||
+        !_allows(EasyFeature.ai) ||
+        !runtime.settings.automaticEstimates) {
+      return;
+    }
+    final now = DateTime.now();
+    final hour =
+        now.toUtc().millisecondsSinceEpoch ~/ Duration.millisecondsPerHour;
+    if (hour == _lastEstimateCheck) return;
+    _lastEstimateCheck = hour;
+    final candidates =
+        _data.tasks
+            .where((task) => !task.done && task.estimatedMinutes == null)
+            .toList()
+          ..sort((first, second) {
+            final a = first.dueAt ?? first.date;
+            final b = second.dueAt ?? second.date;
+            if (a != null && b != null) {
+              final order = a.compareTo(b);
+              if (order != 0) return order;
+            }
+            if ((a == null) != (b == null)) return a == null ? 1 : -1;
+            final priority = (second.priority ?? TaskPriority.normal).index
+                .compareTo((first.priority ?? TaskPriority.normal).index);
+            return priority == 0 ? first.id.compareTo(second.id) : priority;
+          });
+    for (final task in candidates) {
+      final candidate = _estimateCandidate(task);
+      if (candidate != null && runtime.canAutomaticallyEstimate(candidate)) {
+        await runtime.runAutomaticEstimate(
+          candidate: candidate,
+          currentRevision: _estimateRevision,
+        );
+        return;
+      }
+    }
+  }
+
+  Iterable<TaskEstimateReviewItem> _pendingEstimates(AiRuntime runtime) sync* {
+    for (final estimate in runtime.currentPendingEstimates(_estimateRevision)) {
+      final task = _data.tasks
+          .where((task) => task.id == estimate.taskId)
+          .firstOrNull;
+      if (task == null) continue;
+      yield TaskEstimateReviewItem(
+        estimate: estimate,
+        title: task.title,
+        issue: taskSplitIssue(
+          allowSplit: task.allowSplit,
+          minimumChunkMinutes: task.minimumChunkMinutes,
+          estimatedMinutes: estimate.durationMinutes,
+        ),
+      );
+    }
+  }
+
+  void _openTaskEstimates() {
+    final runtime = _ai;
+    if (runtime == null || !_allows(EasyFeature.ai)) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => TaskEstimatesPage(
+          runtime: runtime,
+          readItems: () => _pendingEstimates(runtime),
+          onAccept: (estimate) async {
+            final previous = _data;
+            final item = _pendingEstimates(runtime)
+                .where((item) => identical(item.estimate, estimate))
+                .firstOrNull;
+            if (item == null || item.issue != null) {
+              throw StateError('The estimate changed.');
+            }
+            await _commitReviewedData(
+              previous,
+              previous.copyWith(
+                tasks: [
+                  for (final task in previous.tasks)
+                    if (task.id == estimate.taskId)
+                      task.withEstimate(estimate.durationMinutes)
+                    else
+                      task,
+                ],
+              ),
+            );
+            await runtime.discardPendingEstimate(estimate);
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _openAiSettings() async {
@@ -651,7 +1099,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     MaterialPageRoute(
       builder: (context) => CalendarSettingsPage(
         adapter: _allows(EasyFeature.externalCalendars)
-            ? const EventKitCalendarAdapter()
+            ? widget.calendarAdapter
             : const EventKitCalendarAdapter(platform: TargetPlatform.linux),
         isAppleCalendar: (id) =>
             _allows(EasyFeature.externalCalendars) && _isAppleCalendar(id),
@@ -983,6 +1431,13 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           onViewPhoto: _allows(EasyFeature.captureMedia)
               ? _viewMealPhoto
               : null,
+          onReviewPhoto:
+              _allows(EasyFeature.captureMedia) &&
+                  _allows(EasyFeature.ai) &&
+                  (_ai?.canRunMealVision ?? false)
+              ? _reviewMealPhoto
+              : null,
+          onCancelPhotoReview: _cancelMealReview,
         ),
       ),
     );
@@ -995,11 +1450,319 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         : NutritionData.fromJson(saved as Map<String, dynamic>);
   }
 
+  void _cancelMealReview() {
+    _mealReviewGeneration++;
+    if (_reviewingMealPhoto) _ai?.cancelCurrent();
+  }
+
+  Future<List<NutritionPortion>?> _reviewMealPhoto(
+    BuildContext routeContext,
+    NutritionMeal meal,
+    List<NutritionFood> foods,
+  ) async {
+    final runtime = _ai;
+    final reference = meal.photo;
+    if (runtime == null ||
+        reference == null ||
+        !runtime.canRunMealVision ||
+        !_allows(EasyFeature.ai) ||
+        _reviewingMealPhoto ||
+        runtime.busy) {
+      return null;
+    }
+    _reviewingMealPhoto = true;
+    final generation = ++_mealReviewGeneration;
+    bool active() =>
+        mounted && routeContext.mounted && generation == _mealReviewGeneration;
+    try {
+      await _pendingSave;
+      final persisted = await _store!.read();
+      final workspaceJson =
+          jsonDecode(persisted.snapshot.workspaceJson) as Map<String, dynamic>;
+      final raw = workspaceJson[_nutritionKey];
+      final stored = raw is Map<String, dynamic>
+          ? NutritionData.fromJson(raw).meals
+                .where((item) => item.id == meal.id)
+                .firstOrNull
+          : null;
+      if (stored?.photo?.id != reference.id) {
+        throw StateError('Save the draft before analysis.');
+      }
+      final media = await (await _openAttachments())?.read(reference.id);
+      if (media == null || !active()) return null;
+      final image = await prepareAiVisionImage(media.bytes);
+      if (!active()) return null;
+      final revision = _stableRevision([meal.id, reference.id]);
+      final capture = CaptureInput(
+        id: 'meal-photo:${meal.id}',
+        revision: revision,
+        text: 'Meal photo',
+        context: CaptureContext(anchor: meal.eatenAt, revision: revision),
+      );
+      AiCaptureRevision? current(String id) {
+        if (!active() || id != capture.id) return null;
+        final photo = _nutritionData().meals
+            .where((item) => item.id == meal.id)
+            .firstOrNull
+            ?.photo;
+        return photo?.id == reference.id
+            ? (sourceRevision: revision, contextRevision: revision)
+            : null;
+      }
+
+      final result = await runtime.runMealVision(
+        source: capture,
+        image: image,
+        currentRevision: current,
+        authorize: (details) => routeContext.mounted && active()
+            ? showMealVisionTransmissionDialog(routeContext, details)
+            : Future.value(false),
+      );
+      if (!routeContext.mounted || !active()) return null;
+      if (result.value case final review?) {
+        final portions = await showMealVisionReview(
+          routeContext,
+          review,
+          foods,
+        );
+        return active() ? portions : null;
+      }
+      if (result.status != AiRunStatus.declined) {
+        _inform(
+          result.message ??
+              'The photo is saved. No food suggestions are available.',
+        );
+      }
+      return null;
+    } finally {
+      _reviewingMealPhoto = false;
+    }
+  }
+
+  Object? _activityCacheKey;
+  ActivityData? _cachedActivityData;
+
   ActivityData _activityData() {
     final saved = _data.sections[_activitiesKey];
-    return saved == null
+    final existing = _cachedActivityData;
+    if (existing != null && identical(saved, _activityCacheKey)) {
+      return existing;
+    }
+    final parsed = saved == null
         ? ActivityData()
         : ActivityData.fromJson(saved as Map<String, dynamic>);
+    _activityCacheKey = saved;
+    _cachedActivityData = parsed;
+    return parsed;
+  }
+
+  void _openDailyReview() {
+    if (!_allows(EasyFeature.reviews)) return;
+    final saved = _data.sections[_reviewsKey];
+    final ReviewData review;
+    try {
+      review = saved == null
+          ? ReviewData()
+          : ReviewData.fromJson(saved as Map<String, dynamic>);
+    } catch (_) {
+      _inform('Your review history could not be opened.');
+      return;
+    }
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ReviewPage(
+          data: review,
+          agendaForDay: _reviewAgenda,
+          activityMinutesForDay: (day) =>
+              _confirmedMinutes(day, plusDays(day, 1)),
+          onChanged: (data) => _commitReviewedData(
+            _data,
+            _data.withSection(_reviewsKey, data.toJson()),
+          ),
+          onRollForward: _rollReviewTaskForward,
+          onReviewActions: _openCaptureReview,
+        ),
+      ),
+    );
+  }
+
+  void _openInsights() {
+    if (!_allows(EasyFeature.insights)) return;
+    final ActivityData activity;
+    try {
+      activity = _activityData();
+    } catch (_) {
+      _inform('Activity records could not be opened.');
+      return;
+    }
+    final active = _allows(EasyFeature.activity)
+        ? activity.records
+        : const <ActivityRecord>[];
+    final eventSpans = <String, List<InsightWindow>>{};
+    final records = <InsightActivity>[];
+    for (final record in active) {
+      final spans = [
+        for (final span in record.spans)
+          if (span.end != null && span.end!.isAfter(span.start))
+            InsightWindow(span.start, span.end!),
+      ];
+      if (spans.isEmpty) continue;
+      final target = record.target;
+      if (target?.kind == ActivityTargetKind.event) {
+        (eventSpans[target!.id] ??= []).addAll(spans);
+      }
+      records.add(
+        InsightActivity(
+          id: record.id,
+          category: record.category,
+          spans: spans,
+          taskId: target?.kind == ActivityTargetKind.task ? target?.id : null,
+        ),
+      );
+    }
+    if (_allows(EasyFeature.workouts)) {
+      for (final session in _gymSessions ?? const <GymSession>[]) {
+        final finished = session.finishedAt;
+        if (finished == null || !finished.isAfter(session.startedAt)) continue;
+        records.add(
+          InsightActivity(
+            id: 'gym:${session.startedAt.toIso8601String()}',
+            category: 'gym',
+            spans: [InsightWindow(session.startedAt, finished)],
+          ),
+        );
+      }
+    }
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => InsightsPage(
+          activities: records,
+          tasks: [
+            for (final task in _data.tasks)
+              InsightTask(
+                id: task.id,
+                title: task.title,
+                category: task.category,
+                projectId: task.parentId,
+                dueAt: task.dueAt,
+                completedAt: task.completedAt,
+              ),
+          ],
+          plans: [
+            for (final event in _data.events)
+              if (event.plannedTaskId != null ||
+                  eventSpans.containsKey(event.id))
+                InsightPlan(
+                  id: event.id,
+                  category: event.category,
+                  initial:
+                      event.initialPlannedStart != null &&
+                          event.initialPlannedEnd != null
+                      ? InsightWindow(
+                          event.initialPlannedStart!,
+                          event.initialPlannedEnd!,
+                        )
+                      : null,
+                  accepted: InsightWindow(event.start, event.end),
+                  actual: eventSpans[event.id] ?? const [],
+                ),
+          ],
+          onExportJson: (name, data) async {
+            try {
+              await _exportFile(
+                Uint8List.fromList(utf8.encode(data)),
+                name,
+                'application/json',
+              );
+              return true;
+            } on BackupExportCancelled {
+              return false;
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  ReviewAgenda _reviewAgenda(DateTime day) {
+    final end = plusDays(day, 1);
+    return ReviewAgenda(
+      events: [
+        for (final event in [
+          ..._standaloneEvents(_data.events),
+          ..._appleFeed.events.map(_fromApple),
+          ..._icsFeed.events.map((row) => row.event),
+          ..._internalFeed.events.map((row) => row.event),
+        ])
+          if (event.start.isBefore(end) && event.end.isAfter(day))
+            ReviewEvent(
+              id: event.id,
+              title: event.title,
+              start: event.start,
+              end: event.end,
+              allDay: event.allDay,
+            ),
+      ],
+      tasks: [
+        for (final task in _data.tasks)
+          ReviewTask(
+            id: task.id,
+            title: task.title,
+            date: task.date,
+            dueAt: task.dueAt,
+            done: task.done,
+            estimatedMinutes: task.estimatedMinutes,
+            completedAt: task.completedAt,
+          ),
+      ],
+      unresolvedCaptures: _data.captures
+          .where(
+            (item) => !item.applied && sameDay(item.capturedAt.toLocal(), day),
+          )
+          .length,
+      confirmedActivityMinutes: _confirmedMinutes(day, end),
+    );
+  }
+
+  int? _confirmedMinutes(DateTime start, DateTime end) {
+    if (!_allows(EasyFeature.activity)) return null;
+    final ActivityData activity;
+    try {
+      activity = _activityData();
+    } catch (_) {
+      return null;
+    }
+    final bounds = TimeSpan(start, end);
+    final spans = [
+      for (final activity in activity.records)
+        for (final span in activity.spans)
+          if (span.end != null && span.end!.isAfter(span.start))
+            ?TimeSpan(span.start, span.end!).intersection(bounds),
+    ]..sort((first, second) => first.start.compareTo(second.start));
+    if (spans.isEmpty) return null;
+    var minutes = Duration.zero;
+    var cursor = start;
+    for (final span in spans) {
+      if (!span.end.isAfter(cursor)) continue;
+      minutes += span.end.difference(
+        span.start.isAfter(cursor) ? span.start : cursor,
+      );
+      cursor = span.end;
+    }
+    return minutes.inMinutes;
+  }
+
+  Future<void> _rollReviewTaskForward(ReviewTask recorded, DateTime day) async {
+    final previous = _data;
+    final tasks = [...previous.tasks];
+    final index = tasks.indexWhere((task) => task.id == recorded.id);
+    if (index < 0) throw StateError('This task is unavailable.');
+    final task = tasks[index];
+    if (task.done || task.dueAt != null || task.date != recorded.date) {
+      throw StateError('Review the current task before moving its date.');
+    }
+    tasks[index] = task.withDate(dateOnly(day));
+    await _commitReviewedData(previous, previous.copyWith(tasks: tasks));
   }
 
   void _openActivities() {
@@ -1049,6 +1812,48 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _attachmentStore = null;
       rethrow;
     }
+  }
+
+  HealthData _healthData() {
+    final saved = _data.sections[_healthKey];
+    return saved == null
+        ? HealthData()
+        : HealthData.fromJson(saved as Map<String, dynamic>);
+  }
+
+  List<HealthExerciseTarget> _healthTargets([WorkoutPlan? only]) => [
+    for (final plan
+        in only == null ? _workoutPlans ?? const <WorkoutPlan>[] : [only])
+      for (final exercise in plan.exercises)
+        HealthExerciseTarget(
+          planId: plan.id,
+          exerciseId: exercise.id,
+          name: exercise.name,
+          planName: plan.name,
+        ),
+  ];
+
+  void _openHealthLog() {
+    if (!_allows(EasyFeature.health)) return;
+    final HealthData health;
+    try {
+      health = _healthData();
+    } catch (_) {
+      _inform('Your health log could not be opened.');
+      return;
+    }
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => HealthPage(
+          data: health,
+          exerciseTargets: _healthTargets(),
+          onChanged: (data) => _commitReviewedData(
+            _data,
+            _data.withSection(_healthKey, data.toJson()),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<AttachmentRef?> _attachMealPhoto() async {
@@ -1298,6 +2103,16 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   Future<void> _openGymSession({WorkoutPlan? plan}) async {
+    if (_openingGym || !_allows(EasyFeature.workouts)) return;
+    _openingGym = true;
+    try {
+      await _showGymSession(plan);
+    } finally {
+      _openingGym = false;
+    }
+  }
+
+  Future<void> _showGymSession(WorkoutPlan? plan) async {
     final sessions = _gymSessions;
     if (!mounted) return;
     if (sessions == null) {
@@ -1312,8 +2127,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (latest != null && !latest.finished) {
       session = latest;
     } else {
-      session = GymSession.start(plan: plan);
-      _saveGymSession(session);
+      final begun = await _startWorkout(plan, sessions);
+      if (begun == null || !mounted) return;
+      session = begun;
     }
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -1323,6 +2139,60 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  Future<GymSession?> _startWorkout(
+    WorkoutPlan? plan,
+    List<GymSession> previousSessions,
+  ) async {
+    final at = DateTime.now();
+    final planned = GymSession.start(plan: plan, now: at);
+    final HealthData? health;
+    try {
+      health = _allows(EasyFeature.health) ? _healthData() : null;
+    } catch (_) {
+      _inform('Open the health log before starting this workout.');
+      return null;
+    }
+    if (health == null ||
+        health
+            .forWorkout(
+              planId: plan?.id,
+              exerciseIds: planned.exercises.map((exercise) => exercise.id),
+              workoutAt: at,
+            )
+            .isEmpty) {
+      _saveGymSession(planned);
+      return planned;
+    }
+    final decision = await showWorkoutHealthReview(
+      context,
+      data: health,
+      planId: plan?.id,
+      exercises: plan == null ? const [] : _healthTargets(plan),
+      workoutAt: at,
+    );
+    if (!mounted ||
+        decision == null ||
+        !identical(_gymSessions, previousSessions)) {
+      return null;
+    }
+    final updated = planned.withSkippedExercises(decision.skippedExerciseIds);
+    final before = _data;
+    try {
+      await _commitReviewedData(
+        before,
+        before.withSection(
+          _healthKey,
+          health.withWorkoutDecision(decision).toJson(),
+        ),
+        sessions: [...previousSessions, updated],
+      );
+      return updated;
+    } catch (_) {
+      if (mounted) _inform('The reviewed workout could not be saved.');
+      return null;
+    }
   }
 
   ({WorkoutPlan plan, DateTime date})? _nextWorkout() {
@@ -1456,23 +2326,28 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   void _toggleTask(TaskItem task) {
     final done = !task.done;
-    _setTaskDone(task.id, done);
+    _setTaskDone(
+      task.id,
+      done,
+      completedAt: done ? DateTime.now().toUtc() : null,
+    );
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(done ? 'Task completed' : 'Task reopened'),
         duration: const Duration(seconds: 3),
         action: SnackBarAction(
           label: 'Undo',
-          onPressed: () => _setTaskDone(task.id, task.done),
+          onPressed: () =>
+              _setTaskDone(task.id, task.done, completedAt: task.completedAt),
         ),
       ),
     );
   }
 
-  void _setTaskDone(String id, bool done) {
+  void _setTaskDone(String id, bool done, {DateTime? completedAt}) {
     final task = _data.tasks.where((task) => task.id == id).firstOrNull;
     if (task == null || task.done == done) return;
-    _saveRecord(task.withDone(done));
+    _saveRecord(task.withDone(done, completedAt: completedAt));
   }
 
   List<T> _upsert<T>(List<T> records, T updated, String Function(T) id) => [
@@ -1545,6 +2420,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   Future<void> _deleteRecord(Object record) async {
     if (record is CalendarEvent && record.isReadOnly) return;
+    if (record is CalendarEvent && record.recurringSeriesId != null) {
+      await _skipOccurrence(record);
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1715,7 +2594,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final result = await _showEditor(
       PlanDaySheet(
         day: day,
-        events: [...prior.events, ...appointments],
+        events: [..._standaloneEvents(prior.events), ...appointments],
         tasks: prior.tasks,
       ),
     );
@@ -1724,11 +2603,15 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (!mounted || finalAppointments == null) return;
     final checkedFeed = _appleFeed.events;
     final checkedImports = _icsFeed.events;
+    final checkedSeries = _internalFeed.events;
     final beforeAcceptance = _data;
     final current = await compute(_reviewSchedule, (
       window: result.window,
       reservationStart: result.reservationStart,
-      events: [...beforeAcceptance.events, ...finalAppointments],
+      events: [
+        ..._standaloneEvents(beforeAcceptance.events),
+        ...finalAppointments,
+      ],
       tasks: beforeAcceptance.tasks,
     ));
     if (!mounted) return;
@@ -1744,6 +2627,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (!identical(beforeAcceptance, _data) ||
         !identical(checkedFeed, _appleFeed.events) ||
         !identical(checkedImports, _icsFeed.events) ||
+        !identical(checkedSeries, _internalFeed.events) ||
         selectedIds.length != result.tasks.length ||
         result.tasks.any((entry) {
           final checked = available[entry.task.id];
@@ -1775,6 +2659,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             end: block.end,
             category: available[entry.task.id]!.task.category,
             plannedTaskId: entry.task.id,
+            initialPlannedStart: block.start,
+            initialPlannedEnd: block.end,
           ),
     ];
     try {
@@ -1800,10 +2686,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   Future<List<CalendarEvent>?> _planningCalendar(DateTime day) async {
     final apple = _selectedAppleCalendars;
     final imports = _selectedIcsCalendars;
-    if (apple.isEmpty && imports.isEmpty) return const [];
+    final series = _eventSeries;
+    if (apple.isEmpty && imports.isEmpty && series.isEmpty) return const [];
     await Future.wait<void>([
       if (apple.isNotEmpty) _refreshExternalCalendars(day: day, force: true),
-      if (imports.isNotEmpty) _icsFeed.refresh(day: day, calendars: imports),
+      if (imports.isNotEmpty) _icsFeed.refresh(day: day, sources: imports),
+      if (series.isNotEmpty) _internalFeed.refresh(day: day, sources: series),
     ]);
     if (!mounted) return null;
     if (apple.isNotEmpty &&
@@ -1816,9 +2704,17 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _inform(_icsFeed.problem ?? 'Imported calendars could not be refreshed.');
       return null;
     }
+    if (series.isNotEmpty &&
+        (_internalFeed.problem != null || !_internalFeed.covers(day))) {
+      _inform(
+        _internalFeed.problem ?? 'Repeating events could not be refreshed.',
+      );
+      return null;
+    }
     return [
       ..._appleFeed.events.map(_fromApple),
       for (final row in _icsFeed.events) row.event,
+      for (final row in _internalFeed.events) row.event,
     ];
   }
 
@@ -2234,7 +3130,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           if (index < 0 || tasks[index].done) {
             return 'Review the task’s current state.';
           }
-          tasks[index] = tasks[index].withDone(true);
+          tasks[index] = tasks[index].withDone(
+            true,
+            completedAt: DateTime.now().toUtc(),
+          );
       }
     }
 
@@ -2262,6 +3161,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   Future<void> _editRecord(Object existing) async {
     if (existing is CalendarEvent && existing.isReadOnly) return;
+    if (existing is CalendarEvent && existing.recurringSeriesId != null) {
+      await _editOccurrence(existing);
+      return;
+    }
     final result = await _showEditor(
       RecordEditor(
         date: _destination == _Destination.calendar ? _calendarDate : _today,
@@ -2302,13 +3205,31 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _inform('The linked record is unavailable.');
       return;
     }
-    if (target is CalendarEvent) _changeDate(target.start);
+    final Object shown;
+    if (target is CalendarEvent && _eventSeriesIds.contains(target.id)) {
+      final occurrence = _internalFeed.events
+          .where(
+            (row) =>
+                row.series.id == target.id && !row.event.end.isBefore(_today),
+          )
+          .firstOrNull;
+      if (occurrence == null) {
+        _inform(
+          'This series has no upcoming occurrence in the current calendar window.',
+        );
+        return;
+      }
+      shown = occurrence.event;
+    } else {
+      shown = target;
+    }
+    if (shown is CalendarEvent) _changeDate(shown.start);
     _navigate(
       link.kind == NoteLinkKind.task
           ? _Destination.tasks
           : _Destination.calendar,
     );
-    await _openRecord(target);
+    await _openRecord(shown);
   }
 
   Future<void> _openRecord(Object record) async {
@@ -2335,6 +3256,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           onEstimate: _canEstimate(record)
               ? () => Navigator.pop(context, 'estimate')
               : null,
+          onAppleCopy: _canCopyToApple(record)
+              ? () => Navigator.pop(context, 'apple-copy')
+              : null,
+          onRepeat: _canRepeatEvent(record)
+              ? () => Navigator.pop(context, 'repeat')
+              : null,
         ),
       ),
     );
@@ -2344,6 +3271,187 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (action is NoteLink) await _openNoteLink(action);
     if (action == 'estimate' && record is TaskItem) {
       await _suggestDuration(record);
+    }
+    if (action == 'apple-copy' && record is CalendarEvent) {
+      await _copyToApple(record);
+    }
+    if (action == 'repeat' && record is CalendarEvent) {
+      await _setEventRepeat(record);
+    }
+  }
+
+  bool _canRepeatEvent(Object? record) =>
+      record is CalendarEvent &&
+      !record.isReadOnly &&
+      record.plannedTaskId == null &&
+      (record.recurringSeriesId != null ||
+          !_eventSeriesIds.contains(record.id));
+
+  bool _canCopyToApple(Object? record) =>
+      record is CalendarEvent &&
+      !record.isReadOnly &&
+      record.recurringSeriesId == null &&
+      !_eventSeriesIds.contains(record.id) &&
+      widget.calendarAdapter.isAvailable &&
+      _allows(EasyFeature.externalCalendars) &&
+      _appleCopyFor(record.id) == null;
+
+  CalendarOccurrenceIdentity? _appleCopyFor(String localId) {
+    final unsaved = _unsavedAppleCopies[localId];
+    if (unsaved != null) return unsaved;
+    final saved = _data.sections[_appleCopiesKey];
+    if (saved is! Map<String, dynamic>) return null;
+    final entry = saved[localId];
+    if (entry is! Map<String, dynamic>) return null;
+    try {
+      final eventId = entry['eventId'];
+      if (eventId is! String || eventId.isEmpty) return null;
+      return CalendarOccurrenceIdentity(
+        calendar: CalendarIdentity.fromJson(entry),
+        eventId: eventId,
+      );
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<void> _copyToApple(CalendarEvent event) async {
+    if (_copyingApple || !_canCopyToApple(event)) return;
+    _copyingApple = true;
+    var copied = false;
+    try {
+      final adapter = widget.calendarAdapter;
+      if (await adapter.accessStatus() != EventKitCalendarAccess.full) {
+        if (mounted) {
+          _inform('Connect Apple Calendar in Settings before copying.');
+        }
+        return;
+      }
+      final sources = (await adapter.calendars())
+          .where((source) => source.canWrite)
+          .toList();
+      if (!mounted) return;
+      if (sources.isEmpty) {
+        _inform('No writable Apple calendars are available.');
+        return;
+      }
+      final defaultSource = _calendarPreferences?.defaultWriteCalendar;
+      sources.sort((first, second) {
+        if (first.id == defaultSource) {
+          return second.id == defaultSource ? 0 : -1;
+        }
+        if (second.id == defaultSource) return 1;
+        return first.name.compareTo(second.name);
+      });
+      final destination = await showDialog<CalendarSource>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: const Text('Choose Apple calendar'),
+          children: [
+            for (final source in sources)
+              ListTile(
+                title: Text(source.name),
+                subtitle: Text(source.accountName),
+                onTap: () => Navigator.pop(context, source),
+              ),
+          ],
+        ),
+      );
+      if (!mounted || destination == null) return;
+      final review = await adapter.prepareCreate(
+        destination: destination,
+        draft: EventKitEventDraft(
+          title: event.title,
+          start: event.start,
+          end: event.end,
+          allDay: event.allDay,
+          location: event.location,
+          notes: event.description,
+        ),
+      );
+      if (!mounted) return;
+      final approved = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          final format = MaterialLocalizations.of(context);
+          String when(DateTime instant) {
+            final local = instant.toLocal();
+            final day = format.formatMediumDate(local);
+            if (event.allDay) return day;
+            return '$day · ${format.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
+          }
+
+          final last = event.allDay ? plusDays(review.end, -1) : review.end;
+          return AlertDialog(
+            scrollable: true,
+            title: const Text('Copy to Apple Calendar?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 8,
+              children: [
+                Text(review.draft.title, style: sectionHeadingStyle),
+                Text(
+                  '${review.destination.name} · ${review.destination.accountName}',
+                ),
+                Text(
+                  event.allDay && sameDay(review.start, last)
+                      ? '${when(review.start)} · All day'
+                      : '${when(review.start)} to ${when(last)}',
+                ),
+                if (review.timeZoneId case final zone?)
+                  Text(zone, style: contentMetadataStyle),
+                if (review.draft.location case final location?) Text(location),
+                if (review.draft.notes case final notes?) Text(notes),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Add to calendar'),
+              ),
+            ],
+          );
+        },
+      );
+      if (!mounted || approved != true || !_canCopyToApple(event)) return;
+      if (!_data.events.any((current) => identical(current, event))) {
+        _inform('This event changed. Open its current details to copy it.');
+        return;
+      }
+      final result = await adapter.createReviewedEvent(review, confirmed: true);
+      copied = true;
+      if (!mounted) return;
+      _unsavedAppleCopies[event.id] = result;
+      _appleCopyRevision++;
+      final previous = _data;
+      final saved = previous.sections[_appleCopiesKey];
+      final copies = <String, Object?>{
+        if (saved is Map<String, dynamic>) ...saved,
+        event.id: {...result.calendar.toJson(), 'eventId': result.eventId},
+      };
+      await _commitReviewedData(
+        previous,
+        previous.withSection(_appleCopiesKey, copies),
+      );
+      _unsavedAppleCopies.remove(event.id);
+      if (!mounted) return;
+      _inform('Added to ${destination.name}.');
+      unawaited(_refreshExternalCalendars(force: true));
+    } catch (_) {
+      if (mounted) {
+        _inform(
+          copied
+              ? 'Apple Calendar saved this copy. Easy could not save its link.'
+              : 'The copy could not be confirmed. Check Apple Calendar before trying again.',
+        );
+      }
+    } finally {
+      _copyingApple = false;
     }
   }
 
@@ -2462,9 +3570,14 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       context: context,
       builder: (_) => _SearchDialog(
         records: [
-          ..._data.events,
+          ..._standaloneEvents(_data.events),
           ..._appleFeed.events.map(_fromApple),
           for (final row in _icsFeed.events) row.event,
+          for (final event in {
+            for (final row in _internalFeed.events.reversed)
+              row.series.id: row.event,
+          }.values)
+            event,
           ..._data.tasks,
           ..._data.notes,
         ],
@@ -2539,6 +3652,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     List<IcsWorkspaceEvent>,
     CalendarSourcePreferences?,
     FocusMode?,
+    int,
+    List<InternalRecurringEvent>,
+    List<InternalWorkspaceEvent>,
   )?
   _visibleEventRevision;
   List<CalendarEvent> _visibleEvents = const [];
@@ -2551,22 +3667,45 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _icsFeed.events,
       preferences,
       mode,
+      _appleCopyRevision,
+      _eventSeries,
+      _internalFeed.events,
     );
     if (_visibleEventRevision == revision) return _visibleEvents;
     final calendars = preferences?.calendarsFor(mode?.id);
+    bool visible(CalendarEvent event) =>
+        calendars?.contains(_localCalendar(event.category)) ??
+        (mode?.includes(event.category.toLowerCase()) ?? true);
+    final local = [
+      for (final event in _standaloneEvents(_data.events))
+        if (visible(event)) event,
+    ];
+    final linked = <CalendarOccurrenceIdentity, CalendarEvent>{
+      if (_data.sections[_appleCopiesKey] != null ||
+          _unsavedAppleCopies.isNotEmpty)
+        for (final event in local) ?_appleCopyFor(event.id): event,
+    };
     _visibleEvents = [
-      for (final event in _data.events)
-        if (calendars?.contains(_localCalendar(event.category)) ??
-            (mode?.includes(event.category.toLowerCase()) ?? true))
-          event,
+      ...local,
+      for (final row in _internalFeed.events)
+        if (visible(row.event)) row.event,
       for (final event in revision.$2)
-        if (calendars?.contains(event.id.calendar) ?? false) _fromApple(event),
+        if ((calendars?.contains(event.id.calendar) ?? false) &&
+            !_sameAppleEvent(linked[event.id], event.event))
+          _fromApple(event),
       for (final row in revision.$3)
         if (calendars?.contains(row.calendar) ?? false) row.event,
     ];
     _visibleEventRevision = revision;
     return _visibleEvents;
   }
+
+  bool _sameAppleEvent(CalendarEvent? local, ExternalCalendarEvent apple) =>
+      local != null &&
+      local.title == apple.title &&
+      local.allDay == apple.allDay &&
+      local.start.isAtSameMomentAs(apple.start) &&
+      local.end.isAtSameMomentAs(apple.end);
 
   @override
   Widget build(BuildContext context) {
@@ -2619,7 +3758,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             : null) ??
         (visibleCalendars.any((id) => id.accountId == workspaceIcsAccountId)
             ? _icsFeed.problem
-            : null);
+            : null) ??
+        _internalFeed.problem;
     final todayNote = mobile ? _homeNote() : null;
     final canPlan =
         _allows(EasyFeature.planning) &&
@@ -2811,6 +3951,17 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                                                   _inspected! as TaskItem,
                                                 )
                                               : null,
+                                          onAppleCopy:
+                                              _canCopyToApple(_inspected)
+                                              ? () => _copyToApple(
+                                                  _inspected! as CalendarEvent,
+                                                )
+                                              : null,
+                                          onRepeat: _canRepeatEvent(_inspected)
+                                              ? () => _setEventRepeat(
+                                                  _inspected! as CalendarEvent,
+                                                )
+                                              : null,
                                         ),
                                       ),
                                     ),
@@ -2847,6 +3998,12 @@ ScheduleProposal _reviewSchedule(
 
 String _normalizeIcsFile(Uint8List data) =>
     IcsCalendar.parseBytes(data).encode();
+
+int _stableRevision(Object value) => sha256
+    .convert(utf8.encode(jsonEncode(value)))
+    .bytes
+    .take(6)
+    .fold(0, (number, byte) => number * 256 + byte);
 
 bool _samePlanBlocks(List<TimeSpan> first, List<TimeSpan> second) {
   if (first.length != second.length) return false;
@@ -3380,6 +4537,8 @@ class _RecordDetails extends StatelessWidget {
     this.noteTargets = const [],
     this.onOpenNoteLink,
     this.onEstimate,
+    this.onAppleCopy,
+    this.onRepeat,
   });
 
   final Object record;
@@ -3389,6 +4548,8 @@ class _RecordDetails extends StatelessWidget {
   final List<NoteTarget> noteTargets;
   final ValueChanged<NoteLink>? onOpenNoteLink;
   final VoidCallback? onEstimate;
+  final VoidCallback? onAppleCopy;
+  final VoidCallback? onRepeat;
 
   @override
   Widget build(BuildContext context) {
@@ -3503,12 +4664,30 @@ class _RecordDetails extends StatelessWidget {
                   TextButton(
                     onPressed: onDelete,
                     style: TextButton.styleFrom(foregroundColor: muted),
-                    child: const Text('Delete'),
+                    child: Text(
+                      item is CalendarEvent && item.recurringSeriesId != null
+                          ? 'Skip'
+                          : 'Delete',
+                    ),
                   ),
                   if (onEstimate != null)
                     TextButton(
                       onPressed: onEstimate,
                       child: const Text('Suggest duration'),
+                    ),
+                  if (onAppleCopy != null)
+                    TextButton(
+                      onPressed: onAppleCopy,
+                      child: const Text('Copy to Apple Calendar'),
+                    ),
+                  if (onRepeat != null)
+                    TextButton(
+                      onPressed: onRepeat,
+                      child: Text(
+                        item is CalendarEvent && item.recurringSeriesId != null
+                            ? 'Repeat rule'
+                            : 'Repeat',
+                      ),
                     ),
                 ],
               ),

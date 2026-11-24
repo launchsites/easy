@@ -1,20 +1,19 @@
 # Acceptance status
 
-| Requirement | Status at sustained-build start | Evidence or remaining gate |
+| Requirement | Development evidence | Remaining release gate |
 |---|---|---|
-| P01 Device-only start and module preferences | Partial | Local startup works. Presets, capability settings, and module disable behavior need implementation and verification. |
-| P02 Today, calendar, tasks, notes, and navigation | Partial | Linux release through `19d8c09` and the mobile viewport widget suite cover the core routes. Physical phone verification and additional interaction coverage remain. |
-| P03 Tasks, projects, and notes | Partial | Local task completion and note capture work. Rich fields, nesting, linking, reminders, and recurring tasks need separate checks. |
-| P04 Calendar and deterministic scheduling | Partial | Day and wide-week navigation work. The new pure-Dart scheduler covers explicit availability, buffers, dependencies, effort, and split feasibility in `test/scheduling/planner_test.dart`. Acceptance UI, recurrence, providers, and deeper profiling remain. |
-| P05 Focus views and activity logging | Partial | A mode switches the active view. Flutter tests cover Gym plans and session recovery. Multi-calendar membership, general activities, and actual-time review remain. |
-| P06 Daily and weekly review and habits | Pending | Morning, evening, recurring, and historical review flows need implementation. |
-| P07 Gym, fitness, and health | Partial | Once, weekdays, interval plans, cardio, strength sets, and done or skipped session rows were verified on Linux. Health review and device integrations remain. |
-| P08 Nutrition | Pending | Manual tracking, local records, and bounded optional analysis need implementation. |
-| P09 Statistics and learning | Pending | Confirmation-backed history, estimates, and editable preferences need implementation. |
-| P10 Capture, automations, and integrations | Partial | Manual text capture and review of event times work. Cross-focus interpretation, audio, proposed commands, and provider integration have separate gates. |
-| Data integrity and recovery | Partial | Existing local persistence supports restart. Transactional migration, backup, restore, and fault tests are in progress. |
-| Pairing and sync | Pending | Peer trust, convergence, and recovery need implementation and adversarial verification before use with real data. |
-| Accessibility and performance | Partial | Phone-width Flutter and native Linux interactions passed. Device, text-scale, soak, and concurrent model probes remain. |
-| Platform release | Partial | Linux x86-64 release verified. Android builds and physical device testing, signed macOS and iOS verification, and distribution evidence remain. |
+| P01 Device-first start and preferences | Feature presets and independent focus and calendar controls preserve data across restart. | First-run flow and appearance coverage on native targets. |
+| P02 Today and navigation | Native Home, Tasks and Settings at twelve sizes. Thumb orbit, Calendar swipe, keyboard search and contextual details have tests. | Expanded platform accessibility and device sign-off. |
+| P03 Tasks and notes | Task nesting, prerequisites, deadlines, effort, completion history, Markdown organization and canonical record links are implemented. | Recurrence workflow integration, long-history speed and device reminder delivery. |
+| P04 Calendar and deterministic planning | Mobile and desktop Calendar, ICS transfer, scoped event recurrence, explicit availability solver and reviewed Apple copies have dedicated checks. | Native Apple permissions and device review, travel preferences and deeper calendar performance. |
+| P05 Focus and actual activity | Custom modes and cross-mode capture are integrated. Activity timers persist planned and actual spans separately. | Actual device timer interruption tests and optional contextual mode automation. |
+| P06 Review and habits | Daily reflections, weekly and monthly history, habit schedules, pause ranges and reviewed rollover have local checks. | Native reminders and longer history review. |
+| P07 Workouts and health | Workout templates, live sets, freestyle entries and dated health review have tests. | Native health permissions, compact accessibility and linked exercise history review. |
+| P08 Nutrition | Manual and photo drafts, checked units and explicit provider review are implemented. | Food catalogue coverage, weighed meal evaluation and media retention. |
+| P09 Statistics and learning | Confirmed activity union, comparable outcomes, duration evidence and aggregate export have property and scale tests. | Additional forecast provenance and app-wide evaluation. |
+| P10 Capture and integrations | Durable voice, typed proposals, paid budgeting, local model validation and explicit Calendar writes have focused evidence. | Native microphone, automation integration, API/provider interoperability and device reviews. |
+| Data integrity and recovery | SQLite migration, bounded history, authenticated backups, selected restore and an actual interruption test have evidence. | Portable media archives and broader disk fault tests. |
+| Device sharing | The local encrypted journal supports approved peers, reviewed import, conflicts and replay protection. | Paired device workflow and transport validation before release. |
+| Platform distribution | Native Linux build and offline flow, plus three Android AOT architectures, have run. | Android APK and lint, Apple builds, signed distribution, and physical devices. |
 
-A pure component test verifies its contract. It does not verify the corresponding feature through every platform or release path.
+[Reproducible checks and measured results](TEST_EVIDENCE.md)

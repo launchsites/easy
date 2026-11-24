@@ -1,26 +1,15 @@
 # Easy build status
 
-The sustained build started on 24 November 2026 at 00:51 UTC from commit `19d8c09`. The user asked the team to keep working through at least 09:00 UTC, integrate verified increments, and publish them to `main` as they land.
+Easy has a native Flutter workspace, on-device records and development verification for its primary Linux routes. Optional access uses rendered confirmation steps and separate permissions.
 
-The starting build had account-free local records, mobile orbit navigation, quiet desktop and phone Calendar views, one-line capture, contextual Today, flat task lists, file-like Notes, and planned or freestyle workouts. Its Linux release build and 73 Flutter tests had passed.
+| Work area | Current evidence |
+|---|---|
+| Workspace and focus | Custom modes, independent category and calendar visibility, task tools, and optional module preferences are integrated. |
+| Capture | One-field entry, cross-focus review, voice recording and optional local transcription are integrated. Model suggestions select only validated, reviewable changes. |
+| Calendars | Device-local schedules, imported recurrence, optional Apple calendar discovery, and reviewed Apple event copies are implemented. Apple runtime verification is pending. |
+| Recovery | Native encrypted logical backups, version history, record selection and a pre-restore recovery point are implemented. |
+| Planning | Deterministic proposals use explicit time windows and current commitments. Acceptance rechecks the workspace before saving. |
+| Workouts and nutrition | Recurring workout plans, live sets, exercise logs, manually editable meal drafts and optional photo suggestions are integrated. |
+| Inference and testing | Constrained local model measurements, synthetic speech, broad viewport checks, mutation tests and an offline native audit have recorded evidence. |
 
-## Active work
-
-| Area | Current increment | Integration dependency |
-|---|---|---|
-| Capture | Cross-focus typed interpreter and review contract | Capture UI and transaction application |
-| Calendars | Source identity, mode membership, and portable ICS | App filters and explicit Apple access |
-| Persistence | Native SQLite snapshot transactions, legacy migration, and verified backups | App store wiring and restore UI |
-| Planning | Pure deterministic time-window solver and feasibility tests | Task constraints and review UI |
-| Tasks and Notes | Task hierarchy and planning properties | App persistence and safe state transitions |
-| Design | Mobile Home and Gym refinements | Native captures and independent visual review |
-| Inference | Pinned local CPU runs with reduced resource limits | Expanded quality fixtures and device evidence |
-
-A blocked platform or integration does not stop independent work. The app stays usable with intelligence, sync, and external calendar access disabled. Device claims require tests on that device class.
-
-See [acceptance status](ACCEPTANCE.md) and [decisions](DECISIONS.md).
-
-
-## Integrated increments
-
-- `991a241` introduced the deterministic scheduling core. Six tests covered exact single-task split feasibility across 2,500 seeded cases, fixed commitments, deadlines, prerequisite failures, and stable allocation over 1,000 tasks.
+[Acceptance status](ACCEPTANCE.md) · [Test evidence](TEST_EVIDENCE.md) · [Engineering decisions](DECISIONS.md)

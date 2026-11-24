@@ -241,6 +241,13 @@ class WorkspaceData {
             allDay: event['allDay'] as bool,
             location: event['location'] as String?,
             plannedTaskId: event['plannedTaskId'] as String?,
+            initialPlannedStart: DateTime.tryParse(
+              event['initialPlannedStart'] as String? ?? '',
+            ),
+            initialPlannedEnd: DateTime.tryParse(
+              event['initialPlannedEnd'] as String? ?? '',
+            ),
+            description: event['description'] as String?,
           ),
       ],
       tasks: [
@@ -263,6 +270,9 @@ class WorkspaceData {
               task['earliestStart'] as String? ?? '',
             ),
             dueAt: DateTime.tryParse(task['dueAt'] as String? ?? ''),
+            completedAt: DateTime.tryParse(
+              task['completedAt'] as String? ?? '',
+            ),
             prerequisiteIds: List.unmodifiable(
               (task['prerequisiteIds'] as List?)?.cast<String>() ??
                   const <String>[],
@@ -296,7 +306,16 @@ class WorkspaceData {
           'category': event.category,
           'allDay': event.allDay,
           'location': event.location,
+          if (event.description != null) 'description': event.description,
           if (event.plannedTaskId != null) 'plannedTaskId': event.plannedTaskId,
+          if (event.initialPlannedStart != null)
+            'initialPlannedStart': event.initialPlannedStart!
+                .toUtc()
+                .toIso8601String(),
+          if (event.initialPlannedEnd != null)
+            'initialPlannedEnd': event.initialPlannedEnd!
+                .toUtc()
+                .toIso8601String(),
         },
     ],
     'tasks': [
@@ -316,6 +335,8 @@ class WorkspaceData {
             'earliestStart': task.earliestStart!.toIso8601String(),
           if (task.dueAt != null)
             'dueAt': task.dueAt!.toUtc().toIso8601String(),
+          if (task.completedAt != null)
+            'completedAt': task.completedAt!.toUtc().toIso8601String(),
           if (task.prerequisiteIds.isNotEmpty)
             'prerequisiteIds': task.prerequisiteIds,
           if (task.allowSplit) 'allowSplit': true,

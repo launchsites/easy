@@ -18,6 +18,9 @@ class CalendarEvent {
     this.allDay = false,
     this.location,
     this.plannedTaskId,
+    this.initialPlannedStart,
+    this.initialPlannedEnd,
+    this.recurringSeriesId,
     this.sourceLabel,
     this.description,
     this.color,
@@ -31,6 +34,9 @@ class CalendarEvent {
   final bool allDay;
   final String? location;
   final String? plannedTaskId;
+  final DateTime? initialPlannedStart;
+  final DateTime? initialPlannedEnd;
+  final String? recurringSeriesId;
   final String? sourceLabel;
   final String? description;
   final Color? color;

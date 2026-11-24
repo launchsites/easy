@@ -5,6 +5,12 @@ import '../storage/attachment_store.dart' show AttachmentRef;
 import '../ui_theme.dart';
 import 'nutrition_model.dart';
 
+typedef ReviewMealPhoto = Future<List<NutritionPortion>?> Function(
+  BuildContext context,
+  NutritionMeal meal,
+  List<NutritionFood> foods,
+);
+
 class NutritionPage extends StatefulWidget {
   const NutritionPage({
     required this.foods,
@@ -14,6 +20,8 @@ class NutritionPage extends StatefulWidget {
     this.clock,
     this.onAttachPhoto,
     this.onViewPhoto,
+    this.onReviewPhoto,
+    this.onCancelPhotoReview,
     super.key,
   });
 
@@ -24,6 +32,8 @@ class NutritionPage extends StatefulWidget {
   final DateTime Function()? clock;
   final Future<AttachmentRef?> Function()? onAttachPhoto;
   final Future<void> Function(AttachmentRef)? onViewPhoto;
+  final ReviewMealPhoto? onReviewPhoto;
+  final VoidCallback? onCancelPhotoReview;
 
   @override
   State<NutritionPage> createState() => _NutritionPageState();
@@ -98,6 +108,8 @@ class _NutritionPageState extends State<NutritionPage> {
           ), (item) => item.id),
         ),
         onViewPhoto: widget.onViewPhoto,
+        onReviewPhoto: widget.onReviewPhoto,
+        onCancelPhotoReview: widget.onCancelPhotoReview,
       ),
     );
     if (!mounted || edit == null) return;
@@ -479,6 +491,8 @@ class _MealEditor extends StatefulWidget {
     required this.foods,
     required this.onFoodSaved,
     required this.onViewPhoto,
+    required this.onReviewPhoto,
+    required this.onCancelPhotoReview,
   });
 
   final NutritionMeal? meal;
@@ -486,6 +500,8 @@ class _MealEditor extends StatefulWidget {
   final List<NutritionFood> foods;
   final ValueChanged<NutritionFood> onFoodSaved;
   final Future<void> Function(AttachmentRef)? onViewPhoto;
+  final ReviewMealPhoto? onReviewPhoto;
+  final VoidCallback? onCancelPhotoReview;
 
   @override
   State<_MealEditor> createState() => _MealEditorState();
@@ -497,9 +513,39 @@ class _MealEditorState extends State<_MealEditor> {
   late final _foods = [...widget.foods];
   late DateTime _eatenAt = widget.meal?.eatenAt.toLocal() ?? widget.date;
   String? _error;
+  var _reviewingPhoto = false;
+
+  Future<void> _reviewPhoto() async {
+    final meal = widget.meal;
+    final review = widget.onReviewPhoto;
+    if (meal?.photo == null || review == null || _reviewingPhoto) return;
+    setState(() {
+      _reviewingPhoto = true;
+      _error = null;
+    });
+    try {
+      final portions = await review(context, meal!, _foods);
+      if (!mounted || portions == null) return;
+      setState(() {
+        final existing = _portions.map((portion) => portion.food.id).toSet();
+        _portions.addAll(
+          portions.where((portion) => existing.add(portion.food.id)),
+        );
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error = 'The photo is saved. Suggestions could not be loaded.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _reviewingPhoto = false);
+    }
+  }
 
   @override
   void dispose() {
+    if (_reviewingPhoto) widget.onCancelPhotoReview?.call();
     _name.dispose();
     super.dispose();
   }
@@ -614,7 +660,10 @@ class _MealEditorState extends State<_MealEditor> {
     return _NutritionScreen(
       title: widget.meal == null ? 'New meal' : foodName,
       error: _error,
-      footer: FilledButton(onPressed: _save, child: const Text('Save meal')),
+      footer: FilledButton(
+        onPressed: _reviewingPhoto ? null : _save,
+        child: const Text('Save meal'),
+      ),
       children: [
         _Input(label: 'Meal name', controller: _name),
         const SizedBox(height: 9),
@@ -644,6 +693,24 @@ class _MealEditorState extends State<_MealEditor> {
             trailing: widget.onViewPhoto == null
                 ? null
                 : const Icon(Icons.chevron_right_rounded, color: muted),
+          ),
+        if (widget.meal?.photo != null && widget.onReviewPhoto != null)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: _reviewingPhoto
+                  ? widget.onCancelPhotoReview
+                  : _reviewPhoto,
+              icon: Icon(
+                _reviewingPhoto
+                    ? Icons.close_rounded
+                    : Icons.auto_awesome_outlined,
+                size: 18,
+              ),
+              label: Text(
+                _reviewingPhoto ? 'Cancel request' : 'Suggest foods from photo',
+              ),
+            ),
           ),
         const SizedBox(height: 20),
         const _Heading('Foods'),

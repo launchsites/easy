@@ -398,6 +398,7 @@ class _RecordEditorState extends State<RecordEditor> {
             category: _category,
             date: _dueDate,
             done: widget.task?.done ?? false,
+            completedAt: widget.task?.completedAt,
             estimatedMinutes: estimate,
             priority: _priority,
             parentId: _taskParentId,
@@ -437,6 +438,10 @@ class _RecordEditorState extends State<RecordEditor> {
             allDay: _allDay,
             location: location.isEmpty ? null : location,
             plannedTaskId: widget.event?.plannedTaskId,
+            initialPlannedStart: widget.event?.initialPlannedStart,
+            initialPlannedEnd: widget.event?.initialPlannedEnd,
+            description: widget.event?.description,
+            color: widget.event?.color,
           ),
         );
       case RecordKind.note:

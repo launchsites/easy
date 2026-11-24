@@ -26,6 +26,7 @@ class TaskItem {
     this.allowSplit = false,
     this.minimumChunkMinutes = defaultTaskChunkMinutes,
     this.dueAt,
+    this.completedAt,
   });
 
   final String id;
@@ -42,8 +43,13 @@ class TaskItem {
   final bool allowSplit;
   final int minimumChunkMinutes;
   final DateTime? dueAt;
+  final DateTime? completedAt;
 
-  TaskItem withDone(bool done) => _with(done: done, parentId: parentId);
+  TaskItem withDone(bool done, {DateTime? completedAt}) =>
+      _with(done: done, parentId: parentId, completion: completedAt);
+
+  TaskItem withDate(DateTime date) =>
+      _with(done: done, parentId: parentId, rescheduledDate: date);
 
   TaskItem withParent(String? parentId) =>
       _with(done: done, parentId: parentId);
@@ -62,11 +68,13 @@ class TaskItem {
     required String? parentId,
     List<String>? prerequisites,
     int? estimate,
+    DateTime? completion,
+    DateTime? rescheduledDate,
   }) => TaskItem(
     id: id,
     title: title,
     category: category,
-    date: date,
+    date: rescheduledDate ?? date,
     done: done,
     estimatedMinutes: estimate ?? estimatedMinutes,
     priority: priority,
@@ -77,6 +85,7 @@ class TaskItem {
     allowSplit: allowSplit,
     minimumChunkMinutes: minimumChunkMinutes,
     dueAt: dueAt,
+    completedAt: done ? completion ?? completedAt : null,
   );
 }
 
