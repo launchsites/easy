@@ -14,6 +14,10 @@ All three directions use the same Tasks, Home and Gym screens with the built-in 
 
 **Graphite** uses a charcoal surround, a pale neutral work surface and violet controls. Its list rows and corners sit between the other two directions.
 
+## Mobile Calendar
+
+The current Android review build shows the day timeline after a swipe, with compact hour labels and the two bottom-corner controls. [Current Calendar screenshot](runtime-previews/477594a/README.md)
+
 ## Reproduce
 
 The renderer builds a Linux release from revision `d8e9018` in a temporary directory. It applies the chosen appearance there, opens Easy on an isolated X11 display and captures the three routes. The sample dates come from the machine’s local clock. Capture before 09:30 local time to see all three upcoming events in the mobile Home image.

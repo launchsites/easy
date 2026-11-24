@@ -24,6 +24,9 @@ The hosted `a339bf8` release produced all three development-signed review APKs. 
 
 The downloadable `ecdc55a` packages also passed assembly, signature and compiled policy checks, and 16 KiB ZIP and ELF alignment on each ABI. Release lint recorded zero errors and one available Gradle upgrade warning. The independent AOSP runtime check installed the exact uploaded x86-64 APK verified against its digest, completing setup and the held-drag, day swipe, and timed event save. [Current review APKs](https://github.com/launchsites/easy/actions/runs/45352804011) · [Uploaded APK runtime](https://github.com/launchsites/easy/actions/runs/45353884908) · [Current package evidence](benchmark-results/android-packages-ecdc55a-hosted-20261124.json)
 
+
+The `477594a` review build includes the compact mobile Calendar clock labels. The three ABI packages passed signature, compiled-policy and 16 KiB alignment checks. Release lint recorded zero errors and one available Gradle upgrade warning. A separate AOSP 36 host verified the original uploaded x86-64 APK, completed Full sample setup, opened Calendar with the held drag, swiped to the following day and saved one event with touch input. [Current review APKs](https://github.com/launchsites/easy/actions/runs/45363351696) · [Current uploaded APK runtime](https://github.com/launchsites/easy/actions/runs/45364549136) · [Verification results](benchmark-results/android-packages-477594a-hosted-20261124.json) · [Current Calendar screenshot](runtime-previews/477594a/README.md)
+
 ```sh
 flutter build apk --release --split-per-abi
 cd android

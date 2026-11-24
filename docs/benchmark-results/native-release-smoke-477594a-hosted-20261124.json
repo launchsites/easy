@@ -1,0 +1,16 @@
+{
+  "app_revision": "477594a709487f8f361a993fdb4071dcf86b4502",
+  "build_run_id": 45363213755,
+  "build_artifact_id": 14906820186,
+  "build_artifact_sha256": "b685c27e77f61feeb4fe41c39aca8b0dc85ba44eee19cb9a50f70f35bf25e874",
+  "archive_sha256": "e5d7307853f328a4d08954538de45602e6d77c7bff7405380e0d912bcc9fdfbc",
+  "archive_entries": 34,
+  "runtime_run_id": 45363622470,
+  "runtime_artifact_id": 14905867325,
+  "runtime_artifact_sha256": "414b10d169d99de2cb89f783fbe5ecacdd4cc7cc4b49bd1010d76c3090c95604",
+  "status": "passed",
+  "visual_and_storage_checks": 38,
+  "elapsed_seconds": 39.43,
+  "runner": "GitHub-hosted Ubuntu 24.04",
+  "renderer": "Mesa llvmpipe"
+}

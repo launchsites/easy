@@ -20,7 +20,7 @@ The workflows request read-only repository contents and use GitHub's checkout ac
 
 | Hosted check | Revision | Result |
 | --- | --- | --- |
-| Linux | `ecdc55a` | Analyzer, eight Python checks, 884 Flutter tests with seven conditional skips, both DST checks, release compilation and archive extraction passed. [Run](https://github.com/launchsites/easy/actions/runs/45352683815) |
+| Linux | `477594a` | Analyzer, eight Python checks, 886 Flutter tests with seven conditional skips, both DST checks, release compilation and archive extraction passed. [Run](https://github.com/launchsites/easy/actions/runs/45363213755) |
 | Apple SDK | `f8c14fc` | The iOS simulator debug build and unsigned macOS release compiled with Xcode 26.3. [Run](https://github.com/launchsites/easy/actions/runs/45334132108) |
 | iPhone simulator | `b20417a` | Xcode 26.4.1 compiled iOS and macOS. The iPhone 17 simulator on iOS 26.4 launched Easy, verified the private empty workspace, and captured the 1206 × 2622 setup screen. [Run](https://github.com/launchsites/easy/actions/runs/45341653863) |
 | macOS startup | `3f56109` | Easy's ARM64 release launched on macOS 15.8.2 with Xcode 26.3. A runner-local ad hoc copy passed strict signature and release-entitlement checks. The live app created its sandboxed workspace, where a read-only probe verified the empty pending setup, SQLite integrity, and document checksums. [Run](https://github.com/launchsites/easy/actions/runs/45345576521) |
@@ -31,12 +31,12 @@ The workflows request read-only repository contents and use GitHub's checkout ac
 
 ## Review builds
 
-The downloadable previews were built from `ecdc55a` and include SHA-256 checksums. GitHub sign-in is required. Run `./easy` from the extracted Linux directory. The Android archives contain development-signed APKs.
+The downloadable previews were built from `477594a` and include SHA-256 checksums. GitHub sign-in is required. Unzip the Linux download, extract `easy-linux-x64.tar.gz`, and run `./easy` from the inner `easy` directory. The Android archives contain development-signed APKs.
 
-- [Linux x86-64](https://github.com/launchsites/easy/actions/runs/45352683815/artifacts/14902297185)
-- [Android ARM64](https://github.com/launchsites/easy/actions/runs/45352804011/artifacts/14901376881)
-- [Android ARMv7](https://github.com/launchsites/easy/actions/runs/45352804011/artifacts/14900594599)
-- [Android x86-64](https://github.com/launchsites/easy/actions/runs/45352804011/artifacts/14900918873)
+- [Linux x86-64](https://github.com/launchsites/easy/actions/runs/45363213755/artifacts/14906820186)
+- [Android ARM64](https://github.com/launchsites/easy/actions/runs/45363351696/artifacts/14906785512)
+- [Android ARMv7](https://github.com/launchsites/easy/actions/runs/45363351696/artifacts/14906246598)
+- [Android x86-64](https://github.com/launchsites/easy/actions/runs/45363351696/artifacts/14906331419)
 
 ## Run the checks locally
 

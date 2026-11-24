@@ -17,6 +17,8 @@ The `5d2ef907c9a6396e34943606fe8e80b96d099d35` review archive passed 38 baseline
 
 An independent Ubuntu 24.04 runner downloaded the `ecdc55a` review archive produced by the main verification job. The runner verified the archive SHA-256 and `BUILD.txt` source, checked dynamic linking, and ran the extracted release under X11 with Mesa llvmpipe. All 38 native checks passed in 55.90 seconds, including both onboarding paths, Health visibility and live workout capture. [Native package run](https://github.com/launchsites/easy/actions/runs/45357107699) · [Verification results](benchmark-results/native-release-smoke-ecdc55a-hosted-20261124.json) · [Screenshots and raw output](https://github.com/launchsites/easy/actions/runs/45357107699/artifacts/14903286313)
 
+The refreshed `477594a` archive also passed all 38 native checks in 39.43 seconds. The independent runner downloaded the same package available from CI, verified its source and digest, and ran the extracted executable under Mesa llvmpipe. [Exact runtime run](https://github.com/launchsites/easy/actions/runs/45363622470) · [Current runtime artifacts](https://github.com/launchsites/easy/actions/runs/45363622470/artifacts/14905867325) · [Verification results](benchmark-results/native-release-smoke-477594a-hosted-20261124.json)
+
 The runner uses Flutter's Linux x64 release bundle, Python 3, Xvfb, xdotool, ImageMagick, and Tesseract. It checks simulated pointer and keyboard input at desktop and phone dimensions. Android, iOS, and physical touch use require separate checks.
 
 ```sh
