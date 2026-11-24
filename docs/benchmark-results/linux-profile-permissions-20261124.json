@@ -1,0 +1,64 @@
+{
+  "base_revision": "e8896cff408a643652b6d98642ab153a0ca0a879",
+  "runner_overlay_sha256": {
+    "linux/runner/main.cc": "894f79e1739e0dbeeb00acbd6ececa13f81550bcf6fbf90938e9a2bc6c242109",
+    "linux/runner/CMakeLists.txt": "3983967ed87b430090821f5d8a95c037bbf67047203c46eccaccbbd15b6552a9",
+    "linux/runner/profile_permissions.h": "095388d9a1c078f6432bd3f4b93e0304812dc5f4d254af05c8cc7cb8fb049724",
+    "linux/runner/profile_permissions.cc": "a24005bfceadc25e8c5cfdd447d4c4ef97d5a3568f4e1ace1eecdae1819af6d4"
+  },
+  "executable_sha256": "9909c4d028b154d202def4c0889cbd56fe60e52557d5bd5ffea11975734c0b51",
+  "aot_library_sha256": "29f6e7c62dcd647a45d025e0db041f5858060732765e088652acf172a72e5149",
+  "parent_umask": "0022",
+  "native_helper": {
+    "symlink_ancestors_and_profile_left_untouched": true,
+    "owner_permissions_preserved": true,
+    "verified_legacy_directory_and_preferences_tightened": true,
+    "linked_preference_files_left_untouched": true,
+    "unrelated_files_left_untouched": true
+  },
+  "new_profile": {
+    "modes": {
+      "xdg_parent": "0755",
+      "profile": "0700",
+      "workspace_directory": "0700",
+      "database": "0600",
+      "database_wal": "0600",
+      "unrelated_profile": "0755",
+      "unrelated_export": "0644"
+    },
+    "workspace": {
+      "revision": 1,
+      "digest": "28d07efa29e2ef2ac9e1a88e5da4a12ed01c82a9094142fca537e6faccccf892",
+      "storage_format": "chunked",
+      "counts": {
+        "events": 0,
+        "tasks": 0,
+        "notes": 0
+      },
+      "quick_check": "ok"
+    }
+  },
+  "existing_profile": {
+    "modes": {
+      "xdg_parent": "0755",
+      "profile": "0700",
+      "workspace_directory": "0700",
+      "database": "0600",
+      "database_wal": "0600",
+      "unrelated_profile": "0755",
+      "unrelated_export": "0644",
+      "older_preferences_under_private_profile": "0644"
+    },
+    "workspace": {
+      "revision": 1,
+      "digest": "c80938235207ffa44e8c04d29358446d36dfe29b526837641a931b837cfb50db",
+      "storage_format": "chunked",
+      "counts": {
+        "events": 0,
+        "tasks": 1,
+        "notes": 2
+      },
+      "quick_check": "ok"
+    }
+  }
+}

@@ -12,6 +12,7 @@ add_executable(${BINARY_NAME}
   "ai_credential_service.cc"
   "main.cc"
   "my_application.cc"
+  "profile_permissions.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 
@@ -20,7 +21,10 @@ add_executable(${BINARY_NAME}
 apply_standard_settings(${BINARY_NAME})
 
 # Add preprocessor definitions for the application ID.
-add_definitions(-DAPPLICATION_ID="${APPLICATION_ID}")
+target_compile_definitions(${BINARY_NAME} PRIVATE
+  APPLICATION_ID="${APPLICATION_ID}"
+  EASY_BINARY_NAME="${BINARY_NAME}"
+)
 
 # Add dependency libraries. Add any application-specific dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter)
