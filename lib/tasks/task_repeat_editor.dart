@@ -31,6 +31,7 @@ Future<TaskRepeatSettings?> showTaskRepeatEditor(
 Future<InternalOccurrenceScope?> showTaskOccurrenceScopeDialog(
   BuildContext context, {
   required bool skipping,
+  bool allowSingle = true,
 }) => showDialog<InternalOccurrenceScope>(
   context: context,
   builder: (context) => AlertDialog(
@@ -42,16 +43,17 @@ Future<InternalOccurrenceScope?> showTaskOccurrenceScopeDialog(
         mainAxisSize: MainAxisSize.min,
         children: [
           for (final scope in InternalOccurrenceScope.values)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(switch (scope) {
-                InternalOccurrenceScope.one => 'This occurrence',
-                InternalOccurrenceScope.future =>
-                  'This and following occurrences',
-                InternalOccurrenceScope.series => 'Entire series',
-              }),
-              onTap: () => Navigator.pop(context, scope),
-            ),
+            if (allowSingle || scope != InternalOccurrenceScope.one)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(switch (scope) {
+                  InternalOccurrenceScope.one => 'This occurrence',
+                  InternalOccurrenceScope.future =>
+                    'This and following occurrences',
+                  InternalOccurrenceScope.series => 'Entire series',
+                }),
+                onTap: () => Navigator.pop(context, scope),
+              ),
         ],
       ),
     ),

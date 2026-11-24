@@ -32,6 +32,7 @@ class ReviewTask {
     this.done = false,
     this.estimatedMinutes,
     this.completedAt,
+    this.canChangePreferredDate = true,
   });
 
   final String id;
@@ -41,6 +42,7 @@ class ReviewTask {
   final bool done;
   final int? estimatedMinutes;
   final DateTime? completedAt;
+  final bool canChangePreferredDate;
 
   DateTime? get _dueDay {
     if (dueAt case final instant?) return reviewDay(instant.toLocal());
@@ -48,7 +50,8 @@ class ReviewTask {
     return null;
   }
 
-  bool get canRollForward => !done && date != null && dueAt == null;
+  bool get canRollForward =>
+      canChangePreferredDate && !done && date != null && dueAt == null;
 }
 
 class ReviewAgenda {

@@ -482,6 +482,7 @@ class _RecordDetails extends StatelessWidget {
     this.onEstimate,
     this.onAppleCopy,
     this.onRepeat,
+    this.repeatingTask = false,
     this.onAssignPlace,
   });
 
@@ -494,6 +495,7 @@ class _RecordDetails extends StatelessWidget {
   final VoidCallback? onEstimate;
   final VoidCallback? onAppleCopy;
   final VoidCallback? onRepeat;
+  final bool repeatingTask;
   final VoidCallback? onAssignPlace;
 
   @override
@@ -521,6 +523,7 @@ class _RecordDetails extends StatelessWidget {
       ],
       TaskItem() => [
         (Icons.check_box_outlined, item.done ? 'Completed' : 'Open'),
+        if (repeatingTask) (Icons.repeat_rounded, 'Repeating task'),
         if (item.date != null) (Icons.calendar_today_outlined, day(item.date!)),
         (Icons.circle_outlined, spaceName(item.category)),
         if (item.estimatedMinutes case final minutes?)
@@ -602,19 +605,23 @@ class _RecordDetails extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 children: [
-                  FilledButton.tonal(
-                    onPressed: onEdit,
-                    child: const Text('Edit'),
-                  ),
-                  TextButton(
-                    onPressed: onDelete,
-                    style: TextButton.styleFrom(foregroundColor: muted),
-                    child: Text(
-                      item is CalendarEvent && item.recurringSeriesId != null
-                          ? 'Skip'
-                          : 'Delete',
+                  if (item is! TaskItem || !repeatingTask || !item.done) ...[
+                    FilledButton.tonal(
+                      onPressed: onEdit,
+                      child: const Text('Edit'),
                     ),
-                  ),
+                    TextButton(
+                      onPressed: onDelete,
+                      style: TextButton.styleFrom(foregroundColor: muted),
+                      child: Text(
+                        repeatingTask ||
+                                item is CalendarEvent &&
+                                    item.recurringSeriesId != null
+                            ? 'Skip'
+                            : 'Delete',
+                      ),
+                    ),
+                  ],
                   if (onEstimate != null)
                     TextButton(
                       onPressed: onEstimate,
@@ -629,7 +636,9 @@ class _RecordDetails extends StatelessWidget {
                     TextButton(
                       onPressed: onRepeat,
                       child: Text(
-                        item is CalendarEvent && item.recurringSeriesId != null
+                        repeatingTask ||
+                                item is CalendarEvent &&
+                                    item.recurringSeriesId != null
                             ? 'Repeat rule'
                             : 'Repeat',
                       ),

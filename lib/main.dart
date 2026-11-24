@@ -70,12 +70,16 @@ import 'settings_page.dart';
 import 'storage/attachment_store.dart';
 import 'storage/workspace_backup_page.dart';
 import 'storage/workspace_store.dart';
+import 'tasks/recurring_task.dart';
+import 'tasks/task_repeat_editor.dart';
+import 'tasks/task_workspace_feed.dart';
 import 'today_page.dart';
 import 'workout_plan.dart';
 import 'workout_plans_page.dart';
 import 'workspace_data.dart';
 
 part 'workspace_chrome.dart';
+part 'workspace_repeating_tasks.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -218,6 +222,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   List<WorkspaceIcsCalendar> _icsCalendars = const [];
   List<InternalRecurringEvent> _eventSeries = const [];
   Set<String> _eventSeriesIds = const {};
+  var _taskFeed = TaskWorkspaceFeed();
+  var _taskSeriesUnreadable = false;
   Future<AttachmentStore?>? _attachmentStore;
   Future<AiDeviceState>? _aiState;
   Future<AiRuntime?>? _preparingAi;
@@ -430,6 +436,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     } on Object {
       _assignEventSeries(const []);
     }
+    _readTaskFeed();
   }
 
   void _assignEventSeries(List<InternalRecurringEvent> series) {
@@ -949,7 +956,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   AiEnrichmentCandidate? _estimateCandidate(TaskItem task) {
-    if (task.done || task.estimatedMinutes != null || task.title.length > 300) {
+    if (task.done ||
+        _taskFeed.ids.contains(task.id) ||
+        task.estimatedMinutes != null ||
+        task.title.length > 300) {
       return null;
     }
     final samples =
@@ -1749,7 +1759,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         builder: (_) => InsightsPage(
           activities: records,
           tasks: [
-            for (final task in _data.tasks)
+            for (final task in _taskFeed.insightTasks(_data.tasks))
               InsightTask(
                 id: task.id,
                 title: task.title,
@@ -1797,6 +1807,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   ReviewAgenda _reviewAgenda(DateTime day) {
     final end = plusDays(day, 1);
+    final standaloneIds = _taskFeed.series.isEmpty
+        ? null
+        : _taskFeed.standalone(_data.tasks).map((task) => task.id).toSet();
     return ReviewAgenda(
       events: [
         for (final event in [
@@ -1815,7 +1828,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             ),
       ],
       tasks: [
-        for (final task in _data.tasks)
+        for (final task in _taskFeed.reviewTasks(_data.tasks, day))
           ReviewTask(
             id: task.id,
             title: task.title,
@@ -1824,6 +1837,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             done: task.done,
             estimatedMinutes: task.estimatedMinutes,
             completedAt: task.completedAt,
+            canChangePreferredDate: standaloneIds?.contains(task.id) ?? true,
           ),
       ],
       unresolvedCaptures: _data.captures
@@ -2113,14 +2127,20 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   void _assignData(WorkspaceData data) {
+    final taskSeriesChanged = !identical(
+      data.sections[recurringTasksSection],
+      _data.sections[recurringTasksSection],
+    );
     if (!identical(data.tasks, _data.tasks) ||
         !identical(data.events, _data.events) ||
-        !identical(data.notes, _data.notes)) {
+        !identical(data.notes, _data.notes) ||
+        taskSeriesChanged) {
       _contentRevision++;
     }
     _data = data;
+    if (taskSeriesChanged) _readTaskFeed();
     if (_inspected case final TaskItem selected) {
-      _inspected = data.tasks
+      _inspected = _workspaceTasks
           .where((task) => task.id == selected.id)
           .firstOrNull;
     }
@@ -2436,6 +2456,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   void _toggleTask(TaskItem task) {
+    if (_repeatingTask(task) case final row?) {
+      unawaited(_toggleRepeatingTask(row));
+      return;
+    }
     final done = !task.done;
     _setTaskDone(
       task.id,
@@ -2533,6 +2557,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (record is CalendarEvent && record.isReadOnly) return;
     if (record is CalendarEvent && record.recurringSeriesId != null) {
       await _skipOccurrence(record);
+      return;
+    }
+    if (_repeatingTask(record) case final row?) {
+      await _skipRepeatingTask(row);
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -2714,7 +2742,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       PlanDaySheet(
         day: day,
         events: [..._standaloneEvents(prior.events), ...appointments],
-        tasks: prior.tasks,
+        tasks: _taskFeed.planningTasks(prior.tasks, day),
         settings: settings,
         categories: categories,
       ),
@@ -2740,7 +2768,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         ..._standaloneEvents(beforeAcceptance.events),
         ...finalAppointments,
       ],
-      tasks: beforeAcceptance.tasks,
+      tasks: _taskFeed.planningTasks(beforeAcceptance.tasks, day),
       settings: settings,
       categories: categories,
     ));
@@ -3030,7 +3058,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       selectedRecordId: _inspected == null ? null : _recordId(_inspected!),
       categories: _categories(),
       records: [
-        for (final task in _data.tasks)
+        for (final task in _captureTaskMatches(source.capturedAt))
           CaptureRecordRef(
             id: task.id,
             kind: CaptureIntentKind.task,
@@ -3147,6 +3175,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final tasks = [...previous.tasks];
     final events = [...previous.events];
     final notes = [...previous.notes];
+    final repeats = <String, RecurringTaskSeries>{};
     List<GymSession>? gym;
     GymSession? capturedSession;
     NutritionData? nutrition;
@@ -3255,12 +3284,29 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           );
         case CaptureCompleteTaskDraft():
           final index = tasks.indexWhere((task) => task.id == draft.targetId);
-          if (index < 0 || tasks[index].done) {
+          if (index >= 0 &&
+              !_taskFeed.ids.contains(draft.targetId) &&
+              !tasks[index].done) {
+            tasks[index] = tasks[index].withDone(
+              true,
+              completedAt: DateTime.now().toUtc(),
+            );
+            continue;
+          }
+          final row = _taskFeed.row(
+            draft.targetId,
+            previous.tasks,
+            _today,
+            sourceDate: source.capturedAt.toLocal(),
+          );
+          if (row == null ||
+              row.task.done ||
+              repeats.containsKey(row.series.id)) {
             return 'Review the task’s current state.';
           }
-          tasks[index] = tasks[index].withDone(
-            true,
-            completedAt: DateTime.now().toUtc(),
+          repeats[row.series.id] = row.series.complete(
+            row.occurrence,
+            at: DateTime.now().toUtc(),
           );
       }
     }
@@ -3278,6 +3324,11 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (nutrition != null) {
       updated = updated.withSection(_nutritionKey, nutrition.toJson());
     }
+    if (repeats.isNotEmpty) {
+      updated = _withTaskSeries(updated, [
+        for (final series in _taskFeed.series) repeats[series.id] ?? series,
+      ]);
+    }
     await _commitReviewedData(
       previous,
       updated,
@@ -3291,6 +3342,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (existing is CalendarEvent && existing.isReadOnly) return;
     if (existing is CalendarEvent && existing.recurringSeriesId != null) {
       await _editOccurrence(existing);
+      return;
+    }
+    if (_repeatingTask(existing) case final row?) {
+      await _editRepeatingTask(row);
       return;
     }
     final result = await _showEditor(
@@ -3325,7 +3380,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   Future<void> _openNoteLink(NoteLink link) async {
     final target = switch (link.kind) {
       NoteLinkKind.task =>
-        _data.tasks.where((task) => task.id == link.id).firstOrNull,
+        _workspaceTasks.where((task) => task.id == link.id).firstOrNull ??
+            _linkedTaskOccurrence(link.id),
       NoteLinkKind.event =>
         _data.events.where((event) => event.id == link.id).firstOrNull,
     };
@@ -3387,7 +3443,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           onAppleCopy: _canCopyToApple(record)
               ? () => Navigator.pop(context, 'apple-copy')
               : null,
-          onRepeat: _canRepeatEvent(record)
+          repeatingTask: _repeatingTask(record) != null,
+          onRepeat: _canRepeatEvent(record) || _canRepeatTask(record)
               ? () => Navigator.pop(context, 'repeat')
               : null,
           onAssignPlace: _canAssignPlace(record)
@@ -3408,6 +3465,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }
     if (action == 'repeat' && record is CalendarEvent) {
       await _setEventRepeat(record);
+    }
+    if (action == 'repeat' && record is TaskItem) {
+      await _setTaskRepeat(record);
     }
     if (action == 'place' && record is CalendarEvent) {
       await _assignPlace(record);
@@ -3592,6 +3652,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   bool _canEstimate(Object? record) =>
       record is TaskItem &&
       !record.done &&
+      !_taskFeed.ids.contains(record.id) &&
+      _repeatingTask(record) == null &&
       _allows(EasyFeature.ai) &&
       (_ai?.settings.allowEstimates ?? false);
 
@@ -3870,9 +3932,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final mode = _focus;
     final modes = _availableModes.toList(growable: false);
     final events = _calendarEvents(mode);
+    final workspaceTasks = _workspaceTasks;
     final tasks = mode == null || mode.categories == null
-        ? _data.tasks
-        : _data.tasks
+        ? workspaceTasks
+        : workspaceTasks
               .where((item) => mode.includes(item.category.toLowerCase()))
               .toList();
     final notes = mode == null || mode.categories == null
@@ -4091,11 +4154,18 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                                                   _inspected! as CalendarEvent,
                                                 )
                                               : null,
-                                          onRepeat: _canRepeatEvent(_inspected)
-                                              ? () => _setEventRepeat(
-                                                  _inspected! as CalendarEvent,
-                                                )
-                                              : null,
+                                          repeatingTask:
+                                              _repeatingTask(_inspected) !=
+                                              null,
+                                          onRepeat: switch (_inspected) {
+                                            CalendarEvent event
+                                                when _canRepeatEvent(event) =>
+                                              () => _setEventRepeat(event),
+                                            TaskItem task
+                                                when _canRepeatTask(task) =>
+                                              () => _setTaskRepeat(task),
+                                            _ => null,
+                                          },
                                           onAssignPlace:
                                               _canAssignPlace(_inspected)
                                               ? () => _assignPlace(

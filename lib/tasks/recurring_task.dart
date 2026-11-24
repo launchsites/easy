@@ -242,6 +242,37 @@ class RecurringTaskSeries {
     return List.unmodifiable(result);
   }
 
+  /// Recorded completions can outlive the visible repeat window.
+  Iterable<RecurringTaskOccurrence> get completions sync* {
+    for (final entry in _outcomes.entries) {
+      final outcome = entry.value;
+      if (outcome.status != RecurringTaskStatus.completed) continue;
+      yield _project(
+        identity: entry.key,
+        date: outcome.date,
+        details: outcome.details,
+        rule: outcome.rule,
+        status: outcome.status,
+        completedAt: outcome.completedAt,
+        placement: outcome.placement,
+      );
+    }
+  }
+
+  TaskItem fieldsForDate(RecurringTaskOccurrence occurrence, DateTime date) {
+    _requirePending(occurrence);
+    final shifted = _project(
+      identity: occurrence.identityDate,
+      date: _day(date),
+      details: _detailsAt(occurrence.identityDate),
+      rule: occurrence.rule,
+    );
+    if (shifted.constraintIssue case final issue?) {
+      throw RecurringTaskScheduleException(issue);
+    }
+    return shifted.task;
+  }
+
   RecurringTaskSeries complete(
     RecurringTaskOccurrence occurrence, {
     required DateTime at,
@@ -645,7 +676,6 @@ class _TaskTemplate {
       estimatedMinutes: task.estimatedMinutes,
     );
     if (task.title.trim().isEmpty ||
-        task.category.trim().isEmpty ||
         (task.estimatedMinutes ?? 1) < 1 ||
         task.prerequisiteIds.any((id) => id.trim().isEmpty) ||
         task.prerequisiteIds.toSet().length != task.prerequisiteIds.length ||
