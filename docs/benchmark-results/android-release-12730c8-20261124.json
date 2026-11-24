@@ -1,0 +1,77 @@
+{
+  "app_revision": "12730c86ac311e5c473a6810a69cc31ec257f1ff",
+  "debuggable": false,
+  "development_signed": true,
+  "inspector_sha256": "12cc0e4431f8ae9c19b3d22e8fbf8cadac66fc9e100a0a3a3770d55eccc0a19d",
+  "packages": {
+    "arm64-v8a": {
+      "bytes": 26797725,
+      "certificate_sha256": "c32cecda8dbf70c9aa8e5c25886e542aa1c15efbc624d491bfac5fbc23ec43ac",
+      "elf_segment_alignments": {
+        "libapp.so": [
+          65536
+        ],
+        "libdartjni.so": [
+          16384
+        ],
+        "libdatastore_shared_counter.so": [
+          16384
+        ],
+        "libflutter.so": [
+          65536
+        ],
+        "libsqlite3.so": [
+          16384
+        ]
+      },
+      "filename": "easy-android-review-12730c8-arm64-v8a.apk",
+      "sha256": "3b3874f2217bbceb2945df272feb39823c3e8a0058a031f770a053de3f1c0716"
+    },
+    "armeabi-v7a": {
+      "bytes": 25062583,
+      "certificate_sha256": "c32cecda8dbf70c9aa8e5c25886e542aa1c15efbc624d491bfac5fbc23ec43ac",
+      "elf_segment_alignments": {
+        "libapp.so": [
+          16384
+        ],
+        "libdartjni.so": [
+          16384
+        ],
+        "libdatastore_shared_counter.so": [
+          16384
+        ],
+        "libflutter.so": [
+          65536
+        ],
+        "libsqlite3.so": [
+          16384
+        ]
+      },
+      "filename": "easy-android-review-12730c8-armeabi-v7a.apk",
+      "sha256": "2681560a9af724e2054c7d483219dac116e9257b188bb5553f337ea13694e32f"
+    },
+    "x86_64": {
+      "bytes": 28199894,
+      "certificate_sha256": "c32cecda8dbf70c9aa8e5c25886e542aa1c15efbc624d491bfac5fbc23ec43ac",
+      "elf_segment_alignments": {
+        "libapp.so": [
+          65536
+        ],
+        "libdartjni.so": [
+          16384
+        ],
+        "libdatastore_shared_counter.so": [
+          16384
+        ],
+        "libflutter.so": [
+          65536
+        ],
+        "libsqlite3.so": [
+          16384
+        ]
+      },
+      "filename": "easy-android-review-12730c8-x86_64.apk",
+      "sha256": "e11cf642906a810d94a19382e4eb1eaf2f934c576baa3dc4bf35a3f2c6439e96"
+    }
+  }
+}

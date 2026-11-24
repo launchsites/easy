@@ -9,6 +9,8 @@ The Linux x64 release at `908c53adcbe53369c4cd11426dbec25367b0147c` passed all 2
 
 The live workout check passed nine visual checkpoints in 76.81 seconds on `68fecf80a3c9da48e2d81252322efe4c0e19bbc2`. From the live Gym screen, one capture logged a stretch after the treadmill, updated the bench press to 60 kg × 8, 8, 6, and created a Work task. The explicit mark-done choice kept the three original targets of 50 kg × 8 and the treadmill settings. Two transactions saved the captured text and then the reviewed changes. The session refreshed in place and showed the same result after restarting. The SQLite workspace stayed at revision 3 with the same checksum after reopening. [Live capture report](benchmark-results/native-live-gym-68fecf8-epyc-20261124.json)
 
+An extracted 64-bit review archive from `12730c86ac311e5c473a6810a69cc31ec257f1ff` passed all 38 baseline checkpoints in 223.43 seconds. [Release archive verification](benchmark-results/native-release-smoke-12730c8-epyc-20261124.json)
+
 The runner uses Flutter's Linux x64 release bundle, Python 3, Xvfb, xdotool, ImageMagick, and Tesseract. It checks simulated pointer and keyboard input at desktop and phone dimensions. Android, iOS, and physical touch use require separate checks.
 
 ```sh
@@ -57,3 +59,20 @@ XDG_DATA_HOME="$easy_check_dir/data" XDG_CONFIG_HOME="$easy_check_dir/config" \
 The same Linux release opened a synthetic `.ics` file through GTK at 390×844 while IPv4 and IPv6 were blocked. The preview showed three daily occurrences and a separate event. Unchecking that event and confirming created one imported calendar in one SQLite revision. The preview alone left the workspace unchanged. The stored calendar and the GTK export kept the recurrence rule and next-day override, and the export matched the stored document byte for byte.
 
 After removing the original file and restarting, Today showed the first occurrence. Swiping through Calendar showed the override on day two and the original series title on day three. The workspace digest stayed the same. To repeat the check with the offline launcher above, open Settings, Calendar files, and Import or export events. Choose a test calendar with a short recurring series and a standalone event, clear the standalone event, and import. Open the imported calendar under Calendar files to export it. [Verification report](benchmark-results/native-calendar-transfer-d1ac727-epyc-20261124.json)
+
+## A day across Focus modes
+
+The extracted `12730c8` archive passed 37 visual checkpoints in one compact, offline profile. Today showed the note, upcoming events, and due tasks. The navigation hold opened Calendar. The three-step event input rejected an end equal to the start without saving and committed one 14:00–14:45 appointment for the next day. During the Gym workout, one reviewed capture kept the original targets, logged a stretch and the completed sets, and saved a Work task. Health opened from Gym and saved a fixture photo and a measured 150 g portion. After a forced process exit and removal of the original photo, the Work task, swiped calendar appointment, active workout, and managed photo reopened. SQLite stayed at revision 6 with the same document checksum. [Journey report](benchmark-results/native-persona-journey-12730c8-epyc-20261124.json)
+
+A second run verified the inline Fits now marker on Today at 390×844 and 1440×900. The eligible Work task was suggested when the calendar was free. Completing it saved one revision and removed the marker. In a separate profile with a conflicting Personal calendar appointment, the Work task remained visible without an inline recommendation. The app still offered the general What fits now action in that profile. [Availability report](benchmark-results/native-today-fit-12730c8-epyc-20261124.json)
+
+Use the same socket blocker with Xvfb, xauth, xdotool, ImageMagick, Tesseract, and Pillow installed. Each run takes a fresh output directory and an unused X11 display number. The report and synthetic screenshots are written inside that directory.
+
+```sh
+for scenario in persona_journey today_fit; do
+  python3 "tool/benchmark/native_${scenario}.py" \
+    --binary build/linux/x64/release/bundle/easy \
+    --app-revision "$(git rev-parse HEAD)" \
+    --deny-ip /tmp/easy-deny-ip-sockets --output "$(mktemp -d)"
+done
+```

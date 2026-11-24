@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "app_revision": "12730c86ac311e5c473a6810a69cc31ec257f1ff",
+  "checks": {
+    "fits-home": "c91f0c52a819907266caf29ec05023042675a9c302bc4d83488c267707f2836a",
+    "fits-task-visible": "c91f0c52a819907266caf29ec05023042675a9c302bc4d83488c267707f2836a",
+    "fits-compact": "c91f0c52a819907266caf29ec05023042675a9c302bc4d83488c267707f2836a",
+    "fits-desktop": "f69712aa818046f62b2105b313521777a067e401447f05c8e0e652466ac26e36",
+    "fits-review": "643586264ec8674b63ba2ec335a60c6cbdba817e2a83be8e5043c0d83cd05a07",
+    "occupied-home": "e08364d20d5de3a63f8b7ad794cb675faf6111eb4b4bec0f913316486bc6cc7f",
+    "occupied-task-visible": "e08364d20d5de3a63f8b7ad794cb675faf6111eb4b4bec0f913316486bc6cc7f",
+    "occupied-visible": "e08364d20d5de3a63f8b7ad794cb675faf6111eb4b4bec0f913316486bc6cc7f"
+  },
+  "ip_sockets_blocked": true,
+  "aot_sha256": "c098f231038db74a5891ee5429059a510a9660c5d16b792f079e030a28eb7f5b",
+  "completed_revision": 2
+}

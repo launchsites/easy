@@ -1,16 +1,16 @@
 # Android release verification
 
-The Android build and lint passed offline at `918b71e`. The scratch toolchain used Android SDK 36, Build Tools 36.0.0, NDK 28.2.13676358, JDK 21, Gradle 9.5.0, and Android Gradle Plugin 9.3.1. Missing artifacts were retrieved from Google Maven, Flutter download storage, and Maven Central. The build used a local cache of checksum-verified artifacts.
+Android release assembly and lint passed from a fresh archive of `12730c86ac311e5c473a6810a69cc31ec257f1ff`. Dependency resolution used verified local caches. The toolchain used Android SDK 36, Build Tools 36.0.0, NDK 28.2.13676358, JDK 21, Gradle 9.5.0, and Android Gradle Plugin 9.3.1. [Package verification](benchmark-results/android-release-12730c8-20261124.json)
 
 | ABI | Package bytes | SHA-256 |
 | --- | ---: | --- |
-| `arm64-v8a` | 25,880,197 | `7f77041d8ddbbec37322881118714db7f667e09db772332ff0062a3aaa3076a2` |
-| `armeabi-v7a` | 24,079,523 | `89f6e9b8d4bdb03046e31c31ae05981ba8808796a45c54cda6a00a5eac5b9e47` |
-| `x86_64` | 27,282,366 | `37e1d11c30ecc1781124286cd5be0c364d420d0bf0668c478bb41ceb838ea5b0` |
+| `arm64-v8a` | 26,797,725 | `3b3874f2217bbceb2945df272feb39823c3e8a0058a031f770a053de3f1c0716` |
+| `armeabi-v7a` | 25,062,583 | `2681560a9af724e2054c7d483219dac116e9257b188bb5553f337ea13694e32f` |
+| `x86_64` | 28,199,894 | `e11cf642906a810d94a19382e4eb1eaf2f934c576baa3dc4bf35a3f2c6439e96` |
 
-Each package passed Android signature and 16 KiB ZIP alignment checks. ELF headers matched its ABI for Flutter AOT, the Flutter engine, and SQLite. The binary app manifest identified `app.launchsites.easy.MainActivity` as the launcher and declared target SDK 36. The packaged resource table and compiled XML confirmed cleartext is available for exact IPv4 and IPv6 loopback addresses only. The app disables Android backup and excludes its workspace domains from Android 12 and later cloud backup and device transfer.
+Each package passed Android signature and 16 KiB ZIP alignment checks. All 15 native libraries matched their APK's ABI and 16 KiB load alignment. The compiled manifest declared a non-debuggable app, minimum SDK 24, target SDK 36, and `app.launchsites.easy.MainActivity` as the launcher. Its compiled network policy permits cleartext only on exact IPv4 and IPv6 loopback addresses. Its backup settings disable older Android backup and exclude workspace domains from Android 12 and later cloud backup and device transfer.
 
-Release lint reported zero errors and four warnings. The warnings cover synchronous reminder preference storage, compatibility guidance for pre-Android 12 backup declarations, and two obsolete SDK checks or resource qualifiers. The packages use a development signing certificate. Android device startup and notification delivery remain pending physical-device or emulator verification.
+Release lint reported no issues. Gradle emitted a separate deprecation summary. The packages use a development signing certificate. Startup, notification delivery, and the platform's enforcement of the compiled policies still require Android device or emulator verification.
 
 ```sh
 flutter build apk --release --split-per-abi
