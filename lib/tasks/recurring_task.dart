@@ -259,6 +259,17 @@ class RecurringTaskSeries {
     }
   }
 
+  int? get maximumReminderLeadDays {
+    int? result;
+    for (final details in [..._templates.values, ..._edits.values]) {
+      final reminder = details.reminder;
+      if (reminder == null) continue;
+      final lead = -reminder.dayOffset;
+      if (result == null || lead > result) result = lead;
+    }
+    return result;
+  }
+
   TaskItem fieldsForDate(RecurringTaskOccurrence occurrence, DateTime date) {
     _requirePending(occurrence);
     final shifted = _project(

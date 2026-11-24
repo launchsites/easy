@@ -64,6 +64,10 @@ import 'preferences/feature_preferences.dart';
 import 'preferences/feature_preferences_page.dart';
 import 'quick_capture.dart';
 import 'record_editor.dart';
+import 'reminders/local_reminder.dart';
+import 'reminders/local_reminder_backend.dart';
+import 'reminders/local_reminder_editor.dart';
+import 'reminders/workspace_record_reminders.dart';
 import 'review/review.dart';
 import 'scheduling/availability_settings.dart';
 import 'scheduling/availability_settings_page.dart';
@@ -91,6 +95,7 @@ part 'workspace_repeating_tasks.dart';
 part 'workspace_category_views.dart';
 part 'workspace_search.dart';
 part 'workspace_task_actions.dart';
+part 'workspace_reminders.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -106,10 +111,14 @@ class EasyApp extends StatelessWidget {
     super.key,
     this.openStore = openWorkspaceStore,
     this.calendarAdapter = const EventKitCalendarAdapter(),
+    this.reminderBackend = const PlatformLocalReminderBackend(),
+    this.reminderSettings = const LocalReminderSettingsStore(),
   });
 
   final WorkspaceStoreOpener openStore;
   final EventKitCalendarAdapter calendarAdapter;
+  final LocalReminderBackend reminderBackend;
+  final LocalReminderSettingsStore reminderSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +126,12 @@ class EasyApp extends StatelessWidget {
       title: appName,
       debugShowCheckedModeBanner: false,
       theme: easyTheme(),
-      home: _Workspace(openStore: openStore, calendarAdapter: calendarAdapter),
+      home: _Workspace(
+        openStore: openStore,
+        calendarAdapter: calendarAdapter,
+        reminderBackend: reminderBackend,
+        reminderSettings: reminderSettings,
+      ),
     );
   }
 }
@@ -205,10 +219,17 @@ _decodeWorkspaceSnapshot(WorkspaceSnapshot snapshot) {
 }
 
 class _Workspace extends StatefulWidget {
-  const _Workspace({required this.openStore, required this.calendarAdapter});
+  const _Workspace({
+    required this.openStore,
+    required this.calendarAdapter,
+    required this.reminderBackend,
+    required this.reminderSettings,
+  });
 
   final WorkspaceStoreOpener openStore;
   final EventKitCalendarAdapter calendarAdapter;
+  final LocalReminderBackend reminderBackend;
+  final LocalReminderSettingsStore reminderSettings;
 
   @override
   State<_Workspace> createState() => _WorkspaceState();
@@ -266,6 +287,14 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   Object? _searchActivitySource;
   List<ActivityRecord> _searchActivities = const [];
   var _searchOpen = false;
+  late final _localReminderController = LocalReminderController(
+    backend: widget.reminderBackend,
+    appName: appName,
+  );
+  Future<LocalReminderSettings>? _localReminderSettings;
+  WorkspaceData? _reminderWorkspace;
+  Object? _reminderWorkspaceRevision;
+  Timer? _reminderDebounce;
   var _taskFeed = TaskWorkspaceFeed();
   var _taskSeriesUnreadable = false;
   Future<AttachmentStore?>? _attachmentStore;
@@ -315,6 +344,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     _features.dispose();
     _aiViewChanges.dispose();
     _estimateTimer?.cancel();
+    _reminderDebounce?.cancel();
     _voiceTranscriber.cancel();
     _ai?.dispose();
     final aiState = _aiState;
@@ -337,6 +367,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (state != AppLifecycleState.resumed) _voiceTranscriber.cancel();
     if (!_loading && state == AppLifecycleState.resumed) {
       unawaited(_refreshExternalCalendars(force: true));
+      if (_reminderWorkspace case final saved?) {
+        _queueReminderSync(saved, force: true);
+      }
+    } else if (_reminderWorkspace case final saved?
+        when _reminderDebounce?.isActive == true) {
+      _queueReminderSync(saved, force: true, immediate: true);
     }
   }
 
@@ -389,6 +425,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _loadFailed = false;
     });
     _refreshCalendarViews();
+    _queueReminderSync(data, force: true);
     if (!_allows(EasyFeature.ai)) _ai?.setForeground(false);
     if (!kIsWeb && identical(widget.openStore, openWorkspaceStore)) {
       if (_allows(EasyFeature.ai)) unawaited(_prepareAi());
@@ -828,6 +865,13 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                     subtitle: 'Import or export iCalendar files',
                     onTap: _openCalendarFiles,
                   ),
+                  if (_supportsReminders)
+                    SettingsItem(
+                      icon: Icons.notifications_none_rounded,
+                      title: 'Reminders',
+                      subtitle: 'Choose alerts for this device',
+                      onTap: _openReminderSettings,
+                    ),
                   if (_eventSeries.isNotEmpty)
                     SettingsItem(
                       icon: Icons.repeat_rounded,
@@ -2174,10 +2218,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   void _update(WorkspaceData data) {
     setState(() => _assignData(data));
     final snapshot = data.encode();
-    _queueSave(
-      () => _saveMutation(WorkspaceMutation.workspace(snapshot)),
-      () => _update(_data),
-    );
+    _queueSave(() async {
+      await _saveMutation(WorkspaceMutation.workspace(snapshot));
+      _queueReminderSync(data);
+    }, () => _update(_data));
   }
 
   void _assignData(WorkspaceData data) {
@@ -2258,6 +2302,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           );
         }
         await _saveMutation(mutation, operationId: operationId);
+        _queueReminderSync(updated);
         if (mounted) {
           setState(() {
             _assignData(updated);
@@ -3528,6 +3573,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             onBreakdown: _canAddSubtask(record)
                 ? () => Navigator.pop(context, 'breakdown')
                 : null,
+            reminderSet: _hasRecordReminder(record),
+            onReminder: _recordReminderTarget(record) != null
+                ? () => Navigator.pop(context, 'reminder')
+                : null,
           ),
         ),
       ),
@@ -3555,6 +3604,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     if (action == 'breakdown' && record is TaskItem) {
       await _breakDownTask(record);
     }
+    if (action == 'reminder') await _editRecordReminder(record);
   }
 
   bool _canRepeatEvent(Object? record) =>
@@ -4249,6 +4299,18 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                                                 _canAddSubtask(_inspected)
                                                 ? () => _breakDownTask(
                                                     _inspected! as TaskItem,
+                                                  )
+                                                : null,
+                                            reminderSet: _hasRecordReminder(
+                                              _inspected,
+                                            ),
+                                            onReminder:
+                                                _recordReminderTarget(
+                                                      _inspected,
+                                                    ) !=
+                                                    null
+                                                ? () => _editRecordReminder(
+                                                    _inspected!,
                                                   )
                                                 : null,
                                           ),

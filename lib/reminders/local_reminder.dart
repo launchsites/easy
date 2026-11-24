@@ -53,14 +53,17 @@ class LocalReminder {
 
   String get id => target.notificationId;
 
-  LocalReminderRequest request({required bool showRecordTitle}) {
+  LocalReminderRequest request({
+    required bool showRecordTitle,
+    String appName = 'Easy',
+  }) {
     final title = recordTitle?.trim();
     return LocalReminderRequest(
       id: id,
       at: at,
       title: showRecordTitle && title != null && title.isNotEmpty
           ? String.fromCharCodes(title.runes.take(160))
-          : 'Easy',
+          : String.fromCharCodes(appName.runes.take(160)),
       body: switch (target.kind) {
         ReminderTargetKind.task => 'Task reminder',
         ReminderTargetKind.event => 'Calendar reminder',
@@ -214,10 +217,11 @@ List<LocalReminder> remindersForRecurringTasks(
   final nowUtc = now.toUtc();
   final limit = nowUtc.add(horizon);
   final first = _civil(nowUtc).subtract(const Duration(days: 2));
-  // An occurrence can have a reminder up to a year before its scheduled day.
-  final last = _civil(limit).add(const Duration(days: 368));
   final result = <LocalReminder>[];
   for (final taskSeries in series) {
+    final lead = taskSeries.maximumReminderLeadDays;
+    if (lead == null) continue;
+    final last = _civil(limit).add(Duration(days: lead + 3));
     var start = first;
     while (start.isBefore(last)) {
       final next = start.add(const Duration(days: 366));

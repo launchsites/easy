@@ -361,7 +361,7 @@ class _TaskRepeatEditorState extends State<_TaskRepeatEditor> {
                   onTap: _pickReminder,
                 ),
                 const Text(
-                  'Notification delivery is unavailable on this device.',
+                  'Delivery depends on this device’s reminder settings.',
                 ),
               ],
               if (_error != null)

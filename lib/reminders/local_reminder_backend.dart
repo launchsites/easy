@@ -60,7 +60,7 @@ class PlatformLocalReminderBackend implements LocalReminderBackend {
   /// Override for host-side contract tests.
   final TargetPlatform? platform;
 
-  bool get _supported =>
+  bool get supportsPlatform =>
       !kIsWeb &&
       const {
         TargetPlatform.iOS,
@@ -77,7 +77,7 @@ class PlatformLocalReminderBackend implements LocalReminderBackend {
       _capabilities('requestNotifications');
 
   Future<LocalReminderCapabilities> _capabilities(String method) async {
-    if (!_supported) return LocalReminderCapabilities.unavailable;
+    if (!supportsPlatform) return LocalReminderCapabilities.unavailable;
     try {
       final result = await channel.invokeMapMethod<Object?, Object?>(method);
       return result == null
@@ -90,13 +90,13 @@ class PlatformLocalReminderBackend implements LocalReminderBackend {
 
   @override
   Future<void> requestExactScheduling() async {
-    if (!_supported) return;
+    if (!supportsPlatform) return;
     await channel.invokeMethod<void>('requestExactScheduling');
   }
 
   @override
   Future<List<LocalReminderRequest>> pending() async {
-    if (!_supported) return const [];
+    if (!supportsPlatform) return const [];
     final rows = await channel.invokeListMethod<Object?>('pending');
     return List.unmodifiable([
       for (final value in rows ?? const [])
@@ -106,7 +106,7 @@ class PlatformLocalReminderBackend implements LocalReminderBackend {
 
   @override
   Future<void> schedule(LocalReminderRequest request) async {
-    if (!_supported) {
+    if (!supportsPlatform) {
       throw StateError('Local reminders are unavailable on this device.');
     }
     await channel.invokeMethod<void>('schedule', request.toJson());
@@ -115,7 +115,7 @@ class PlatformLocalReminderBackend implements LocalReminderBackend {
   @override
   Future<void> cancel(Iterable<String> ids) async {
     final valid = ids.where(isLocalReminderId).toSet().toList();
-    if (!_supported || valid.isEmpty) return;
+    if (!supportsPlatform || valid.isEmpty) return;
     await channel.invokeMethod<void>('cancel', valid);
   }
 }
@@ -180,6 +180,7 @@ class LocalReminderController {
     DateTime Function()? clock,
     this.horizon = const Duration(days: localReminderHorizonDays),
     this.pendingLimit = localReminderPendingLimit,
+    this.appName = 'Easy',
   }) : clock = clock ?? DateTime.now {
     if (horizon <= Duration.zero ||
         horizon > const Duration(days: localReminderHorizonDays) ||
@@ -193,6 +194,7 @@ class LocalReminderController {
   final DateTime Function() clock;
   final Duration horizon;
   final int pendingLimit;
+  final String appName;
   Future<void> _queue = Future.value();
 
   /// Applies a complete current snapshot. Call after relevant local changes and
@@ -231,6 +233,7 @@ class LocalReminderController {
       for (final item in reminders) {
         if (!item.at.isAfter(now) || item.at.isAfter(limit)) continue;
         final request = item.request(
+          appName: appName,
           showRecordTitle: settings.showRecordTitles,
         );
         final previous = desired[request.id];

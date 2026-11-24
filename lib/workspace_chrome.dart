@@ -486,6 +486,8 @@ class _RecordDetails extends StatelessWidget {
     this.onAssignPlace,
     this.onAddSubtask,
     this.onBreakdown,
+    this.onReminder,
+    this.reminderSet = false,
   });
 
   final Object record;
@@ -501,6 +503,8 @@ class _RecordDetails extends StatelessWidget {
   final VoidCallback? onAssignPlace;
   final VoidCallback? onAddSubtask;
   final VoidCallback? onBreakdown;
+  final VoidCallback? onReminder;
+  final bool reminderSet;
 
   @override
   Widget build(BuildContext context) {
@@ -668,6 +672,13 @@ class _RecordDetails extends StatelessWidget {
                     TextButton(
                       onPressed: onBreakdown,
                       child: const Text('Break down'),
+                    ),
+                  if (onReminder != null)
+                    TextButton(
+                      onPressed: onReminder,
+                      child: Text(
+                        reminderSet ? 'Edit reminder' : 'Set reminder',
+                      ),
                     ),
                 ],
               ),

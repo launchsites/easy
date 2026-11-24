@@ -34,10 +34,10 @@ void main() {
       await tester.tap(find.text('Reminder preference'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(
-        find.text('Notification delivery is unavailable on this device.'),
+        find.text('Delivery depends on this device’s reminder settings.'),
       );
       expect(
-        find.text('Notification delivery is unavailable on this device.'),
+        find.text('Delivery depends on this device’s reminder settings.'),
         findsOneWidget,
       );
       expect(result, isNull);
