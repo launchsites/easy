@@ -24,9 +24,12 @@ void main() {
     WidgetTester tester,
     List<SyncPasswordVault?> results, {
     required bool forSetup,
+    Size viewport = const Size(320, 620),
+    double textScale = 1.35,
+    TextDirection direction = TextDirection.ltr,
   }) async {
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(320, 620);
+    tester.view.physicalSize = viewport;
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetViewInsets);
@@ -35,8 +38,8 @@ void main() {
         theme: easyTheme(),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context)
-              .copyWith(textScaler: TextScaler.linear(1.35)),
-          child: child!,
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: Directionality(textDirection: direction, child: child!),
         ),
         home: Scaffold(
           body: Builder(
@@ -103,6 +106,34 @@ void main() {
       find.widgetWithText(TextField, 'Passphrase'),
       _passphrase,
     );
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(results, [null]);
+    expect(File(path).existsSync(), isFalse);
+  });
+
+  testWidgets('landscape setup stays operable at 200% text with the keyboard', (
+    tester,
+  ) async {
+    final results = <SyncPasswordVault?>[];
+    await open(
+      tester,
+      results,
+      forSetup: true,
+      viewport: const Size(568, 320),
+      textScale: 2,
+      direction: TextDirection.rtl,
+    );
+    tester.view.viewInsets = const FakeViewPadding(bottom: 155);
+    await tester.pumpAndSettle();
+    final passphrase = find.widgetWithText(TextField, 'Passphrase');
+    final repeat = find.widgetWithText(TextField, 'Repeat passphrase');
+    await tester.ensureVisible(passphrase);
+    await tester.enterText(passphrase, _passphrase);
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.ensureVisible(repeat);
+    await tester.enterText(repeat, _passphrase);
+    expect(tester.takeException(), isNull);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(results, [null]);
