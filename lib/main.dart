@@ -2655,6 +2655,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         mode: 'gym',
         child: GymHistoryPage(
           sessions: _gymSessions ?? const [],
+          bodyMeasurements: _gymHistoryMeasurements(),
           onOpen: (session) => Navigator.of(routeContext).push<void>(
             MaterialPageRoute(
               builder: (_) => MobileModeFrame(
@@ -2670,6 +2671,17 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       ),
     ),
   );
+
+  List<BodyMeasurement> _gymHistoryMeasurements() {
+    if (!_allows(EasyFeature.health)) return const [];
+    try {
+      return _healthData().measurements;
+    } on FormatException {
+      return const [];
+    } on TypeError {
+      return const [];
+    }
+  }
 
   void _saveGymSession(GymSession? session) {
     if (session == null || !mounted) return;
