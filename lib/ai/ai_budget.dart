@@ -302,6 +302,11 @@ class AiBudgetLedger {
   List<AiReservation> get reservations =>
       List.unmodifiable(_reservations.values);
 
+  int? maximumCost(AiBudgetRequest request) {
+    final (cost, denial) = _quote(request);
+    return denial == null ? cost : null;
+  }
+
   AiBudgetDecision reserve(AiBudgetRequest request) {
     if (_reservations.containsKey(request.id)) {
       return const AiBudgetDecision._(denial: AiBudgetDenial.duplicateId);

@@ -119,11 +119,30 @@ class AiProviderClient {
   late final _BudgetWriteLane _writeLane = _budgetWriters[_ledger] ??=
       _BudgetWriteLane();
 
+  bool fitsRequest(
+    AiProviderConfig config,
+    Map<String, Object?> payload, {
+    bool estimate = false,
+  }) {
+    try {
+      final bytes = _requestBytes(
+        config,
+        estimate ? _estimateInstructions : _captureInstructions,
+        payload,
+      );
+      return bytes.length <= _maxRequestBytes &&
+          bytes.length <= config.maxInputTokens;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<AiProviderResult<CaptureReview>> capture({
     required AiProviderConfig config,
     required AiInferenceClaim claim,
     required CaptureInput input,
     required AiRevisionLookup currentRevision,
+    bool includeOptionalMetadata = true,
   }) => _execute(
     config: config,
     claim: claim,
@@ -135,34 +154,10 @@ class AiProviderClient {
         input.text.trim().isNotEmpty,
     oversizeInput: input.text.length > _maxRequestBytes,
     instructions: _captureInstructions,
-    payload: () {
-      final current = interpretCapture(input);
-      return {
-        'captureId': input.id,
-        'sourceRevision': input.revision,
-        'contextRevision': input.context.revision,
-        'anchor': input.context.anchor.toIso8601String(),
-        'timezone': ?input.context.timezone,
-        'categoryIds': {
-          for (final proposal in current.proposals)
-            ?proposal.draft.category:
-                input.context.categories[proposal.draft.category],
-        },
-        'text': input.text,
-        'completionTargets': [
-          for (final proposal in current.proposals)
-            if (proposal.isReady)
-              if (proposal.draft case final CaptureCompleteTaskDraft target)
-                {
-                  'id': target.targetId,
-                  'title': target.title,
-                  'revision': target.expectedRevision,
-                  'start': proposal.span.start,
-                  'end': proposal.span.end,
-                },
-        ],
-      };
-    },
+    payload: () => aiCapturePayload(
+      input,
+      includeOptionalMetadata: includeOptionalMetadata,
+    ),
     parse: (content) {
       final review = validateModelCapture(input, content);
       return review.issues.any(
@@ -195,13 +190,12 @@ class AiProviderClient {
         input.sampleDurationsMinutes.every(_validMinutes),
     oversizeInput: input.title.length > _maxRequestBytes,
     instructions: _estimateInstructions,
-    payload: () => {
-      'captureId': claim.request.captureId,
-      'sourceRevision': claim.request.sourceRevision,
-      'contextRevision': claim.request.contextRevision,
-      'title': input.title,
-      'sampleDurationsMinutes': input.sampleDurationsMinutes,
-    },
+    payload: () => aiEstimatePayload(
+      input,
+      captureId: claim.request.captureId,
+      sourceRevision: claim.request.sourceRevision,
+      contextRevision: claim.request.contextRevision,
+    ),
     parse: (content) {
       final object = _jsonObject(content);
       final request = claim.request;
@@ -291,18 +285,7 @@ class AiProviderClient {
 
     final List<int> bytes;
     try {
-      bytes = utf8.encode(
-        jsonEncode({
-          'model': config.model,
-          'messages': [
-            {'role': 'system', 'content': instructions},
-            {'role': 'user', 'content': jsonEncode(payload())},
-          ],
-          'stream': false,
-          config.tokenLimitProperty: config.maxOutputTokens,
-          if (config.jsonObjectMode) 'response_format': {'type': 'json_object'},
-        }),
-      );
+      bytes = _requestBytes(config, instructions, payload());
     } catch (_) {
       return stopBeforeDispatch(AiProviderFailure.invalidRequest);
     }
@@ -488,6 +471,70 @@ class AiProviderClient {
     }
   }
 }
+
+List<int> _requestBytes(
+  AiProviderConfig config,
+  String instructions,
+  Map<String, Object?> payload,
+) => utf8.encode(
+  jsonEncode({
+    'model': config.model,
+    'messages': [
+      {'role': 'system', 'content': instructions},
+      {'role': 'user', 'content': jsonEncode(payload)},
+    ],
+    'stream': false,
+    config.tokenLimitProperty: config.maxOutputTokens,
+    if (config.jsonObjectMode) 'response_format': {'type': 'json_object'},
+  }),
+);
+
+Map<String, Object?> aiCapturePayload(
+  CaptureInput input, {
+  bool includeOptionalMetadata = true,
+}) {
+  final current = interpretCapture(input);
+  return {
+    'captureId': input.id,
+    'sourceRevision': input.revision,
+    'contextRevision': input.context.revision,
+    'anchor': input.context.anchor.toIso8601String(),
+    if (includeOptionalMetadata) 'timezone': ?input.context.timezone,
+    'categoryIds': {
+      for (final proposal in current.proposals)
+        ?proposal.draft.category:
+            input.context.categories[proposal.draft.category],
+    },
+    'text': input.text,
+    if (includeOptionalMetadata)
+      'completionTargets': [
+        for (final proposal in current.proposals)
+          if (proposal.isReady)
+            if (proposal.draft case final CaptureCompleteTaskDraft target)
+              {
+                'id': target.targetId,
+                'title': target.title,
+                'revision': target.expectedRevision,
+                'start': proposal.span.start,
+                'end': proposal.span.end,
+              },
+      ],
+  };
+}
+
+Map<String, Object?> aiEstimatePayload(
+  AiEstimateInput input, {
+  required String captureId,
+  required int sourceRevision,
+  required int contextRevision,
+}) => {
+  'captureId': captureId,
+  'sourceRevision': sourceRevision,
+  'contextRevision': contextRevision,
+  'title': input.title,
+  if (input.sampleDurationsMinutes.isNotEmpty)
+    'sampleDurationsMinutes': input.sampleDurationsMinutes,
+};
 
 final _budgetWriters = Expando<_BudgetWriteLane>();
 
