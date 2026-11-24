@@ -287,6 +287,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   var _taskObjectivesOpen = false;
   var _automationOpen = false;
   Timer? _automationCalendarTimer;
+  Object? _automationSeriesKey;
+  Future<List<InternalWorkspaceEvent>>? _automationSeriesWindow;
   Object? _automationCacheKey;
   AutomationData? _cachedAutomation;
   Object? _reviewAvailabilityKey;

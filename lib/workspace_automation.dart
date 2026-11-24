@@ -104,8 +104,11 @@ extension _WorkspaceAutomation on _WorkspaceState {
     if (draft == null || draft.status != AutomationDraftStatus.pending) {
       throw const FormatException('This draft has already been reviewed.');
     }
-    final revision = _currentAutomationSource(draft.event);
-    if (revision == null || revision != draft.event.sourceRevision) {
+    final revision = await _currentAutomationSource(draft.event);
+    if (!mounted ||
+        !identical(workspace, _data) ||
+        revision == null ||
+        revision != draft.event.sourceRevision) {
       throw const FormatException(
         'The source changed. Review its current state.',
       );
@@ -172,7 +175,7 @@ extension _WorkspaceAutomation on _WorkspaceState {
     return next;
   }
 
-  int? _currentAutomationSource(AutomationEvent source) {
+  Future<int?> _currentAutomationSource(AutomationEvent source) async {
     final id = source.sourceId;
     final AutomationEvent? current;
     switch (source.trigger) {
@@ -183,9 +186,18 @@ extension _WorkspaceAutomation on _WorkspaceState {
             .firstOrNull;
         current = task == null ? null : automationForTask(task);
       case AutomationTrigger.acceptedEventStarted:
-        final event = _automationCalendarEvents(_data)
+        var event = _standaloneEvents(_data.events)
             .where((item) => item.id == id)
             .firstOrNull;
+        if (event == null && _eventSeries.isNotEmpty) {
+          final occurrences = await _automationSeriesForDay(
+            source.occurredAt.toLocal(),
+          );
+          event = occurrences
+              .where((row) => row.event.id == id)
+              .firstOrNull
+              ?.event;
+        }
         current = event == null ? null : automationForCalendar(event);
       case AutomationTrigger.workoutFinished:
         final workout = _gymSessions
@@ -272,11 +284,44 @@ extension _WorkspaceAutomation on _WorkspaceState {
     );
   }
 
-  Iterable<CalendarEvent> _automationCalendarEvents(
+  Future<List<InternalWorkspaceEvent>> _automationSeriesForDay(
+    DateTime date,
+  ) async {
+    if (_eventSeries.isEmpty) return const [];
+    final day = dateOnly(date);
+    final previous = plusDays(day, -1);
+    final next = plusDays(day, 1);
+    if (_internalFeed.problem == null &&
+        _internalFeed.covers(previous) &&
+        _internalFeed.covers(next)) {
+      return _internalFeed.events;
+    }
+    final revision = (day, _eventSeries);
+    if (_automationSeriesKey != revision || _automationSeriesWindow == null) {
+      _automationSeriesKey = revision;
+      _automationSeriesWindow = compute(expandInternalWorkspace, (
+        sources: _eventSeries,
+        start: previous,
+        end: plusDays(next, 1),
+      ));
+    }
+    final pending = _automationSeriesWindow!;
+    try {
+      return await pending;
+    } on Object {
+      if (identical(pending, _automationSeriesWindow)) {
+        _automationSeriesWindow = null;
+      }
+      return const [];
+    }
+  }
+
+  Iterable<CalendarEvent> _automationEvents(
     WorkspaceData workspace,
+    List<InternalWorkspaceEvent> rows,
   ) sync* {
     yield* _standaloneEvents(workspace.events);
-    for (final row in _internalFeed.events) {
+    for (final row in rows) {
       yield row.event;
     }
   }
@@ -312,11 +357,20 @@ extension _WorkspaceAutomation on _WorkspaceState {
   Future<void> _checkAutomationCalendar() async {
     if (!mounted || !_hasCalendarAutomation) return;
     if (_reviewSaving || !identical(_data, _savedWorkspace)) return;
-    final now = DateTime.now();
     final workspace = _data;
+    final definitions = _eventSeries;
+    final rows = await _automationSeriesForDay(DateTime.now());
+    if (!mounted ||
+        !_hasCalendarAutomation ||
+        _reviewSaving ||
+        !identical(workspace, _data) ||
+        !identical(definitions, _eventSeries)) {
+      return;
+    }
+    final now = DateTime.now();
     final active = <AutomationEvent>[];
-    DateTime? nextStart;
-    for (final event in _automationCalendarEvents(workspace)) {
+    var nextStart = plusDays(dateOnly(now), 1);
+    for (final event in _automationEvents(workspace, rows)) {
       if (event.allDay ||
           event.isReadOnly ||
           !event.end.isAfter(now) ||
@@ -324,7 +378,7 @@ extension _WorkspaceAutomation on _WorkspaceState {
         continue;
       }
       if (event.start.isAfter(now)) {
-        if (nextStart == null || event.start.isBefore(nextStart)) {
+        if (event.start.isBefore(nextStart)) {
           nextStart = event.start;
         }
       } else if (automationForCalendar(event) case final source?) {
@@ -345,11 +399,9 @@ extension _WorkspaceAutomation on _WorkspaceState {
       }
     }
     if (!mounted) return;
-    if (nextStart case final date?) {
-      final delay = date.difference(DateTime.now());
-      _queueAutomationCalendarCheck(
-        delay > Duration.zero ? delay : Duration.zero,
-      );
-    }
+    final delay = nextStart.difference(DateTime.now());
+    _queueAutomationCalendarCheck(
+      delay > Duration.zero ? delay : Duration.zero,
+    );
   }
 }
