@@ -20,19 +20,16 @@ final _encryptionAlgorithm = AesGcm.with256bits();
 final class SyncDevicePublicKey {
   factory SyncDevicePublicKey.fromBytes(List<int> bytes) {
     final copy = syncFixedBytes(bytes, _publicKeyBytes, 'device key');
-    return SyncDevicePublicKey._(
-      fingerprint: crypto.sha256.convert(copy).toString(),
-      key: SimplePublicKey(
-        copy.asUnmodifiableView(),
-        type: KeyPairType.ed25519,
-      ),
-    );
+    return SyncDevicePublicKey._(crypto.sha256.convert(copy).toString(), copy);
   }
 
-  const SyncDevicePublicKey._({required this.fingerprint, required this.key});
+  const SyncDevicePublicKey._(this.fingerprint, this._bytes);
 
   final String fingerprint;
-  final SimplePublicKey key;
+  final Uint8List _bytes;
+
+  SimplePublicKey get key =>
+      SimplePublicKey(Uint8List.fromList(_bytes), type: KeyPairType.ed25519);
 }
 
 final class SyncDeviceIdentity {
@@ -180,7 +177,10 @@ final class SyncTrust {
     final grant = _grant(change.dot.deviceId);
     final verified = await _signatureAlgorithm.verify(
       _signingBytes(change),
-      signature: Signature(signed.signature, publicKey: grant.publicKey.key),
+      signature: Signature(
+        Uint8List.fromList(signed.signature),
+        publicKey: grant.publicKey.key,
+      ),
     );
     if (!verified) throw const SyncAuthenticationException();
     _ensureGrant(change.dot.deviceId, grant);
@@ -265,6 +265,7 @@ final class SyncEnvelopeCodec {
   const SyncEnvelopeCodec();
 
   static const maximumChanges = 48;
+  static const maximumPayloadBytes = _maximumBatchBytes;
   static const maximumBytes = _maximumBatchBytes + _headerLength + _tagLength;
 
   Future<Uint8List> seal({

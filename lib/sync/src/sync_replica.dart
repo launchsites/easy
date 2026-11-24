@@ -32,6 +32,21 @@ final class SyncBatchResult {
   final List<SyncDeferredChange> deferred;
 }
 
+final class SyncRecordChange {
+  const SyncRecordChange._(this.key, this.before, this.after);
+
+  final SyncRecordKey key;
+  final SyncRecord? before;
+  final SyncRecord? after;
+}
+
+final class SyncBatchPreview {
+  const SyncBatchPreview._(this.result, this.records);
+
+  final SyncBatchResult result;
+  final List<SyncRecordChange> records;
+}
+
 final class SyncHistoryException implements Exception {
   const SyncHistoryException(this.message);
 
@@ -147,6 +162,46 @@ final class SyncReplica {
   /// leaves the replica untouched. The host can retain deferred changes and
   /// request missing counters using the returned watermarks.
   SyncBatchResult applyBatch(List<VerifiedSyncChange> incoming) {
+    final plan = _plan(incoming);
+    for (final verified in plan.staged.values) {
+      final change = verified.change;
+      final record = _records.putIfAbsent(change.record, _RecordRegister.new);
+      record.apply(change);
+      if (record.isEmpty) _records.remove(change.record);
+    }
+    _journal.addAll(plan.staged);
+    _journalBytes = plan.size;
+    _watermark = plan.watermark;
+    return plan.result;
+  }
+
+  /// Projects a validated batch without writing the register or journal.
+  SyncBatchPreview previewBatch(List<VerifiedSyncChange> incoming) {
+    final plan = _plan(incoming);
+    final projected = <SyncRecordKey, _RecordRegister>{};
+    for (final verified in plan.staged.values) {
+      final change = verified.change;
+      projected
+          .putIfAbsent(
+            change.record,
+            () => _records[change.record]?.copy() ?? _RecordRegister(),
+          )
+          .apply(change);
+    }
+    return SyncBatchPreview._(
+      plan.result,
+      List.unmodifiable([
+        for (final entry in projected.entries)
+          SyncRecordChange._(
+            entry.key,
+            read(entry.key),
+            entry.value.isEmpty ? null : entry.value.project(entry.key),
+          ),
+      ]),
+    );
+  }
+
+  _ApplyPlan _plan(List<VerifiedSyncChange> incoming) {
     if (incoming.length > SyncEnvelopeCodec.maximumChanges) {
       throw const SyncHistoryException('Too many changes in one sync batch.');
     }
@@ -213,27 +268,22 @@ final class SyncReplica {
     }
 
     final nextWatermark = SyncVersionVector(counters);
-    for (final verified in staged.values) {
-      final change = verified.change;
-      final record = _records.putIfAbsent(change.record, _RecordRegister.new);
-      record.apply(change);
-      if (record.fields.isEmpty && record.tombstones.isEmpty) {
-        _records.remove(change.record);
-      }
-    }
-    _journal.addAll(staged);
-    _journalBytes = size;
-    _watermark = nextWatermark;
-    return SyncBatchResult._(
+    final result = SyncBatchResult._(
       duplicates: duplicates,
       applied: List.unmodifiable(staged.values.map((change) => change.signed)),
       deferred: List.unmodifiable([
         for (final verified in pending.values)
           SyncDeferredChange(
             verified,
-            verified.change.context.missingFrom(_watermark),
+            verified.change.context.missingFrom(nextWatermark),
           ),
       ]),
+    );
+    return (
+      staged: staged,
+      size: size,
+      watermark: nextWatermark,
+      result: result,
     );
   }
 
@@ -257,9 +307,24 @@ final class SyncReplica {
   SyncRecord? read(SyncRecordKey key) => _records[key]?.project(key);
 }
 
+typedef _ApplyPlan = ({
+  Map<SyncDot, VerifiedSyncChange> staged,
+  int size,
+  SyncVersionVector watermark,
+  SyncBatchResult result,
+});
+
 final class _RecordRegister {
   final fields = <String, Map<SyncDot, SyncFieldVersion>>{};
   final tombstones = <SyncDot, SyncVersionVector>{};
+
+  bool get isEmpty => fields.isEmpty && tombstones.isEmpty;
+
+  _RecordRegister copy() => _RecordRegister()
+    ..fields.addAll({
+      for (final entry in fields.entries) entry.key: Map.of(entry.value),
+    })
+    ..tombstones.addAll(tombstones);
 
   void apply(SyncChange change) {
     if (change.kind != SyncChangeKind.patch) {

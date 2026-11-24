@@ -181,28 +181,28 @@ void main() {
       );
 
       for (final invalid in [
-        codec.open(
+        () => codec.open(
           envelope: encrypted,
           trust: remote,
           senderId: b.deviceId,
           recipientId: a.deviceId,
           key: imported,
         ),
-        codec.open(
+        () => codec.open(
           envelope: encrypted,
           trust: remote,
           senderId: a.deviceId,
           recipientId: c.deviceId,
           key: imported,
         ),
-        codec.open(
+        () => codec.open(
           envelope: encrypted,
           trust: remote,
           senderId: a.deviceId,
           recipientId: b.deviceId,
           key: wrongKey,
         ),
-        codec.open(
+        () => codec.open(
           envelope: encrypted,
           trust: SyncTrust(
             SyncWorkspaceId.generate(),
@@ -213,7 +213,10 @@ void main() {
           key: imported,
         ),
       ]) {
-        await expectLater(invalid, throwsA(isA<SyncAuthenticationException>()));
+        await expectLater(
+          invalid(),
+          throwsA(isA<SyncAuthenticationException>()),
+        );
       }
 
       final altered = Uint8List.fromList(encrypted);
