@@ -777,6 +777,9 @@ class _ContinuousDayTimelineState extends State<_ContinuousDayTimeline> {
       final viewport = _topOf(_viewportKey);
       if (viewport == null) return;
 
+      // The slivers have finalized their children before this callback.
+      _keys.removeWhere((_, keys) => keys.section.currentContext == null);
+
       // The date changes as the next day heading reaches the top of the viewport.
       final leadingEdge = viewport + 24;
       for (final entry in _keys.entries) {
