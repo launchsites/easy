@@ -1,6 +1,13 @@
 name: Android emulator smoke
 
 on:
+  push:
+    branches: [codex/android-touch-proof-20261124]
+    paths:
+      - .github/workflows/android-smoke.yml
+      - tool/benchmark/android_touch_review.py
+      - tool/benchmark/android_emulator_smoke.py
+      - test/test_android_touch_review.py
   workflow_dispatch:
     inputs:
       meal_recovery_replay:
@@ -26,7 +33,7 @@ env:
 jobs:
   android:
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ inputs.touch_review && 55 || 45 }}
+    timeout-minutes: ${{ (inputs.touch_review || github.event_name == 'push') && 55 || 45 }}
     defaults:
       run:
         shell: bash
@@ -37,7 +44,7 @@ jobs:
           persist-credentials: false
 
       - name: Check the optional touch review fixtures
-        if: ${{ inputs.touch_review }}
+        if: ${{ (inputs.touch_review || github.event_name == 'push') }}
         run: python3 -m unittest discover -s test -p 'test_android_touch_review.py'
 
       - name: Verify the checkout and emulator prerequisites
@@ -87,10 +94,10 @@ jobs:
           test "$("$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest debuggable "$apk")" = false
 
       - name: Verify Android first launch
-        timeout-minutes: ${{ (inputs.meal_recovery_replay || inputs.touch_review) && 15 || 10 }}
+        timeout-minutes: ${{ (inputs.meal_recovery_replay || (inputs.touch_review || github.event_name == 'push')) && 15 || 10 }}
         env:
           MEAL_RECOVERY_REPLAY: ${{ inputs.meal_recovery_replay }}
-          TOUCH_REVIEW: ${{ inputs.touch_review }}
+          TOUCH_REVIEW: ${{ (inputs.touch_review || github.event_name == 'push') }}
         run: |
           replay=()
           if [[ "$MEAL_RECOVERY_REPLAY" == true ]]; then
@@ -111,7 +118,7 @@ jobs:
           retention-days: 7
 
       - name: Verify the sample workspace touch journey on a new emulator
-        if: ${{ inputs.touch_review && inputs.meal_recovery_replay }}
+        if: ${{ (inputs.touch_review || github.event_name == 'push') && inputs.meal_recovery_replay }}
         timeout-minutes: 14
         run: |
           report="$RUNNER_TEMP/easy-android-touch-review"
@@ -120,7 +127,7 @@ jobs:
             "$report/setup.png" --touch-review "$report"
 
       - name: Upload Android touch review evidence
-        if: ${{ always() && inputs.touch_review }}
+        if: ${{ always() && (inputs.touch_review || github.event_name == 'push') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: easy-android-touch-review
