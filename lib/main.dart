@@ -91,6 +91,11 @@ import 'storage/attachment_store.dart';
 import 'storage/media_backup.dart';
 import 'storage/workspace_backup_page.dart';
 import 'storage/workspace_store.dart';
+import 'sync/manual_sync_installation.dart';
+import 'sync/manual_sync_page.dart';
+import 'sync/manual_sync_workspace.dart';
+import 'sync/sync_password_vault_prompt.dart';
+import 'sync/workspace_manual_sync.dart';
 import 'task_context/task_context.dart';
 import 'tasks/recurring_task.dart';
 import 'tasks/task_breakdown.dart';
@@ -117,6 +122,7 @@ part 'workspace_apple_updates.dart';
 part 'workspace_activity_actions.dart';
 part 'workspace_onboarding.dart';
 part 'workspace_focus_suggestions.dart';
+part 'workspace_manual_sync_actions.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -264,6 +270,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   var _reviewSaving = false;
   var _activityActionOpen = false;
   var _futureRemovalOpen = false;
+  var _manualSyncOpen = false;
   var _planningDay = false;
   var _recordingVoice = false;
   final _heldVoiceOverlay = HeldVoiceCaptureOverlay();
@@ -275,7 +282,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   WorkspaceData? _savedWorkspace;
   int _contentRevision = 0;
   List<GymSession>? _gymSessions;
+  List<GymSession>? _savedGymSessions;
   List<WorkoutPlan>? _workoutPlans;
+  List<WorkoutPlan>? _savedWorkoutPlans;
   var _calendarDate = dateOnly(DateTime.now());
   DateTime get _today => dateOnly(DateTime.now());
   var _destination = _Destination.today;
@@ -464,8 +473,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _savedWorkspace = data;
       _contentRevision++;
       _taskHistoryRevision++;
-      _gymSessions = sessions;
-      _workoutPlans = plans;
+      _gymSessions = _savedGymSessions = sessions;
+      _workoutPlans = _savedWorkoutPlans = plans;
       _inspected = null;
       _unsavedAppleCopies.clear();
       _appleCopyRevision++;
@@ -1013,6 +1022,13 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                     subtitle: 'Export or preview a workspace backup',
                     onTap: _openBackups,
                   ),
+                  if (!kIsWeb)
+                    SettingsItem(
+                      icon: Icons.devices_other_outlined,
+                      title: 'Manual sync',
+                      subtitle: 'Pair devices and exchange encrypted files',
+                      onTap: _openManualSync,
+                    ),
                   if (!kIsWeb && features.allows(EasyFeature.ai))
                     SettingsItem(
                       icon: Icons.auto_awesome_outlined,
@@ -1092,7 +1108,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       final runtime = AiRuntime(
         read: state.read,
         compareAndSwap: state.compareAndSwap,
-        vault: const AiSystemCredentialVault(),
+        vault: defaultTargetPlatform == TargetPlatform.linux
+            ? AiSessionCredentialVault()
+            : const AiSystemCredentialVault(),
         foreground:
             _allows(EasyFeature.ai) &&
             (lifecycle == null || lifecycle == AppLifecycleState.resumed),
@@ -2377,11 +2395,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   void _persistWorkoutPlans() {
-    final snapshot = _workoutPlans!.map((plan) => plan.encode()).toList();
-    _queueSave(
-      () => _saveMutation(WorkspaceMutation.workoutPlans(snapshot)),
-      _persistWorkoutPlans,
-    );
+    final plans = _workoutPlans!;
+    final snapshot = plans.map((plan) => plan.encode()).toList();
+    _queueSave(() async {
+      await _saveMutation(WorkspaceMutation.workoutPlans(snapshot));
+      _savedWorkoutPlans = plans;
+    }, _persistWorkoutPlans);
   }
 
   void _update(WorkspaceData data) {
@@ -2483,8 +2502,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         if (mounted) {
           setState(() {
             _assignData(updated);
-            if (sessions != null) _gymSessions = List.unmodifiable(sessions);
-            if (plans != null) _workoutPlans = List.unmodifiable(plans);
+            if (sessions != null) {
+              _gymSessions = _savedGymSessions = List.unmodifiable(sessions);
+            }
+            if (plans != null) {
+              _workoutPlans = _savedWorkoutPlans = List.unmodifiable(plans);
+            }
           });
         }
       } finally {
@@ -2727,11 +2750,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   void _persistGymSessions() {
-    final snapshot = _gymSessions!.map((session) => session.encode()).toList();
-    _queueSave(
-      () => _saveMutation(WorkspaceMutation.gymSessions(snapshot)),
-      _persistGymSessions,
-    );
+    final sessions = _gymSessions!;
+    final snapshot = sessions.map((session) => session.encode()).toList();
+    _queueSave(() async {
+      await _saveMutation(WorkspaceMutation.gymSessions(snapshot));
+      _savedGymSessions = sessions;
+    }, _persistGymSessions);
   }
 
   void _navigate(_Destination destination) {

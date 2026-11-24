@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'manual_sync_contracts.dart';
 import 'manual_sync_workspace.dart';
 
 const _configurationKey = 'easy.manualSync.installation.v1';
@@ -10,16 +11,22 @@ const _configurationKey = 'easy.manualSync.installation.v1';
 /// its opaque workspace ID and setup phase. Keys stay in the credential vault.
 final class ManualSyncInstallation {
   ManualSyncInstallation({
-    required SharedPreferencesAsync preferences,
-    required SyncDeviceCredentials credentials,
-    String? databasePath,
-  }) : _preferences = preferences,
-       _credentials = credentials,
-       _databasePath = databasePath;
+    required this._preferences,
+    required SyncDeviceCredentials this._credentials,
+    this._databasePath,
+  }) : _unlock = null;
+
+  ManualSyncInstallation.withPassphrase({
+    required this._preferences,
+    required Future<SyncPasswordVault?> Function(bool forSetup) this._unlock,
+    this._databasePath,
+  }) : _credentials = null;
 
   final SharedPreferencesAsync _preferences;
-  final SyncDeviceCredentials _credentials;
+  final SyncDeviceCredentials? _credentials;
+  final Future<SyncPasswordVault?> Function(bool forSetup)? _unlock;
   final String? _databasePath;
+  SyncPasswordVault? _passwordVault;
   ManualSyncWorkspace? _session;
   Future<void>? _closeFuture;
   static Future<void> _configurationQueue = Future.value();
@@ -29,7 +36,7 @@ final class ManualSyncInstallation {
     final saved = await _read();
     if (saved == null || !saved.initialized) return null;
     return _session = await ManualSyncWorkspace.open(
-      credentials: _credentials,
+      credentials: await _openCredentials(forSetup: false),
       workspaceId: saved.id,
       databasePath: _databasePath,
     );
@@ -45,9 +52,10 @@ final class ManualSyncInstallation {
         );
       }
       if (_session case final workspace?) return workspace;
+      final credentials = await _openCredentials(forSetup: saved == null);
       if (saved?.initialized == true) {
         return _session = await ManualSyncWorkspace.open(
-          credentials: _credentials,
+          credentials: credentials,
           workspaceId: id,
           databasePath: _databasePath,
         );
@@ -55,12 +63,12 @@ final class ManualSyncInstallation {
       if (saved == null) {
         // Check vault access before putting a partially configured workspace
         // on disk. An explicit retry can resume the same ID after interruption.
-        final existing = await _credentials.loadIdentity();
+        final existing = await credentials.loadIdentity();
         existing?.destroy();
         await _write(id, initialized: false);
       }
       final workspace = await ManualSyncWorkspace.create(
-        credentials: _credentials,
+        credentials: credentials,
         workspaceId: id,
         databasePath: _databasePath,
       );
@@ -73,6 +81,16 @@ final class ManualSyncInstallation {
       }
     },
   );
+
+  Future<SyncDeviceCredentials> _openCredentials({
+    required bool forSetup,
+  }) async {
+    if (_credentials case final credentials?) return credentials;
+    final open = _unlock!;
+    final vault = _passwordVault ??= await open(forSetup);
+    if (vault == null) throw const ManualSyncTransferCancelled();
+    return SyncDeviceCredentials(vault);
+  }
 
   Future<({SyncWorkspaceId id, bool initialized})?> _read() async {
     final value = await _preferences.getString(_configurationKey);
@@ -114,6 +132,12 @@ final class ManualSyncInstallation {
     await _configurationQueue;
     final session = _session;
     _session = null;
-    await session?.close();
+    try {
+      await session?.close();
+    } finally {
+      final vault = _passwordVault;
+      _passwordVault = null;
+      await vault?.close();
+    }
   }
 }

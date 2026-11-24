@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../ui_theme.dart';
 import '../manual_sync_workspace.dart';
+import '../manual_sync_contracts.dart';
 import 'manual_sync_ui.dart';
 
 class ManualPairingPage extends StatefulWidget {
@@ -59,6 +60,8 @@ class _ManualPairingPageState extends State<ManualPairingPage> {
     });
     try {
       await work();
+    } on ManualSyncTransferCancelled {
+      // A cancelled unlock preserves the current pairing step.
     } catch (error) {
       _inform(
         manualSyncError(error, 'The pairing could not continue.'),

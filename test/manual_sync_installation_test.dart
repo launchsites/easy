@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:easy/sync/manual_sync_installation.dart';
+import 'package:easy/sync/manual_sync_contracts.dart';
 import 'package:easy/sync/manual_sync_workspace.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -137,6 +138,54 @@ void main() {
     expect(await File('${temp.path}/journal.sqlite3').exists(), isFalse);
     await reopened.close();
   });
+
+  test(
+    'passphrase setup and later unlock are distinct and cancellable',
+    () async {
+      final phases = <bool>[];
+      bool cancel = true;
+      Future<SyncPasswordVault?> open(bool forSetup) async {
+        phases.add(forSetup);
+        if (cancel) return null;
+        return openSyncPasswordVault(
+          passphrase: 'synthetic installation vault passphrase',
+          filePath: '${temp.path}/vault.easysync',
+          createIfMissing: forSetup,
+        );
+      }
+
+      ManualSyncInstallation newRoute() =>
+          ManualSyncInstallation.withPassphrase(
+            preferences: prefs,
+            unlock: open,
+            databasePath: '${temp.path}/journal.sqlite3',
+          );
+
+      final first = newRoute();
+      expect(await first.openConfigured(), isNull);
+      expect(phases, isEmpty);
+      await expectLater(
+        first.enable(null),
+        throwsA(isA<ManualSyncTransferCancelled>()),
+      );
+      expect(await prefs.getString(preferenceKey), isNull);
+      expect(await temp.list().isEmpty, isTrue);
+      cancel = false;
+      final device = (await first.enable(null)).device.fingerprint;
+      await first.close();
+
+      final reopened = newRoute();
+      cancel = true;
+      await expectLater(
+        reopened.openConfigured(),
+        throwsA(isA<ManualSyncTransferCancelled>()),
+      );
+      cancel = false;
+      expect((await reopened.openConfigured())!.device.fingerprint, device);
+      expect(phases, [true, true, false, false]);
+      await reopened.close();
+    },
+  );
 }
 
 final class _Vault implements SyncSecretVault {

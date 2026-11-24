@@ -56,6 +56,8 @@ class _ManualSyncPageState extends State<ManualSyncPage> {
           _configured = Future.value((workspace: workspace, status: status));
         });
       }
+    } on ManualSyncTransferCancelled {
+      // Closing the passphrase prompt leaves installation choices visible.
     } catch (error) {
       if (mounted) {
         _error = manualSyncError(error, 'Manual sync could not be enabled.');
@@ -110,21 +112,24 @@ class _ManualSyncPageState extends State<ManualSyncPage> {
         }
         final configured = snapshot.data;
         if (snapshot.hasError) {
+          final locked = snapshot.error is ManualSyncTransferCancelled;
           return ListView(
             padding: manualSyncPadding,
             children: [
               ManualSyncFeedback(
-                manualSyncError(
-                  snapshot.error,
-                  'The configured sync workspace could not be opened.',
-                ),
-                error: true,
+                locked
+                    ? 'The sync vault is locked.'
+                    : manualSyncError(
+                        snapshot.error,
+                        'The configured sync workspace could not be opened.',
+                      ),
+                error: !locked,
               ),
               Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: TextButton(
                   onPressed: _refresh,
-                  child: const Text('Try again'),
+                  child: Text(locked ? 'Unlock' : 'Try again'),
                 ),
               ),
             ],
