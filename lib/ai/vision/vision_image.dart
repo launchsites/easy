@@ -1,11 +1,12 @@
 import 'dart:convert';
-import 'dart:math' as math;
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:crypto/crypto.dart';
 
-import '../../storage/attachment_store.dart' show AttachmentLimits;
+import '../../storage/src/attachment_contracts.dart' show AttachmentLimits;
+import 'vision_image_stub.dart'
+    if (dart.library.ui) 'vision_image_flutter.dart'
+    as platform;
 
 /// A pixel-only derivative prepared for one meal-photo request.
 final class AiVisionImage {
@@ -42,62 +43,13 @@ Future<AiVisionImage> prepareAiVisionImage(Uint8List original) async {
   if (original.length > AttachmentLimits.photoByteLimit) {
     throw const AiVisionImageException(AiVisionImageFailure.sourceTooLarge);
   }
-  ui.ImmutableBuffer? buffer;
-  ui.ImageDescriptor? descriptor;
   try {
-    buffer = await ui.ImmutableBuffer.fromUint8List(original);
-    descriptor = await ui.ImageDescriptor.encoded(buffer);
-    final width = descriptor.width;
-    final height = descriptor.height;
-    if (width < 1 || height < 1) {
-      throw const AiVisionImageException(AiVisionImageFailure.invalidImage);
-    }
-    if (height > 50000000 ~/ width) {
-      throw const AiVisionImageException(AiVisionImageFailure.sourceTooLarge);
-    }
-    var longest = math.min(math.max(width, height), AiVisionImage.maxEdge);
-    final originalEdge = math.max(width, height);
-    while (true) {
-      final nextWidth = math.max(1, width * longest ~/ originalEdge);
-      final nextHeight = math.max(1, height * longest ~/ originalEdge);
-      final codec = await descriptor.instantiateCodec(
-        targetWidth: nextWidth,
-        targetHeight: nextHeight,
-      );
-      ui.Image? pixels;
-      try {
-        pixels = (await codec.getNextFrame()).image;
-        final encoded = await pixels.toByteData(format: ui.ImageByteFormat.png);
-        if (encoded == null) {
-          throw const AiVisionImageException(AiVisionImageFailure.invalidImage);
-        }
-        final data = _pixelChunks(
-          encoded.buffer.asUint8List(
-            encoded.offsetInBytes,
-            encoded.lengthInBytes,
-          ),
-        );
-        if (data.length <= AiVisionImage.maxBytes) {
-          return AiVisionImage._(data, pixels.width, pixels.height);
-        }
-      } finally {
-        pixels?.dispose();
-        codec.dispose();
-      }
-      if (longest <= 128) {
-        throw const AiVisionImageException(
-          AiVisionImageFailure.derivativeTooLarge,
-        );
-      }
-      longest = math.max(128, longest * 3 ~/ 4);
-    }
+    final pixels = await platform.encodeVisionPixels(original, _pixelChunks);
+    return AiVisionImage._(pixels.bytes, pixels.width, pixels.height);
   } on AiVisionImageException {
     rethrow;
   } catch (_) {
     throw const AiVisionImageException(AiVisionImageFailure.invalidImage);
-  } finally {
-    descriptor?.dispose();
-    buffer?.dispose();
   }
 }
 
