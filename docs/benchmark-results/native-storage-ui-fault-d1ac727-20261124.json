@@ -1,0 +1,54 @@
+{
+  "recorded_at_utc": "2026-11-24T05:41:11.457109+00:00",
+  "app_revision": "d1ac727b57f3362cadc16e735db17ca9f5e3dfff",
+  "executable_sha256": "9bae651e2b77810d5fad7359514c6a90caf214352b6bdaf64456a4ef451b67a3",
+  "aot_library_sha256": "c7f0a3f143c05ee341c3fc36b4457424605e280034aabc453dfc05b6de9bbba1",
+  "file_size_ceiling_bytes": 32992,
+  "fault_status_frames_sampled": 5,
+  "error_observed_before_success": true,
+  "fixture_task_kept_open_while_faulted": true,
+  "before": {
+    "revision": 1,
+    "digest": "a7772b8dce02e6ae7cbd0ce2677dbbe141984ccaf5645f7f39c5dac17224cb50",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 0,
+      "tasks": 1,
+      "notes": 1
+    },
+    "quick_check": "ok"
+  },
+  "rejected": {
+    "revision": 1,
+    "digest": "a7772b8dce02e6ae7cbd0ce2677dbbe141984ccaf5645f7f39c5dac17224cb50",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 0,
+      "tasks": 1,
+      "notes": 1
+    },
+    "quick_check": "ok"
+  },
+  "retried": {
+    "revision": 2,
+    "digest": "bfd1172fce7f418230ebb73cfa5169033361ebbd5f3a9d2a8c01015dea4789e9",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 0,
+      "tasks": 1,
+      "notes": 1
+    },
+    "quick_check": "ok"
+  },
+  "reopened": {
+    "revision": 2,
+    "digest": "bfd1172fce7f418230ebb73cfa5169033361ebbd5f3a9d2a8c01015dea4789e9",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 0,
+      "tasks": 1,
+      "notes": 1
+    },
+    "quick_check": "ok"
+  }
+}

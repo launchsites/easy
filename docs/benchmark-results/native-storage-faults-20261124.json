@@ -1,0 +1,72 @@
+{
+  "storage_source_revision": "535eb3caeab56316d44b5588d42890342e5f1b02",
+  "version": 1,
+  "architecture": "x86_64",
+  "kernel": "6.18.57",
+  "maximumFixtureBytesBetweenPhases": 597508,
+  "phases": [
+    {
+      "phase": "seed",
+      "revision": 2,
+      "workspaceDigest": "f405ebf73af09d9406f629855ad9b30d2504c433fc6c2e0584f18edaeaf7317b",
+      "integrity": "ok",
+      "quickCheck": "ok",
+      "attachmentDigests": [
+        "b05a6e4e189b775fa710a5c1c55474e49cf706683d835793788b7cfbcdbb2aa8"
+      ]
+    },
+    {
+      "phase": "limited",
+      "fileLimitBytes": 98304,
+      "kernelProbeErrno": 27,
+      "revision": 2,
+      "workspaceDigest": "f405ebf73af09d9406f629855ad9b30d2504c433fc6c2e0584f18edaeaf7317b",
+      "integrity": "ok",
+      "quickCheck": "ok",
+      "attachmentDigests": [
+        "b05a6e4e189b775fa710a5c1c55474e49cf706683d835793788b7cfbcdbb2aa8"
+      ],
+      "kernelRejectedWrites": {
+        "workspaceWal": 1,
+        "attachmentStaging": 1,
+        "directProbe": 1
+      }
+    },
+    {
+      "phase": "read-only",
+      "kernelProbeErrno": 13,
+      "workspaceRejectedAt": "open",
+      "revision": 2,
+      "workspaceDigest": "f405ebf73af09d9406f629855ad9b30d2504c433fc6c2e0584f18edaeaf7317b",
+      "integrity": "ok",
+      "quickCheck": "ok",
+      "attachmentDigests": [
+        "b05a6e4e189b775fa710a5c1c55474e49cf706683d835793788b7cfbcdbb2aa8"
+      ],
+      "databaseBytesUnchanged": true
+    },
+    {
+      "phase": "retry",
+      "replayedRevision": 3,
+      "revision": 3,
+      "workspaceDigest": "395af66a8efd0749702d3d78ae17a3f7fdf08e6ff8d784f94b9c9e66a8be95c9",
+      "integrity": "ok",
+      "quickCheck": "ok",
+      "attachmentDigests": [
+        "b05a6e4e189b775fa710a5c1c55474e49cf706683d835793788b7cfbcdbb2aa8",
+        "63b09e7e7b790f216f35401fbd3a35c51efd0546ad2dd8d7280a261d9173eec2"
+      ]
+    },
+    {
+      "phase": "reopen",
+      "revision": 3,
+      "workspaceDigest": "395af66a8efd0749702d3d78ae17a3f7fdf08e6ff8d784f94b9c9e66a8be95c9",
+      "integrity": "ok",
+      "quickCheck": "ok",
+      "attachmentDigests": [
+        "b05a6e4e189b775fa710a5c1c55474e49cf706683d835793788b7cfbcdbb2aa8",
+        "63b09e7e7b790f216f35401fbd3a35c51efd0546ad2dd8d7280a261d9173eec2"
+      ]
+    }
+  ]
+}
