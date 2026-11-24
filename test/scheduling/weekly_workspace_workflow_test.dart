@@ -25,15 +25,15 @@ void main() {
       addTearDown(() => SharedPreferencesAsyncPlatform.instance = platform);
 
       final monday = weeklyPlanEnd(weeklyPlanStart(DateTime.now()));
-      final busyStart = DateTime(monday.year, monday.month, monday.day, 9);
+      final busyStart = DateTime(monday.year, monday.month, monday.day, 20);
       final busyEnd = busyStart.add(const Duration(minutes: 30));
       final settings = SchedulingSettings(
         availability: [
           WeeklyAvailability(
             id: 'work',
             weekdays: [1],
-            startMinute: 540,
-            endMinute: 660,
+            startMinute: 20 * 60,
+            endMinute: 22 * 60,
             categories: ['work'],
           ),
         ],
@@ -120,6 +120,13 @@ void main() {
         );
       }
       await tester.pumpAndSettle();
+      final calendar = tester.widget<CalendarPage>(find.byType(CalendarPage));
+      expect(calendar.date, monday);
+      final displayed = calendar.events.singleWhere(
+        (event) => event.plannedTaskId == 'brief',
+      );
+      expect(displayed.start, busyEnd);
+      expect(displayed.end, busyEnd.add(const Duration(minutes: 30)));
       final durable = WorkspaceData.decode(updated.snapshot.workspaceJson);
       final block = durable.events
           .where((event) => event.plannedTaskId == 'brief')

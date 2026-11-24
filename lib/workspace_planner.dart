@@ -132,19 +132,20 @@ extension _WorkspacePlanner on _WorkspaceState {
     DateTime? first;
     for (final entry in tasks) {
       for (final block in entry.blocks) {
-        if (block.start.isBefore(now)) {
+        final start = block.start.toLocal();
+        if (start.isBefore(now)) {
           _inform(
             'A proposed block has already started. Preview the plan again.',
           );
           return;
         }
-        if (first == null || block.start.isBefore(first)) first = block.start;
+        if (first == null || start.isBefore(first)) first = start;
         additions.add(
           CalendarEvent(
             id: '$operationId-${additions.length}',
             title: entry.task.title,
-            start: block.start,
-            end: block.end,
+            start: start,
+            end: block.end.toLocal(),
             category: entry.task.category,
             plannedTaskId: entry.task.id,
             initialPlannedStart: block.start,

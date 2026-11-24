@@ -67,6 +67,8 @@ class _RecordEditorState extends State<RecordEditor> {
   late DateTime _endDate;
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
+  DateTime? _exactStart;
+  DateTime? _exactEnd;
   late bool _allDay;
   DateTime? _dueDate;
   DateTime? _dueAt;
@@ -139,8 +141,13 @@ class _RecordEditorState extends State<RecordEditor> {
         ? now.hour + 1
         : 9;
     final defaultStart = DateTime(day.year, day.month, day.day, defaultHour);
-    final start = event?.start ?? defaultStart;
-    final end = event?.end ?? defaultStart.add(const Duration(hours: 1));
+    if (event != null && !_allDay) {
+      _exactStart = event.start.toLocal();
+      _exactEnd = event.end.toLocal();
+    }
+    final start = _exactStart ?? event?.start ?? defaultStart;
+    final end =
+        _exactEnd ?? event?.end ?? defaultStart.add(const Duration(hours: 1));
     _startDate = DateUtils.dateOnly(start);
     _endDate = _allDay && end.isAfter(start) && end == DateUtils.dateOnly(end)
         ? _shiftDay(end, -1)
@@ -173,8 +180,9 @@ class _RecordEditorState extends State<RecordEditor> {
   DateTime _combine(DateTime day, TimeOfDay time) =>
       DateTime(day.year, day.month, day.day, time.hour, time.minute);
 
-  DateTime get _start => _combine(_startDate, _startTime);
-  DateTime get _end => _combine(_endDate, _endTime);
+  // A selected wall minute cannot encode seconds or tell the repeated hours apart.
+  DateTime get _start => _exactStart ?? _combine(_startDate, _startTime);
+  DateTime get _end => _exactEnd ?? _combine(_endDate, _endTime);
 
   Future<DateTime?> _pickDate(DateTime date, String label) => showDatePicker(
     context: context,
@@ -186,7 +194,7 @@ class _RecordEditorState extends State<RecordEditor> {
 
   Future<void> _changeStartDate() async {
     final date = await _pickDate(_startDate, 'Choose start date');
-    if (!mounted || date == null) return;
+    if (!mounted || date == null || date == _startDate) return;
     final daySpan = DateTime.utc(_endDate.year, _endDate.month, _endDate.day)
         .difference(
           DateTime.utc(_startDate.year, _startDate.month, _startDate.day),
@@ -195,15 +203,17 @@ class _RecordEditorState extends State<RecordEditor> {
     setState(() {
       _startDate = date;
       _endDate = _shiftDay(date, daySpan);
+      _exactStart = _exactEnd = null;
       _eventError = null;
     });
   }
 
   Future<void> _changeEndDate() async {
     final date = await _pickDate(_endDate, 'Choose end date');
-    if (!mounted || date == null) return;
+    if (!mounted || date == null || date == _endDate) return;
     setState(() {
       _endDate = date;
+      _exactEnd = null;
       _eventError = null;
     });
   }
@@ -214,14 +224,16 @@ class _RecordEditorState extends State<RecordEditor> {
       initialTime: _startTime,
       helpText: 'Choose start time',
     );
-    if (!mounted || time == null) return;
+    if (!mounted || time == null || time == _startTime) return;
     final previousDuration = _end.difference(_start);
     final duration = previousDuration > Duration.zero
         ? previousDuration
         : const Duration(hours: 1);
     setState(() {
       _startTime = time;
+      _exactStart = null;
       final end = _start.add(duration);
+      _exactEnd = end;
       _endTime = TimeOfDay.fromDateTime(end);
       _endDate = DateUtils.dateOnly(end);
       _eventError = null;
@@ -234,9 +246,10 @@ class _RecordEditorState extends State<RecordEditor> {
       initialTime: _endTime,
       helpText: 'Choose end time',
     );
-    if (!mounted || time == null) return;
+    if (!mounted || time == null || time == _endTime) return;
     setState(() {
       _endTime = time;
+      _exactEnd = null;
       _eventError = null;
     });
   }
