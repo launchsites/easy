@@ -4,11 +4,32 @@ import '../gym_mode_ui.dart' show MobileModeFrame;
 import '../storage/attachment_store.dart' show AttachmentRef;
 import '../ui_theme.dart';
 import 'nutrition_model.dart';
+import 'reference_food_catalog.dart';
 
 typedef ReviewMealPhoto = Future<List<NutritionPortion>?> Function(
   BuildContext context,
   NutritionMeal meal,
   List<NutritionFood> foods,
+);
+
+Future<NutritionPortion?> showNutritionPortionEditor(
+  BuildContext context, {
+  required List<NutritionFood> foods,
+  NutritionPortion? existing,
+  NutritionFood? identifiedFood,
+  String initialSearch = '',
+  ({double minimum, double maximum})? photoRange,
+  Future<NutritionFood?> Function()? onNewFood,
+}) => _push<NutritionPortion>(
+  context,
+  _PortionEditor(
+    existing: existing,
+    foods: foods,
+    identifiedFood: identifiedFood,
+    initialSearch: initialSearch,
+    photoRange: photoRange,
+    onNewFood: onNewFood,
+  ),
 );
 
 class NutritionPage extends StatefulWidget {
@@ -593,15 +614,11 @@ class _MealEditorState extends State<_MealEditor> {
   }
 
   Future<void> _editPortion([int? index]) async {
-    if (_foods.isEmpty && index == null && await _newFood() == null) return;
-    if (!mounted) return;
-    final portion = await _push<NutritionPortion>(
+    final portion = await showNutritionPortionEditor(
       context,
-      _PortionEditor(
-        existing: index == null ? null : _portions[index],
-        foods: _foods,
-        onNewFood: _newFood,
-      ),
+      existing: index == null ? null : _portions[index],
+      foods: _foods,
+      onNewFood: _newFood,
     );
     if (!mounted || portion == null) return;
     setState(() {
@@ -750,22 +767,38 @@ class _PortionEditor extends StatefulWidget {
   const _PortionEditor({
     required this.existing,
     required this.foods,
+    required this.identifiedFood,
+    required this.initialSearch,
+    required this.photoRange,
     required this.onNewFood,
   });
 
   final NutritionPortion? existing;
   final List<NutritionFood> foods;
-  final Future<NutritionFood?> Function() onNewFood;
+  final NutritionFood? identifiedFood;
+  final String initialSearch;
+  final ({double minimum, double maximum})? photoRange;
+  final Future<NutritionFood?> Function()? onNewFood;
 
   @override
   State<_PortionEditor> createState() => _PortionEditorState();
 }
 
 class _PortionEditorState extends State<_PortionEditor> {
-  late NutritionFood _food = widget.existing?.food ?? widget.foods.first;
-  late NutritionUnit _unit = widget.existing?.unit ?? _food.referenceUnit;
+  late NutritionFood? _food =
+      widget.existing?.food ??
+      widget.identifiedFood ??
+      (widget.onNewFood != null && widget.foods.length == 1
+          ? widget.foods.single
+          : null);
+  late NutritionUnit _unit =
+      widget.existing?.unit ?? _food?.referenceUnit ?? NutritionUnit.grams;
+  late final _search = TextEditingController(text: widget.initialSearch);
   late final _amount = TextEditingController(
-    text: _inputNumber(widget.existing?.amount ?? _food.referenceAmount),
+    text: _inputNumber(
+      widget.existing?.amount ??
+          (widget.onNewFood == null ? null : _food?.referenceAmount),
+    ),
   );
   late final _minimum = TextEditingController(
     text: _inputNumber(widget.existing?.minimumAmount),
@@ -776,10 +809,13 @@ class _PortionEditorState extends State<_PortionEditor> {
   late bool _estimated =
       widget.existing?.estimated == true ||
       widget.existing?.minimumAmount != null;
+  late String? _estimateSource = widget.existing?.estimateSource;
+  late bool _choosing = _food == null;
   String? _error;
 
   @override
   void dispose() {
+    _search.dispose();
     _amount.dispose();
     _minimum.dispose();
     _maximum.dispose();
@@ -787,15 +823,53 @@ class _PortionEditorState extends State<_PortionEditor> {
   }
 
   void _selectFood(NutritionFood food) => setState(() {
-    _food = food;
-    if (!_unit.isCompatibleWith(food.referenceUnit)) {
+    if (_food != food) {
+      _food = food;
       _unit = food.referenceUnit;
-      _amount.text = _inputNumber(food.referenceAmount);
+      final range = _unit.isCompatibleWith(NutritionUnit.grams)
+          ? widget.photoRange
+          : null;
+      _estimated = range != null;
+      _estimateSource = range == null ? null : 'Photo estimate';
       _minimum.clear();
       _maximum.clear();
+      if (range != null) {
+        _unit = NutritionUnit.grams;
+        _minimum.text = _inputNumber(range.minimum);
+        _maximum.text = _inputNumber(range.maximum);
+        _amount.text = _inputNumber((range.minimum + range.maximum) / 2);
+      } else {
+        final fromCatalog = referenceFoodCatalog.referenceFor(food) != null;
+        _amount.text = _inputNumber(
+          fromCatalog || widget.onNewFood == null ? null : food.referenceAmount,
+        );
+      }
     }
+    _choosing = false;
     _error = null;
   });
+
+  void _useMeasure(ReferenceFood food, int measureId) {
+    final portion = food.estimatedPortion(measureId);
+    setState(() {
+      _unit = NutritionUnit.grams;
+      _amount.text = _inputNumber(portion.amount);
+      _minimum.clear();
+      _maximum.clear();
+      _estimated = true;
+      _estimateSource = portion.estimateSource;
+      _error = null;
+    });
+  }
+
+  void _editAmount(String _) {
+    if (_estimateSource == null) return;
+    setState(() {
+      _estimateSource = null;
+      _minimum.clear();
+      _maximum.clear();
+    });
+  }
 
   void _changeUnit(NutritionUnit unit) => setState(() {
     for (final controller in [_amount, _minimum, _maximum]) {
@@ -809,14 +883,16 @@ class _PortionEditorState extends State<_PortionEditor> {
   });
 
   Future<void> _newFood() async {
-    final food = await widget.onNewFood();
+    final food = await widget.onNewFood?.call();
     if (mounted && food != null) _selectFood(food);
   }
 
   void _save() {
+    final food = _food;
+    if (food == null) return;
     try {
       final portion = NutritionPortion(
-        food: _food,
+        food: food,
         amount: _numberField(_amount, 'amount')!,
         unit: _unit,
         estimated: _estimated,
@@ -826,6 +902,7 @@ class _PortionEditorState extends State<_PortionEditor> {
         maximumAmount: _estimated
             ? _numberField(_maximum, 'maximum amount', optional: true)
             : null,
+        estimateSource: _estimated ? _estimateSource : null,
       );
       Navigator.pop(context, portion);
     } on FormatException catch (error) {
@@ -835,85 +912,156 @@ class _PortionEditorState extends State<_PortionEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final foods = {
-      if (widget.existing != null) widget.existing!.food,
-      ...widget.foods,
-      _food,
-    };
+    final food = _food;
+    final choosing = _choosing || food == null;
+    final reference = food == null
+        ? null
+        : referenceFoodCatalog.referenceFor(food);
+    final historical =
+        food != null &&
+        widget.existing?.food == food &&
+        widget.foods.any((current) => current.id == food.id && current != food);
     return _NutritionScreen(
       title: widget.existing == null ? 'Add food' : 'Edit portion',
       error: _error,
-      footer: FilledButton(onPressed: _save, child: const Text('Save portion')),
-      children: [
-        DropdownButtonFormField<NutritionFood>(
-          key: ObjectKey(_food),
-          initialValue: _food,
-          isExpanded: true,
-          decoration: _decoration('Food'),
-          items: [
-            for (final food in foods)
-              DropdownMenuItem(
-                value: food,
-                child: Text(
-                  widget.existing?.food == food &&
-                          widget.foods.any(
-                            (current) =>
-                                current.id == food.id && current != food,
-                          )
-                      ? '${food.name} (original)'
-                      : food.name,
-                  overflow: TextOverflow.ellipsis,
+      footer: choosing
+          ? const SizedBox.shrink()
+          : FilledButton(onPressed: _save, child: const Text('Save portion')),
+      children: choosing
+          ? _choices()
+          : [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  historical ? '${food.name} (original)' : food.name,
+                  style: contentTitleStyle,
                 ),
+                subtitle: Text(
+                  'Per ${food.referenceUnit.format(food.referenceAmount)}'
+                  '${reference != null
+                      ? ' · USDA FDC ${reference.fdcId}'
+                      : food.source == null
+                      ? ''
+                      : ' · ${food.source}'}',
+                  style: contentMetadataStyle,
+                ),
+                trailing: const Icon(Icons.expand_more_rounded),
+                onTap: () => setState(() {
+                  _search.clear();
+                  _choosing = true;
+                }),
               ),
-          ],
-          onChanged: (food) {
-            if (food != null) _selectFood(food);
-          },
+              _QuantityEditor(
+                controller: _amount,
+                label: 'Amount eaten',
+                unit: _unit,
+                units: NutritionUnit.values.where(
+                  food.referenceUnit.isCompatibleWith,
+                ),
+                onUnitChanged: _changeUnit,
+                onAmountChanged: _editAmount,
+              ),
+              if (reference != null && reference.measures.isNotEmpty)
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: PopupMenuButton<int>(
+                    tooltip: 'Published measures',
+                    onSelected: (measure) => _useMeasure(reference, measure),
+                    itemBuilder: (_) => [
+                      for (final measure in reference.measures)
+                        PopupMenuItem(
+                          value: measure.fdcPortionId,
+                          child: Text(
+                            '${measure.label} · ${NutritionUnit.grams.format(measure.gramWeight)}',
+                          ),
+                        ),
+                    ],
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text('Published measures'),
+                    ),
+                  ),
+                ),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Estimated portion'),
+                value: _estimated,
+                onChanged: (value) => setState(() {
+                  _estimated = value;
+                  if (!value) _estimateSource = null;
+                }),
+              ),
+              if (_estimated) ...[
+                if (_estimateSource case final source?)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(source, style: contentMetadataStyle),
+                  ),
+                _Input(
+                  label: 'Minimum (${_unit.symbol}), optional',
+                  controller: _minimum,
+                  numeric: true,
+                ),
+                const SizedBox(height: 9),
+                _Input(
+                  label: 'Maximum (${_unit.symbol}), optional',
+                  controller: _maximum,
+                  numeric: true,
+                ),
+              ],
+            ],
+    );
+  }
+
+  List<Widget> _choices() {
+    String normalize(String value) =>
+        value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    final query = normalize(_search.text);
+    final saved = widget.foods
+        .where((food) => normalize(food.name).contains(query))
+        .take(18)
+        .toList();
+    final references = referenceFoodCatalog.search(query, limit: 20);
+    return [
+      TextField(
+        controller: _search,
+        decoration: _decoration('Search foods')
+            .copyWith(prefixIcon: const Icon(Icons.search_rounded)),
+        onChanged: (_) => setState(() {}),
+        textInputAction: TextInputAction.search,
+      ),
+      if (_food != null)
+        _RemoveAction(
+          label: 'Keep current food',
+          onPressed: () => setState(() => _choosing = false),
+          destructive: false,
         ),
-        Padding(
-          padding: const EdgeInsets.only(top: 7),
-          child: Text(
-            'Per ${_food.referenceUnit.format(_food.referenceAmount)}'
-            '${_food.source == null ? '' : ' · ${_food.source}'}',
-            style: contentMetadataStyle,
-          ),
-        ),
+      if (widget.onNewFood != null)
         _RemoveAction(
           label: 'New saved food',
           onPressed: _newFood,
           destructive: false,
         ),
-        _QuantityEditor(
-          controller: _amount,
-          label: 'Amount eaten',
-          unit: _unit,
-          units: NutritionUnit.values.where(
-            _food.referenceUnit.isCompatibleWith,
-          ),
-          onUnitChanged: _changeUnit,
-        ),
-        SwitchListTile.adaptive(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Estimated portion'),
-          value: _estimated,
-          onChanged: (value) => setState(() => _estimated = value),
-        ),
-        if (_estimated) ...[
-          _Input(
-            label: 'Minimum (${_unit.symbol}), optional',
-            controller: _minimum,
-            numeric: true,
-          ),
-          const SizedBox(height: 9),
-          _Input(
-            label: 'Maximum (${_unit.symbol}), optional',
-            controller: _maximum,
-            numeric: true,
-          ),
-        ],
+      if (saved.isNotEmpty) ...[
+        const _Heading('Saved foods'),
+        for (final food in saved) _foodOption(food),
       ],
-    );
+      if (references.isNotEmpty) ...[
+        const _Heading('USDA food reference'),
+        for (final reference in references)
+          _foodOption(reference.toNutritionFood()),
+      ],
+      if (saved.isEmpty && references.isEmpty)
+        const Text('No foods match.', style: contentMetadataStyle),
+    ];
   }
+
+  Widget _foodOption(NutritionFood food) => ListTile(
+    contentPadding: EdgeInsets.zero,
+    title: Text(food.name, style: contentTitleStyle),
+    trailing: const Icon(Icons.chevron_right_rounded),
+    onTap: () => _selectFood(food),
+  );
 }
 
 class _QuantityEditor extends StatelessWidget {
@@ -923,6 +1071,7 @@ class _QuantityEditor extends StatelessWidget {
     required this.unit,
     required this.units,
     required this.onUnitChanged,
+    this.onAmountChanged,
   });
 
   final TextEditingController controller;
@@ -930,10 +1079,16 @@ class _QuantityEditor extends StatelessWidget {
   final NutritionUnit unit;
   final Iterable<NutritionUnit> units;
   final ValueChanged<NutritionUnit> onUnitChanged;
+  final ValueChanged<String>? onAmountChanged;
 
   @override
   Widget build(BuildContext context) {
-    final amount = _Input(label: label, controller: controller, numeric: true);
+    final amount = _Input(
+      label: label,
+      controller: controller,
+      numeric: true,
+      onChanged: onAmountChanged,
+    );
     final selectUnit = DropdownButtonFormField<NutritionUnit>(
       key: ValueKey(unit),
       decoration: _decoration('Unit'),
@@ -968,16 +1123,19 @@ class _Input extends StatelessWidget {
     required this.label,
     required this.controller,
     this.numeric = false,
+    this.onChanged,
   });
 
   final String label;
   final TextEditingController controller;
   final bool numeric;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) => TextField(
     controller: controller,
     decoration: _decoration(label),
+    onChanged: onChanged,
     keyboardType: numeric
         ? const TextInputType.numberWithOptions(decimal: true)
         : TextInputType.text,

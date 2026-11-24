@@ -4,6 +4,8 @@ import '../ai/ai_runtime_settings.dart' show formatPoundsMicros;
 import '../ai/vision/meal_vision.dart';
 import '../ui_theme.dart';
 import 'nutrition_model.dart';
+import 'nutrition_page.dart' show showNutritionPortionEditor;
+import 'reference_food_catalog.dart';
 
 enum MealVisionMatchIssue {
   foodMissing,
@@ -14,10 +16,16 @@ enum MealVisionMatchIssue {
 }
 
 class MealVisionMatch {
-  const MealVisionMatch({required this.candidate, this.portion, this.issue});
+  const MealVisionMatch({
+    required this.candidate,
+    this.portion,
+    this.identifiedFood,
+    this.issue,
+  });
 
   final MealVisionCandidate candidate;
   final NutritionPortion? portion;
+  final NutritionFood? identifiedFood;
   final MealVisionMatchIssue? issue;
 }
 
@@ -33,7 +41,11 @@ List<MealVisionMatch> matchMealVisionFoods(
     for (final candidate in review.candidates)
       _match(
         candidate,
-        foods[normalizeMealVisionLabel(candidate.label)] ?? const [],
+        foods[normalizeMealVisionLabel(candidate.label)] ??
+            referenceFoodCatalog
+                .exactMatches(candidate.label)
+                .map((food) => food.toNutritionFood())
+                .toList(),
       ),
   ]);
 }
@@ -42,20 +54,21 @@ MealVisionMatch _match(
   MealVisionCandidate candidate,
   List<NutritionFood> matches,
 ) {
-  MealVisionMatch issue(MealVisionMatchIssue value) =>
-      MealVisionMatch(candidate: candidate, issue: value);
+  MealVisionMatch issue(MealVisionMatchIssue value, [NutritionFood? food]) =>
+      MealVisionMatch(candidate: candidate, identifiedFood: food, issue: value);
   if (matches.isEmpty) return issue(MealVisionMatchIssue.foodMissing);
   if (matches.length != 1) return issue(MealVisionMatchIssue.foodAmbiguous);
-  final grams = candidate.grams;
-  if (grams == null) return issue(MealVisionMatchIssue.portionUnknown);
-  if (!grams.valid) return issue(MealVisionMatchIssue.invalidPortion);
   final food = matches.single;
+  final grams = candidate.grams;
+  if (grams == null) return issue(MealVisionMatchIssue.portionUnknown, food);
+  if (!grams.valid) return issue(MealVisionMatchIssue.invalidPortion, food);
   if (!food.referenceUnit.isCompatibleWith(NutritionUnit.grams)) {
-    return issue(MealVisionMatchIssue.incompatibleFood);
+    return issue(MealVisionMatchIssue.incompatibleFood, food);
   }
   try {
     return MealVisionMatch(
       candidate: candidate,
+      identifiedFood: food,
       portion: NutritionPortion(
         food: food,
         amount: (grams.minimum + grams.maximum) / 2,
@@ -63,10 +76,11 @@ MealVisionMatch _match(
         minimumAmount: grams.minimum,
         maximumAmount: grams.maximum,
         estimated: true,
+        estimateSource: 'Photo estimate',
       ),
     );
   } on FormatException {
-    return issue(MealVisionMatchIssue.invalidPortion);
+    return issue(MealVisionMatchIssue.invalidPortion, food);
   }
 }
 
@@ -138,16 +152,25 @@ Future<List<NutritionPortion>?> showMealVisionReview(
   BuildContext context,
   MealVisionReview review,
   Iterable<NutritionFood> foods,
-) => showDialog<List<NutritionPortion>>(
-  context: context,
-  builder: (_) =>
-      _MealSuggestionDialog(matches: matchMealVisionFoods(review, foods)),
-);
+) {
+  final saved = List<NutritionFood>.unmodifiable(foods);
+  return showDialog<List<NutritionPortion>>(
+    context: context,
+    builder: (_) => _MealSuggestionDialog(
+      matches: matchMealVisionFoods(review, saved),
+      savedFoods: saved,
+    ),
+  );
+}
 
 class _MealSuggestionDialog extends StatefulWidget {
-  const _MealSuggestionDialog({required this.matches});
+  const _MealSuggestionDialog({
+    required this.matches,
+    required this.savedFoods,
+  });
 
   final List<MealVisionMatch> matches;
+  final List<NutritionFood> savedFoods;
 
   @override
   State<_MealSuggestionDialog> createState() => _MealSuggestionDialogState();
@@ -155,12 +178,44 @@ class _MealSuggestionDialog extends StatefulWidget {
 
 class _MealSuggestionDialogState extends State<_MealSuggestionDialog> {
   final _selected = <int>{};
+  final _overrides = <int, NutritionPortion>{};
+
+  MealVisionMatch _matchAt(int index) {
+    final match = widget.matches[index];
+    final override = _overrides[index];
+    if (override == null) return match;
+    return MealVisionMatch(
+      candidate: match.candidate,
+      identifiedFood: override.food,
+      portion: override,
+    );
+  }
+
+  Future<void> _editMatch(int index) async {
+    final match = _matchAt(index);
+    final range = match.candidate.grams;
+    final result = await showNutritionPortionEditor(
+      context,
+      foods: widget.savedFoods,
+      existing: match.portion,
+      identifiedFood: match.identifiedFood,
+      initialSearch: match.candidate.label,
+      photoRange: range == null || !range.valid
+          ? null
+          : (minimum: range.minimum, maximum: range.maximum),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _overrides[index] = result;
+      _selected.add(index);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final selected = [
       for (var index = 0; index < widget.matches.length; index++)
-        if (_selected.contains(index)) widget.matches[index],
+        if (_selected.contains(index)) _matchAt(index),
     ];
     final totals = mealVisionNutritionTotals(selected);
     return AlertDialog(
@@ -172,7 +227,7 @@ class _MealSuggestionDialogState extends State<_MealSuggestionDialog> {
         children: [
           if (widget.matches.isEmpty) const Text('No foods were identified.'),
           for (var index = 0; index < widget.matches.length; index++)
-            _candidateRow(index, widget.matches[index]),
+            _candidateRow(index, _matchAt(index)),
           if (selected.isNotEmpty) ...[
             const SizedBox(height: 14),
             const Text('Selected nutrition', style: sectionHeadingStyle),
@@ -210,14 +265,17 @@ class _MealSuggestionDialogState extends State<_MealSuggestionDialog> {
   Widget _candidateRow(int index, MealVisionMatch match) {
     final candidate = match.candidate;
     final interval = candidate.grams;
-    final amount = switch (interval) {
-      null => 'Portion unknown',
-      final range when range.valid => 'Estimated ${_grams(range)}',
-      _ => 'Portion needs review',
-    };
+    final portion = match.portion;
+    final amount = portion != null
+        ? _portionAmount(portion)
+        : switch (interval) {
+            null => 'Portion unknown',
+            final range when range.valid => 'Estimated ${_grams(range)}',
+            _ => 'Portion needs review',
+          };
     final issue = switch (match.issue) {
-      MealVisionMatchIssue.foodMissing => 'Choose a saved food manually',
-      MealVisionMatchIssue.foodAmbiguous => 'Multiple foods share this name',
+      MealVisionMatchIssue.foodMissing => 'Choose a food',
+      MealVisionMatchIssue.foodAmbiguous => 'Choose the preparation',
       MealVisionMatchIssue.incompatibleFood =>
         'Saved food uses a different unit',
       MealVisionMatchIssue.invalidPortion => 'Portion needs review',
@@ -226,28 +284,50 @@ class _MealSuggestionDialogState extends State<_MealSuggestionDialog> {
     final description = issue == null || issue == amount
         ? amount
         : '$amount\n$issue';
-    if (match.portion == null) {
+    if (portion == null) {
       return ListTile(
         contentPadding: EdgeInsets.zero,
         title: Text(candidate.label),
         subtitle: Text(description),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => _editMatch(index),
       );
     }
-    return CheckboxListTile(
-      contentPadding: EdgeInsets.zero,
-      controlAffinity: ListTileControlAffinity.leading,
-      value: _selected.contains(index),
-      title: Text(match.portion!.food.name),
-      subtitle: Text(description),
-      onChanged: (checked) => setState(() {
-        if (checked == true) {
-          _selected.add(index);
-        } else {
-          _selected.remove(index);
-        }
-      }),
+    return Row(
+      children: [
+        Expanded(
+          child: CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: _selected.contains(index),
+            title: Text(portion.food.name),
+            subtitle: Text(description),
+            onChanged: (checked) => setState(() {
+              if (checked == true) {
+                _selected.add(index);
+              } else {
+                _selected.remove(index);
+              }
+            }),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.edit_outlined),
+          tooltip: 'Edit ${portion.food.name}',
+          onPressed: () => _editMatch(index),
+        ),
+      ],
     );
   }
+}
+
+String _portionAmount(NutritionPortion portion) {
+  final min = portion.minimumAmount;
+  final max = portion.maximumAmount;
+  final amount = min == null || max == null || min == max
+      ? portion.unit.format(portion.amount)
+      : '${formatNutritionNumber(min)}–${portion.unit.format(max)}';
+  return portion.estimated ? 'Estimated $amount' : amount;
 }
 
 String _grams(MealGramInterval range) => range.minimum == range.maximum

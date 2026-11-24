@@ -1,0 +1,139 @@
+fdc_id	group	name	aliases
+171688	fruit	Apple with skin, raw	apple;apples;raw apple
+173944	fruit	Banana, raw	banana;bananas;raw bananas
+169097	fruit	Orange, raw	orange;oranges
+167762	fruit	Strawberries, raw	strawberries;strawberry
+171711	fruit	Blueberries, raw	blueberries;blueberry
+167755	fruit	Raspberries, raw	raspberries;raspberry
+174683	fruit	Red or green grapes, raw	grapes;grape;red grapes;green grapes
+169910	fruit	Mango, raw	mango;mangos;mangoes
+171705	fruit	Avocado, raw	avocado;avocados
+169124	fruit	Pineapple, raw	pineapple
+168153	fruit	Green kiwifruit, raw	kiwi;kiwifruit
+169118	fruit	Pear, raw	pear;pears
+169928	fruit	Yellow peach, raw	peach;peaches
+167765	fruit	Watermelon, raw	watermelon
+167746	fruit	Lemon flesh, raw	lemon;raw lemon
+168191	fruit	Medjool dates	dates;medjool date
+169393	fruit	Seedless raisins	raisin;raisins
+170393	vegetable	Carrot, raw	carrot;carrots;raw carrots
+170394	vegetable	Carrot, boiled	carrot;carrots;cooked carrot;cooked carrots;boiled carrots
+170379	vegetable	Broccoli, raw	broccoli;uncooked broccoli
+169967	vegetable	Broccoli, boiled	broccoli;cooked broccoli
+169986	vegetable	Cauliflower, raw	cauliflower;uncooked cauliflower
+170397	vegetable	Cauliflower, boiled	cauliflower;cooked cauliflower
+168409	vegetable	Cucumber with skin, raw	cucumber;cucumber slices
+168462	vegetable	Spinach, raw	spinach;spinach leaves
+168463	vegetable	Spinach, boiled	spinach;cooked spinach
+168421	vegetable	Kale, raw	kale
+169247	vegetable	Romaine lettuce, raw	romaine;cos lettuce;lettuce
+170108	vegetable	Red bell pepper, raw	red pepper;red bell pepper;bell pepper;capsicum;red capsicum
+170457	vegetable	Tomato, raw	tomato;tomatoes;fresh tomatoes
+170138	vegetable	Tomatoes packed in juice, no added salt	tomato;tomatoes;canned tomatoes;tinned tomatoes
+170000	vegetable	Onion, raw	onion;onions
+169230	vegetable	Garlic, raw	garlic;garlic clove
+169251	vegetable	White mushrooms, raw	mushroom;mushrooms;button mushrooms
+169999	vegetable	Sweetcorn, boiled	sweetcorn;sweet corn;cooked corn;corn kernels
+170420	vegetable	Green peas, boiled	peas;cooked peas;green peas
+169141	vegetable	Green beans, boiled	green beans;string beans;cooked green beans
+170026	vegetable	Potato with skin, raw	potato;potatoes;raw potato;raw potatoes
+170093	vegetable	Potato with skin, baked	potato;potatoes;baked potato;baked potatoes;jacket potato
+170440	vegetable	Peeled potato, boiled	potato;potatoes;boiled potatoes;cooked potato
+168483	vegetable	Sweet potato flesh, baked	sweet potato;baked sweet potato
+169296	vegetable	Butternut squash, baked	butternut squash;cooked butternut squash
+169291	vegetable	Courgette, raw	courgette;zucchini;raw zucchini
+169292	vegetable	Courgette, boiled	courgette;zucchini;cooked courgette;cooked zucchini
+169228	vegetable	Aubergine, raw	aubergine;eggplant;raw eggplant
+169229	vegetable	Aubergine, boiled	aubergine;eggplant;cooked aubergine;cooked eggplant
+168390	vegetable	Asparagus, boiled	asparagus;cooked asparagus
+169988	vegetable	Celery, raw	celery
+169975	vegetable	Cabbage, raw	cabbage;green cabbage
+169977	vegetable	Red cabbage, raw	red cabbage
+169146	vegetable	Beetroot, boiled	beetroot;beet;cooked beetroot;boiled beets
+171477	protein	Skinless chicken breast, roasted	chicken;chicken breast;cooked chicken breast;roast chicken breast
+171077	protein	Skinless chicken breast, raw	chicken;chicken breast;uncooked chicken breast;raw chicken breast
+172388	protein	Skinless chicken thigh, roasted	chicken;chicken thigh;cooked chicken thigh;roast chicken thigh
+171496	protein	Skinless turkey breast, roasted	turkey;turkey breast;roast turkey breast
+175168	protein	Farmed Atlantic salmon, cooked	salmon;atlantic salmon;cooked salmon;baked salmon;grilled salmon
+175167	protein	Farmed Atlantic salmon, raw	salmon;atlantic salmon;raw salmon;uncooked salmon
+173687	protein	Smoked Chinook salmon	salmon;smoked salmon;lox
+173709	protein	Light tuna in water, drained	tuna;canned tuna;tinned tuna;tuna in water
+171956	protein	Atlantic cod, cooked	cod;cooked cod;baked cod
+171971	protein	Shrimp, cooked	shrimp;prawns;cooked shrimp;cooked prawns
+171794	protein	10% ground beef, pan-browned	ground beef;beef mince;cooked ground beef;cooked beef mince
+174030	protein	10% ground beef, raw	ground beef;beef mince;raw ground beef;raw beef mince
+168250	protein	Pork tenderloin, roasted	pork tenderloin;roast pork tenderloin
+167914	protein	Bacon, baked	bacon;cooked bacon;baked bacon
+172475	protein	Firm calcium-set tofu	tofu;firm tofu;raw tofu
+168411	protein	Edamame, prepared	edamame;edamame beans
+171287	protein	Whole egg, raw	egg;eggs;raw egg;raw eggs
+173424	protein	Whole egg, hard-boiled	egg;eggs;boiled egg;boiled eggs;hard boiled egg;hard boiled eggs
+172187	protein	Whole egg, scrambled	egg;eggs;scrambled eggs;scrambled egg
+173757	protein	Chickpeas, boiled	chickpeas;chickpea;garbanzo beans;cooked chickpeas
+173800	protein	Canned chickpeas, drained	chickpeas;chickpea;garbanzo beans;canned chickpeas;tinned chickpeas
+172421	protein	Lentils, boiled	lentils;cooked lentils;boiled lentils
+173735	protein	Black beans, boiled	black beans;cooked black beans
+175194	protein	Red kidney beans, boiled	kidney beans;red kidney beans;cooked kidney beans
+175203	protein	White beans, boiled	white beans;cooked white beans
+174289	protein	Hummus, prepared	hummus;houmous;hummous
+169757	grain	Long-grain white rice, cooked	rice;white rice;cooked white rice;boiled white rice;cooked rice;boiled rice
+169756	grain	Long-grain white rice, dry	rice;white rice;raw white rice;uncooked white rice;dry rice
+169704	grain	Long-grain brown rice, cooked	rice;brown rice;cooked brown rice;boiled brown rice;cooked rice;boiled rice
+169703	grain	Long-grain brown rice, dry	rice;brown rice;raw brown rice;uncooked brown rice;dry rice
+168928	grain	Wheat pasta, cooked	pasta;spaghetti;cooked pasta;cooked spaghetti;plain cooked pasta
+168927	grain	Wheat pasta, dry	pasta;spaghetti;dry pasta;uncooked spaghetti;dry spaghetti
+173904	grain	Oats, dry	oats;oatmeal;rolled oats;porridge oats;dry oats
+173905	grain	Oat porridge, cooked in water	oats;oatmeal;porridge;cooked oats;cooked oatmeal
+168917	grain	Quinoa, cooked	quinoa;cooked quinoa
+168874	grain	Quinoa, dry	quinoa;dry quinoa;uncooked quinoa
+169700	grain	Couscous, cooked	couscous;cooked couscous
+169699	grain	Couscous, dry	couscous;dry couscous;uncooked couscous
+170285	grain	Pearl barley, cooked	barley;pearl barley;cooked barley
+170287	grain	Bulgur, cooked	bulgur;bulgur wheat;cooked bulgur
+172688	grain	Whole-wheat bread	bread;whole wheat bread;wholemeal bread;wholegrain bread
+174924	grain	White bread	bread;white bread;sliced white bread
+172684	grain	Rye bread	bread;rye bread
+174899	grain	Plain bagel	bagel;bagels
+174916	grain	Whole-wheat pita	pita;pitta;pita bread;pitta bread;wholemeal pita
+175036	grain	Corn tortilla	tortilla;corn tortilla;corn tortillas
+167535	grain	Flour tortilla	tortilla;flour tortilla;flour tortillas;wheat tortilla
+172217	dairy	Whole milk	milk;whole milk;full fat milk
+172205	dairy	2% milk	milk;reduced fat milk;2 percent milk
+173432	dairy	Skim milk	milk;skimmed milk;fat free milk;nonfat milk
+171284	dairy	Plain whole-milk yoghurt	yoghurt;yogurt;plain yoghurt;plain yogurt;whole milk yogurt
+170894	dairy	Plain nonfat Greek yoghurt	yoghurt;yogurt;greek yoghurt;greek yogurt;nonfat greek yogurt;greek yogurt 0%;0% greek yoghurt
+171304	dairy	Plain whole-milk Greek yoghurt	yoghurt;yogurt;greek yoghurt;greek yogurt;full fat greek yogurt;whole milk greek yogurt
+173414	dairy	Cheddar cheese	cheddar;cheddar cheese;cheese
+170845	dairy	Whole-milk mozzarella	mozzarella;mozzarella cheese;cheese
+170848	dairy	Hard parmesan	parmesan;parmesan cheese;cheese
+172182	dairy	2% cottage cheese	cottage cheese;low fat cottage cheese
+173418	dairy	Cream cheese	cream cheese
+173410	dairy	Salted butter	butter;salted butter
+170859	dairy	Heavy whipping cream	cream;heavy cream;whipping cream
+171413	pantry	Olive oil	olive oil
+172336	pantry	Canola oil	canola;low erucic rapeseed oil
+170567	pantry	Almonds	almonds;almond
+170187	pantry	English walnuts	walnuts;walnut
+170162	pantry	Cashews, raw	cashews;cashew nuts;raw cashews
+172430	pantry	Peanuts, raw	peanuts;raw peanuts
+172470	pantry	Smooth unsalted peanut butter	peanut butter;smooth peanut butter
+170554	pantry	Chia seeds, dry	chia;chia seeds
+169414	pantry	Flaxseed	flax;flax seed;linseed
+170562	pantry	Sunflower kernels, dry	sunflower seeds;sunflower kernels
+170150	pantry	Whole sesame seeds, dry	sesame;sesame seeds
+170189	pantry	Roasted sesame tahini	tahini;sesame paste
+169640	pantry	Honey	honey
+169641	pantry	Jam or preserves	jam;preserves
+169655	pantry	Granulated sugar	sugar;granulated sugar;white sugar
+173468	pantry	Table salt	salt;table salt
+168556	pantry	Tomato ketchup	ketchup;catsup;tomato sauce
+172234	pantry	Yellow mustard	mustard;yellow mustard
+174277	pantry	Soy and wheat sauce (shoyu)	soy sauce;shoyu
+172473	pantry	Low-sodium soy and wheat sauce	soy sauce;low sodium soy sauce;reduced salt soy sauce
+174278	pantry	Tamari soy sauce	soy sauce;tamari
+171009	pantry	Mayonnaise	mayonnaise;mayo
+169074	pantry	Canned tomato sauce, no added salt	tomato sauce;canned tomato sauce
+172241	pantry	Balsamic vinegar	balsamic vinegar
+173469	pantry	Cider vinegar	apple cider vinegar;cider vinegar
+171890	drink	Black coffee, brewed	black coffee;brewed coffee;coffee
+173227	drink	Black tea, brewed	black tea;brewed black tea;tea

@@ -183,11 +183,18 @@ class NutritionPortion {
     this.estimated = false,
     this.minimumAmount,
     this.maximumAmount,
+    this.estimateSource,
   }) {
     if (!unit.isCompatibleWith(food.referenceUnit)) {
       throw const FormatException('Use a unit compatible with the food label.');
     }
     _checkAmount(amount, unit);
+    if (estimateSource case final source?) {
+      _requiredText(source, 'Estimate source');
+      if (!estimated || source.length > 512) {
+        throw const FormatException('Check the portion estimate source.');
+      }
+    }
     final minimum = minimumAmount;
     final maximum = maximumAmount;
     if (minimum != null || maximum != null) {
@@ -221,6 +228,7 @@ class NutritionPortion {
         estimated: json['estimated'] as bool? ?? false,
         minimumAmount: _number(json['minimumAmount']),
         maximumAmount: _number(json['maximumAmount']),
+        estimateSource: json['estimateSource'] as String?,
       );
 
   // Keep a snapshot so editing a saved food doesn't rewrite the meal history.
@@ -230,6 +238,7 @@ class NutritionPortion {
   final bool estimated;
   final double? minimumAmount;
   final double? maximumAmount;
+  final String? estimateSource;
 
   double _scale(double quantity) =>
       unit._base(quantity) / food.referenceUnit._base(food.referenceAmount);
@@ -241,6 +250,7 @@ class NutritionPortion {
     if (estimated) 'estimated': true,
     if (minimumAmount != null) 'minimumAmount': minimumAmount,
     if (maximumAmount != null) 'maximumAmount': maximumAmount,
+    if (estimateSource != null) 'estimateSource': estimateSource,
   };
 }
 
