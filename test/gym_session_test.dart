@@ -328,6 +328,113 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('live capture refreshes only the same saved workout', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 568);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final started = DateTime.utc(2026, 11, 24, 9);
+    final plan = _plan();
+    final session = GymSession.start(plan: plan, now: started);
+    final recordedAt = started.add(const Duration(minutes: 10));
+    final reviewed = reviewGymWorkoutCapture(
+      session: session,
+      originalText: 'I did Treadmill 3% incline 0.45km in 5mins',
+      recordedAt: recordedAt,
+    ).draft!.apply(session, entryId: 'reviewed-cardio')!;
+    final wrongSession =
+        GymSession.start(
+          plan: plan,
+          now: started.add(const Duration(minutes: 1)),
+        ).withCapturedEntry(
+          GymLogEntry(
+            id: 'unrelated-entry',
+            title: 'Unrelated session entry',
+            loggedAt: recordedAt,
+          ),
+        );
+    ValueChanged<GymSession>? refresh;
+    final saves = <GymSession>[];
+    final capture = find.byTooltip('Capture workout entry');
+    final input = find.byType(TextField);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: easyTheme(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(2)),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: child!,
+          ),
+        ),
+        home: MobileModeFrame(
+          mode: 'gym',
+          child: GymSessionPage(
+            session: session,
+            onChanged: (saved) => saves.add(saved!),
+            buildCaptureControl: (onReviewed) {
+              refresh = onReviewed;
+              return IconButton(
+                tooltip: 'Capture workout entry',
+                icon: const Icon(Icons.mic_none_rounded),
+                onPressed: () => onReviewed(reviewed),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getSize(capture), const Size.square(48));
+    expect(tester.getSize(input).width, greaterThan(250));
+    expect(find.byTooltip('Rest timer').hitTestable(), findsOneWidget);
+
+    refresh!(wrongSession);
+    await tester.pumpAndSettle();
+    expect(find.text('0.5 km'), findsOneWidget);
+    expect(find.text('Unrelated session entry'), findsNothing);
+    expect(saves, isEmpty);
+
+    await tester.enterText(input, 'Existing draft');
+    await tester.tap(capture);
+    await tester.pumpAndSettle();
+    expect(find.text('0.45 km'), findsOneWidget);
+    expect(find.text('Existing draft'), findsOneWidget);
+    expect(saves, isEmpty);
+
+    await _tapTooltip(tester, 'Edit distance for Treadmill');
+    expect(capture, findsNothing);
+    await _tapTooltip(tester, 'Cancel edit');
+    expect(capture.hitTestable(), findsOneWidget);
+    expect(find.text('Existing draft'), findsOneWidget);
+
+    tester.view.physicalSize = const Size(568, 320);
+    await tester.pumpAndSettle();
+    expect(capture.hitTestable(), findsOneWidget);
+    expect(tester.getSize(input).width, greaterThan(270));
+    await _tapTooltip(tester, 'Log entry');
+    expect(saves.single.entries.map((entry) => entry.title), [
+      'Treadmill',
+      'Existing draft',
+    ]);
+
+    await tester.tap(find.text('Finish'));
+    await tester.pumpAndSettle();
+    expect(saves.last.finished, isTrue);
+    expect(capture, findsNothing);
+    refresh!(reviewed);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, 320));
+    await tester.pumpAndSettle();
+    expect(find.text('Session complete'), findsOneWidget);
+    expect(saves, hasLength(2));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Escape closes a desktop metric editor and restores the note draft',
     (tester) async {

@@ -313,12 +313,18 @@ class GymSessionPage extends StatefulWidget {
     required this.session,
     required this.onChanged,
     this.previousSessions = const [],
+    this.buildCaptureControl,
     super.key,
   });
 
   final GymSession? session;
   final ValueChanged<GymSession?> onChanged;
   final List<GymSession> previousSessions;
+
+  /// Builds a compact capture control for a live workout. Report a reviewed
+  /// session through the callback after the caller has persisted it.
+  final Widget Function(ValueChanged<GymSession> onReviewed)?
+  buildCaptureControl;
 
   @override
   State<GymSessionPage> createState() => _GymSessionPageState();
@@ -424,14 +430,28 @@ class _GymSessionPageState extends State<GymSessionPage> {
     super.dispose();
   }
 
-  void _update(GymSession session) {
+  void _update(GymSession session, {bool notify = true}) {
     setState(() {
       final shapeChanged =
           _session?.exercises.length != session.exercises.length;
       _session = session;
       if (shapeChanged) _previousSets = _readPreviousSets();
     });
-    widget.onChanged(session);
+    if (notify) widget.onChanged(session);
+  }
+
+  void _reviewedCapture(GymSession reviewed) {
+    final current = _session;
+    if (!mounted ||
+        current == null ||
+        current.finished ||
+        reviewed.finished ||
+        !current.startedAt.isAtSameMomentAs(reviewed.startedAt) ||
+        current.planId != reviewed.planId ||
+        current.planned != reviewed.planned) {
+      return;
+    }
+    _update(reviewed, notify: false);
   }
 
   void _begin(bool planned) {
@@ -1542,6 +1562,30 @@ class _GymSessionPageState extends State<GymSessionPage> {
     final addSteppers =
         metric?.metric != null && MediaQuery.sizeOf(context).width < 720;
     final showRest = !_editing && (_session?.exercises.isNotEmpty ?? false);
+    final capture = _active && !_editing
+        ? widget.buildCaptureControl?.call(_reviewedCapture)
+        : null;
+    final separateControls =
+        capture != null &&
+        showRest &&
+        MediaQuery.sizeOf(context).width < 360 &&
+        MediaQuery.textScalerOf(context).scale(14) >= 20;
+    final controls = showRest || capture != null
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showRest)
+                GymRestTimer(
+                  endsAt: _session?.restEndsAt,
+                  onStart: (duration) => _update(_session!.startRest(duration)),
+                  onClear: () => _update(_session!.clearRest()),
+                ),
+              if (showRest && capture != null) const SizedBox(width: 8),
+              if (capture != null)
+                SizedBox.square(dimension: 48, child: capture),
+            ],
+          )
+        : null;
     final bar = DecoratedBox(
       decoration: const BoxDecoration(
         color: paper,
@@ -1578,6 +1622,14 @@ class _GymSessionPageState extends State<GymSessionPage> {
                     ),
                   ),
                 ],
+              ),
+            if (separateControls)
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 5),
+                  child: controls,
+                ),
               ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1671,18 +1723,11 @@ class _GymSessionPageState extends State<GymSessionPage> {
                     ),
                   ),
                 ),
-                if (showRest) ...[
-                  const SizedBox(width: 8),
+                if (!separateControls && controls != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: GymRestTimer(
-                      endsAt: _session?.restEndsAt,
-                      onStart: (duration) =>
-                          _update(_session!.startRest(duration)),
-                      onClear: () => _update(_session!.clearRest()),
-                    ),
+                    padding: const EdgeInsetsDirectional.only(start: 8, top: 2),
+                    child: controls,
                   ),
-                ],
               ],
             ),
           ],
