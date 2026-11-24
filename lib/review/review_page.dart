@@ -12,6 +12,7 @@ class ReviewPage extends StatefulWidget {
     required this.data,
     required this.onChanged,
     required this.agendaForDay,
+    this.activityMinutesForDay,
     this.onRollForward,
     this.onReviewActions,
     this.initialDay,
@@ -22,6 +23,10 @@ class ReviewPage extends StatefulWidget {
   final ReviewData data;
   final Future<void> Function(ReviewData data) onChanged;
   final ReviewAgenda Function(DateTime day) agendaForDay;
+
+  /// Optional fast path for History. The host can provide a cached lookup by
+  /// civil date. With no callback, History uses the day agenda's activity total.
+  final int? Function(DateTime day)? activityMinutesForDay;
   final Future<void> Function(ReviewTask task, DateTime day)? onRollForward;
   final ValueChanged<String>? onReviewActions;
   final DateTime? initialDay;
@@ -644,12 +649,15 @@ class _ReviewPageState extends State<ReviewPage> {
           break;
       }
     }
+    final activityMinutes = widget.activityMinutesForDay;
     return (
       day: day,
       reflections: _data.dayFor(day).reflections.length,
       done: done,
       skipped: skipped,
-      actual: widget.agendaForDay(day).confirmedActivityMinutes,
+      actual: activityMinutes == null
+          ? widget.agendaForDay(day).confirmedActivityMinutes
+          : activityMinutes(day),
     );
   }
 
