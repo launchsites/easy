@@ -5,3 +5,5 @@ export 'calendar_settings_page.dart';
 export 'ics_occurrence_expander.dart';
 export 'ics_import_export.dart';
 export 'ics_transfer_page.dart';
+export 'internal_recurrence.dart';
+export 'internal_recurrence_editor.dart';
