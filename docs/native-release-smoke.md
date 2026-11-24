@@ -37,3 +37,23 @@ python3 tool/benchmark/native_gym_scale.py \
   --candidate /tmp/easy-candidate/bundle/easy \
   --output /tmp/easy-native-gym-scale
 ```
+
+## Offline food photo import
+
+The Linux x64 release at `d1ac727b57f3362cadc16e735db17ca9f5e3dfff` used GTK's native file chooser to attach a synthetic PNG to a meal at 390×844. IPv4 and IPv6 were blocked and the workspace had no AI provider configured. Easy showed the imported pixels, kept the photo draft in revision 2, and saved the meal with a measured 150 g portion in revision 3. After deleting the original fixture and restarting, the managed PNG had the same SHA-256, the photo opened again, and the workspace retained the same SQLite digest. The fixture used file import and manual nutrition entry. [Verification report](benchmark-results/native-meal-photo-d1ac727-epyc-20261124.json)
+
+To repeat the offline check, compile the socket blocker and use it to launch the release in a disposable profile. Choose Full at setup. In Health, open Meal log, attach a local test PNG, add a measured food portion, and save. Remove the fixture from its original location and reopen the saved photo after restarting with the same profile.
+
+```sh
+cc -std=c17 -O2 -Wall -Wextra -Werror tool/benchmark/deny_ip_sockets.c -o /tmp/easy-deny-ip-sockets
+easy_check_dir=$(mktemp -d)
+XDG_DATA_HOME="$easy_check_dir/data" XDG_CONFIG_HOME="$easy_check_dir/config" \
+  XDG_CACHE_HOME="$easy_check_dir/cache" \
+  /tmp/easy-deny-ip-sockets "$(pwd)/build/linux/x64/release/bundle/easy"
+```
+
+## Offline calendar transfer
+
+The same Linux release opened a synthetic `.ics` file through GTK at 390×844 while IPv4 and IPv6 were blocked. The preview showed three daily occurrences and a separate event. Unchecking that event and confirming created one imported calendar in one SQLite revision. The preview alone left the workspace unchanged. The stored calendar and the GTK export kept the recurrence rule and next-day override, and the export matched the stored document byte for byte.
+
+After removing the original file and restarting, Today showed the first occurrence. Swiping through Calendar showed the override on day two and the original series title on day three. The workspace digest stayed the same. To repeat the check with the offline launcher above, open Settings, Calendar files, and Import or export events. Choose a test calendar with a short recurring series and a standalone event, clear the standalone event, and import. Open the imported calendar under Calendar files to export it. [Verification report](benchmark-results/native-calendar-transfer-d1ac727-epyc-20261124.json)

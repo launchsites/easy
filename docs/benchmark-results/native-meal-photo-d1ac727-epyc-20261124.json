@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "app_revision": "d1ac727b57f3362cadc16e735db17ca9f5e3dfff",
+  "executable_sha256": "9bae651e2b77810d5fad7359514c6a90caf214352b6bdaf64456a4ef451b67a3",
+  "aot_sha256": "c7f0a3f143c05ee341c3fc36b4457424605e280034aabc453dfc05b6de9bbba1",
+  "ip_sockets_blocked": true,
+  "checks": {
+    "native-photo-button": "a85ace6a25028e95e264360afe5e70ae42263a8000fe1f66d4b218529bebb1e7",
+    "review-photo-draft": "e11be3b73935669fb982ad3e7a03a919c3bf3975d70a4f82852fdeec1475f9ac",
+    "viewed-photo": "4b8124a100e3e22075b319c41740e599fcff7ad75625cfd62d9747737fa9ee0d",
+    "draft-editor": "85f7bf1a8c162dc2ffc3cf3fc66d5f522cf8613a2a88a5e12b29e72125b31788",
+    "portion-entry": "edae2976aefe9ae9f5e50df45783e5475eb5cb2e201f61c58256fd99ca284ee7",
+    "meal-with-portion": "d655098929415e34ace9e7bb3220f135970b7fee36e6af19dadda87935dd25d5",
+    "saved-nutrition": "1dca72d4468608f47d776fb5ea5164dbb5c3232736a4e95da54a6da4f79a016f",
+    "reopened-nutrition": "d1187efb31fcbd113024266b85f701ee6d7c2b69faa7098233a6162f709c208e",
+    "reopened-meal": "47588bc6ed6b3c2e4585da8cea4c11dbde18abd8c2569536b467949fac039b87",
+    "reopened-photo": "5d95669f83cf0d414b017cd4fa6695a909c9c4a6d8da17e0d248310ed5796ca7"
+  },
+  "revision": 3,
+  "source_sha256": "0ebb2fb8b5670516bfbe1a2df35e2241b652d031b47cd57e88c3b9210a9feb3c",
+  "source_bytes": 3270,
+  "measured_grams": 150,
+  "unchanged_restart_digest": "08e9c0a8471c7420a6d08ee291761e3fb0e78888124eb14298f75d0ded6717c8",
+  "draft_revision": 2
+}

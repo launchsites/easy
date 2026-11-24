@@ -108,6 +108,8 @@ def verify_package(tools, apk):
     require("package: name='app.launchsites.easy'" in badging and
             "launchable-activity: name='app.launchsites.easy.MainActivity'" in badging,
             "The Easy application ID or launch activity is missing.")
+    require(not re.search(r"^application-debuggable(?:\s|$)", badging, re.M),
+            "The review package must use a non-debuggable release build.")
     verify_privacy(tools / "aapt2", apk)
     output(tools / "zipalign", "-c", "-P", "16", "4", apk)
     signing = output(tools / "apksigner", "verify", "--verbose", "--print-certs", apk)
@@ -156,7 +158,8 @@ def main():
     except (ValueError, OSError, struct.error, subprocess.CalledProcessError, zipfile.BadZipFile) as error:
         parser.exit(1, f"{error}\n")
     args.output.write_text(json.dumps({"app_revision": args.app_revision,
-                                      "development_signed": True, "packages": result},
+                                      "inspector_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                                      "development_signed": True, "debuggable": False, "packages": result},
                                      indent=2, sort_keys=True) + "\n")
 
 

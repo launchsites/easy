@@ -1,0 +1,27 @@
+{
+  "status": "passed",
+  "app_revision": "d1ac727b57f3362cadc16e735db17ca9f5e3dfff",
+  "executable_sha256": "9bae651e2b77810d5fad7359514c6a90caf214352b6bdaf64456a4ef451b67a3",
+  "aot_sha256": "c7f0a3f143c05ee341c3fc36b4457424605e280034aabc453dfc05b6de9bbba1",
+  "input_sha256": "3f023fbb407edf292cd47db89b8b78a0ee2467170938ec17ab18f0a025267043",
+  "ip_sockets_blocked": true,
+  "checks": {
+    "files-menu": "1f66ae919415ffbeb3de81430c01eb80aee2ad23ca0d54e1312ee73bc790fd3e",
+    "calendar-transfer": "aac711829ff0d2c7d7d48c8845e25790491bab73793be39aaadd994d0163bcd3",
+    "preview": "056a945ce65b4c70f2587206a7f11b2219d9473d24972a3499c2a06aa8acbc25",
+    "preview-deselect-present": "fb21c12183635050b06c000911c469c8f1c3e1bdc2d3eae5026629cb180b104d",
+    "review-confirmed": "bce7410b895ea03e23d5c24458db3a847553ee1cfb8ef2e3dd536d2a3ddc1d1f",
+    "stored-source-list": "5e22e7f86cd3085d3528cd6e8730b9e0cb125e988b8eb62d954b653f6bc32fda",
+    "stored-source-transfer": "572a8dbbab5b443418ffd3d57141f0e01f6438fa7f1e17f4cc90897501b6e4b6",
+    "export-confirmed": "4c45c2663f9abea526681474106c967f466c94d823f5f65977fcf9d198d78575",
+    "day-one": "5ef84dbb5233bbc814dc6a23a8f29c264e15628a5c3d85a8307474d1b361494b",
+    "day-two-override": "e3e38556b46db5537000f5d079cfc215a6b9579e03a86d090fe1c36ef3060db1",
+    "day-three": "b29a240bdf7941a602fe1f594b4bb23030d1f4c48db4392a1de217584a056977"
+  },
+  "revision": 2,
+  "recurrence_occurrences": 3,
+  "override_preserved": true,
+  "unchecked_event_excluded": true,
+  "exact_export_sha256": "3aefc0cc9bf5ddc443e2de0edf28f480a3b20fa608dc448c684de1c46ebd1758",
+  "unchanged_restart_digest": "63825d5fb7b8f9cbbc4728bae454f19849443f1ed703e09b6b14d04c8240ff8e"
+}
