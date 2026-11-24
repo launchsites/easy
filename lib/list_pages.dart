@@ -53,54 +53,49 @@ class TasksPage extends StatefulWidget {
 class _TasksPageState extends State<TasksPage> {
   _TaskFilter _filter = _TaskFilter.all;
   final _collapsed = <String>{};
+  DateTime? _groupedDay;
+  _TaskGroups? _groups;
+  Map<_TaskGroup, _TaskRows>? _visibleRows;
 
-  Map<_TaskGroup, List<_TaskListRow>> _groupedTasks(DateTime today) {
-    final groups = <_TaskGroup, List<TaskItem>>{
-      for (final group in _TaskGroup.values) group: [],
-    };
-    final visible = {
-      for (final task in widget.tasks)
-        if (_filter == _TaskFilter.all ||
-            (task.done
-                ? _filter == _TaskFilter.completed
-                : _filter == _TaskFilter.open))
-          task.id: task,
-    };
-    final hierarchy = TaskHierarchy(visible.values);
-    final children = <String, List<TaskItem>>{};
-    for (final task in visible.values) {
-      if (hierarchy.visibleParentOf(task) case final parent?) {
-        (children[parent] ??= []).add(task);
-      } else {
-        groups[_groupFor(task, today)]!.add(task);
-      }
-    }
-    for (final group in [_TaskGroup.overdue, _TaskGroup.upcoming]) {
-      groups[group]!.sort(
-        (a, b) => (a.dueAt ?? a.date!).compareTo(b.dueAt ?? b.date!),
-      );
-    }
+  @override
+  void didUpdateWidget(covariant TasksPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!listEquals(widget.tasks, oldWidget.tasks)) _invalidateGroups();
+  }
 
-    Iterable<_TaskListRow> rows(TaskItem task, int depth) sync* {
-      final subtasks = children[task.id] ?? const <TaskItem>[];
-      yield (task: task, depth: depth, childCount: subtasks.length);
-      if (_collapsed.contains(task.id)) return;
-      for (final child in subtasks) {
-        yield* rows(child, depth + 1);
-      }
-    }
+  void _invalidateGroups() {
+    _groups = null;
+    _visibleRows = null;
+  }
 
-    return {
-      for (final group in groups.entries)
-        if (group.value.isNotEmpty)
-          group.key: [for (final task in group.value) ...rows(task, 0)],
-    };
+  Map<_TaskGroup, _TaskRows> _tasksFor(DateTime today) {
+    if (_groupedDay != today) {
+      _groupedDay = today;
+      _invalidateGroups();
+    }
+    final groups = _groups ??= _TaskGroups(widget.tasks, _filter, today);
+    return _visibleRows ??= groups.visibleRows(_collapsed);
+  }
+
+  void _setFilter(_TaskFilter filter) {
+    if (_filter == filter) return;
+    setState(() {
+      _filter = filter;
+      _invalidateGroups();
+    });
+  }
+
+  void _toggleChildren(String id) {
+    setState(() {
+      if (!_collapsed.remove(id)) _collapsed.add(id);
+      _visibleRows = null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final today = DateUtils.dateOnly(DateTime.now());
-    final groups = _groupedTasks(today);
+    final groups = _tasksFor(today);
     final labels = Theme.of(context).textTheme.labelLarge;
     return _ListPageLayout(
       title: 'Tasks',
@@ -112,7 +107,7 @@ class _TasksPageState extends State<TasksPage> {
             Semantics(
               selected: _filter == filter,
               child: TextButton(
-                onPressed: () => setState(() => _filter = filter),
+                onPressed: () => _setFilter(filter),
                 style: TextButton.styleFrom(
                   foregroundColor: _filter == filter ? ink : muted,
                   backgroundColor: _filter == filter ? _softSurface : null,
@@ -175,13 +170,7 @@ class _TasksPageState extends State<TasksPage> {
                     : rowData.depth.clamp(0, 4) * 12.0,
                 childCount: rowData.childCount,
                 expanded: expanded,
-                onDisclosure: () => setState(() {
-                  if (expanded) {
-                    _collapsed.add(task.id);
-                  } else {
-                    _collapsed.remove(task.id);
-                  }
-                }),
+                onDisclosure: () => _toggleChildren(task.id),
                 onToggle: () => widget.onToggle(task),
                 onTap: () => widget.onTaskTap(task),
               );
@@ -215,6 +204,88 @@ class _TasksPageState extends State<TasksPage> {
 }
 
 typedef _TaskListRow = ({TaskItem task, int depth, int childCount});
+
+class _TaskGroups {
+  _TaskGroups(List<TaskItem> tasks, _TaskFilter filter, DateTime today) {
+    final visible = {
+      for (final task in tasks)
+        if (switch (filter) {
+          _TaskFilter.all => true,
+          _TaskFilter.open => !task.done,
+          _TaskFilter.completed => task.done,
+        })
+          task.id: task,
+    };
+    // A flat list needs no hierarchy or duplicate parent lookup.
+    final hierarchy = visible.values.any((task) => task.parentId != null)
+        ? TaskHierarchy(visible.values)
+        : null;
+    for (final task in visible.values) {
+      if (hierarchy?.visibleParentOf(task) case final parent?) {
+        (_children[parent] ??= []).add(task);
+      } else {
+        _roots[_groupFor(task, today)]!.add(task);
+      }
+    }
+    for (final group in [_TaskGroup.overdue, _TaskGroup.upcoming]) {
+      _roots[group]!.sort(
+        (a, b) => (a.dueAt ?? a.date!).compareTo(b.dueAt ?? b.date!),
+      );
+    }
+  }
+
+  final _roots = <_TaskGroup, List<TaskItem>>{
+    for (final group in _TaskGroup.values) group: [],
+  };
+  final _children = <String, List<TaskItem>>{};
+
+  Map<_TaskGroup, _TaskRows> visibleRows(Set<String> collapsed) => {
+    for (final group in _roots.entries)
+      if (group.value.isNotEmpty)
+        group.key: _TaskRows(group.value, _children, collapsed),
+  };
+}
+
+class _TaskRows {
+  _TaskRows(
+    this._roots,
+    Map<String, List<TaskItem>> children,
+    Set<String> collapsed,
+  ) : _nested =
+          children.isNotEmpty &&
+              _roots.any((task) => children.containsKey(task.id))
+          ? _flatten(_roots, children, collapsed)
+          : null;
+
+  final List<TaskItem> _roots;
+  final List<_TaskListRow>? _nested;
+
+  int get length => _nested?.length ?? _roots.length;
+
+  _TaskListRow operator [](int index) =>
+      _nested?[index] ?? (task: _roots[index], depth: 0, childCount: 0);
+
+  static List<_TaskListRow> _flatten(
+    List<TaskItem> roots,
+    Map<String, List<TaskItem>> children,
+    Set<String> collapsed,
+  ) {
+    final rows = <_TaskListRow>[];
+    void append(TaskItem task, int depth) {
+      final subtasks = children[task.id];
+      rows.add((task: task, depth: depth, childCount: subtasks?.length ?? 0));
+      if (subtasks == null || collapsed.contains(task.id)) return;
+      for (final subtask in subtasks) {
+        append(subtask, depth + 1);
+      }
+    }
+
+    for (final task in roots) {
+      append(task, 0);
+    }
+    return rows;
+  }
+}
 
 _TaskGroup _groupFor(TaskItem task, DateTime today) {
   final date = (task.dueAt ?? task.date)?.toLocal();
@@ -480,6 +551,8 @@ class _NotesPageState extends State<NotesPage> {
   late List<String> _folders;
   late List<String> _tags;
   late bool _hasPinned;
+  String _matchedQuery = '';
+  _NoteFilters? _matchedFilters;
 
   @override
   void initState() {
@@ -525,7 +598,7 @@ class _NotesPageState extends State<NotesPage> {
       });
     _folders = _filterChoices(_ordered.map((note) => note.folder).nonNulls);
     _tags = _filterChoices(_ordered.expand((note) => note.tags));
-    _hasPinned = _ordered.any((note) => note.pinned);
+    _hasPinned = _ordered.isNotEmpty && _ordered.first.pinned;
     final current = _filters;
     _filters = _NoteFilters(
       pinned: current.pinned && _hasPinned,
@@ -549,12 +622,18 @@ class _NotesPageState extends State<NotesPage> {
     final query = _search.text.trim().toLowerCase();
     final folder = _filters.folder?.toLowerCase();
     final tag = _filters.tag?.toLowerCase();
+    final source =
+        identical(_filters, _matchedFilters) && query.startsWith(_matchedQuery)
+        ? _matching
+        : _ordered;
+    _matchedFilters = _filters;
+    _matchedQuery = query;
     if (query.isEmpty && !_filters.active) {
       _matching = _ordered;
       return;
     }
     _matching = [
-      for (final note in _ordered)
+      for (final note in source)
         if ((!_filters.pinned || note.pinned) &&
             (folder == null || note.folder?.toLowerCase() == folder) &&
             (tag == null ||
@@ -680,6 +759,8 @@ class _NotesPageState extends State<NotesPage> {
 class _NoteRow extends StatelessWidget {
   const _NoteRow({required this.note, required this.onTap, super.key});
 
+  static const _previewLength = 384;
+
   final NoteItem note;
   final VoidCallback onTap;
 
@@ -691,6 +772,10 @@ class _NoteRow extends StatelessWidget {
     final firstBreak = body.indexOf('\n');
     final preview = (firstBreak == -1 ? body : body.substring(0, firstBreak))
         .trimRight();
+    final shortened = preview.length > _previewLength;
+    final snippet = shortened
+        ? '${preview.characters.take(_previewLength)}…'
+        : preview;
     final title = note.title.trim();
     const metadata = TextStyle(color: muted, fontSize: 13, height: 1.3);
     return Material(
@@ -740,7 +825,12 @@ class _NoteRow extends StatelessWidget {
                               when folder.isNotEmpty)
                             TextSpan(text: '  ·  $folder'),
                           if (preview.isNotEmpty)
-                            TextSpan(text: '  ·  $preview'),
+                            TextSpan(
+                              text: '  ·  $snippet',
+                              semanticsLabel: shortened
+                                  ? '  ·  $preview'
+                                  : null,
+                            ),
                         ],
                       ),
                       maxLines: 1,
