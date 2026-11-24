@@ -120,7 +120,7 @@ def check_app_launch(adb, emulator, apk, package, screenshot, snapshot):
     return launcher
 
 
-def run_probe(sdk, apk, screenshot, scratch, *, meal_recovery_replay=False):
+def run_probe(sdk, apk, screenshot, scratch, *, meal_recovery_replay=False, touch_review=None):
     tools = sdk / "cmdline-tools" / "latest" / "bin"
     adb = sdk / "platform-tools" / "adb"
     package = subprocess.check_output(
@@ -155,6 +155,11 @@ def run_probe(sdk, apk, screenshot, scratch, *, meal_recovery_replay=False):
 
                 report = check_meal_recovery(adb, emulator, package, launcher, scratch)
                 print(json.dumps(report, sort_keys=True), flush=True)
+            if touch_review is not None:
+                from android_touch_review import check_touch_review
+
+                report = check_touch_review(adb, emulator, package, scratch, touch_review)
+                print(json.dumps(report, sort_keys=True), flush=True)
         except (OSError, RuntimeError, subprocess.SubprocessError):
             print("\n".join(log_path.read_text(errors="replace").splitlines()[-40:]), flush=True)
             raise
@@ -173,10 +178,14 @@ if __name__ == "__main__":
     parser.add_argument("apk", type=Path)
     parser.add_argument("screenshot", type=Path)
     parser.add_argument("--meal-recovery-replay", action="store_true")
+    parser.add_argument("--touch-review", type=Path, help="output directory for the sample touch journey")
     arguments = parser.parse_args()
+    if arguments.meal_recovery_replay and arguments.touch_review is not None:
+        parser.error("Start separate disposable emulators for the two journeys.")
     with tempfile.TemporaryDirectory(prefix="easy-android-smoke.") as location:
         run_probe(
             Path(os.environ["ANDROID_HOME"]).resolve(), arguments.apk.resolve(),
             arguments.screenshot.resolve(), Path(location),
             meal_recovery_replay=arguments.meal_recovery_replay,
+            touch_review=arguments.touch_review.resolve() if arguments.touch_review is not None else None,
         )

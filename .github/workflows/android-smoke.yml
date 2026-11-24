@@ -7,6 +7,10 @@ on:
         description: Replay a synthetic saved meal photo through two cold starts
         type: boolean
         default: false
+      touch_review:
+        description: Review the sample workspace with Android touch input and a saved event
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,7 +26,7 @@ env:
 jobs:
   android:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: ${{ inputs.touch_review && 55 || 45 }}
     defaults:
       run:
         shell: bash
@@ -31,6 +35,10 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+
+      - name: Check the optional touch review fixtures
+        if: ${{ inputs.touch_review }}
+        run: python3 -m unittest discover -s test -p 'test_android_touch_review.py'
 
       - name: Verify the checkout and emulator prerequisites
         run: |
@@ -79,13 +87,16 @@ jobs:
           test "$("$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest debuggable "$apk")" = false
 
       - name: Verify Android first launch
-        timeout-minutes: ${{ inputs.meal_recovery_replay && 15 || 10 }}
+        timeout-minutes: ${{ (inputs.meal_recovery_replay || inputs.touch_review) && 15 || 10 }}
         env:
           MEAL_RECOVERY_REPLAY: ${{ inputs.meal_recovery_replay }}
+          TOUCH_REVIEW: ${{ inputs.touch_review }}
         run: |
           replay=()
           if [[ "$MEAL_RECOVERY_REPLAY" == true ]]; then
             replay+=(--meal-recovery-replay)
+          elif [[ "$TOUCH_REVIEW" == true ]]; then
+            replay+=(--touch-review "$RUNNER_TEMP/easy-android-touch-review")
           fi
           python3 tool/benchmark/android_emulator_smoke.py \
             build/app/outputs/flutter-apk/app-x86_64-release.apk \
@@ -97,4 +108,22 @@ jobs:
           name: easy-android-setup
           path: ${{ runner.temp }}/easy-android-smoke/setup.png
           if-no-files-found: error
+          retention-days: 7
+
+      - name: Verify the sample workspace touch journey on a new emulator
+        if: ${{ inputs.touch_review && inputs.meal_recovery_replay }}
+        timeout-minutes: 14
+        run: |
+          report="$RUNNER_TEMP/easy-android-touch-review"
+          python3 tool/benchmark/android_emulator_smoke.py \
+            build/app/outputs/flutter-apk/app-x86_64-release.apk \
+            "$report/setup.png" --touch-review "$report"
+
+      - name: Upload Android touch review evidence
+        if: ${{ always() && inputs.touch_review }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: easy-android-touch-review
+          path: ${{ runner.temp }}/easy-android-touch-review/
+          if-no-files-found: warn
           retention-days: 7
