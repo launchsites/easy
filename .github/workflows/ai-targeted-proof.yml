@@ -1,0 +1,51 @@
+name: Exact AI regression proof
+
+on:
+  push:
+    branches: [codex/ai-targeted-proof-a339bf8]
+
+permissions:
+  contents: read
+
+env:
+  EASY_PROOF_SOURCE: a339bf85357448c8dbd29cd70d4663971cf3c7dc
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  DART_SUPPRESS_ANALYTICS: 'true'
+  TZ: Europe/London
+
+jobs:
+  ai-regressions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the exact reviewed source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: a339bf85357448c8dbd29cd70d4663971cf3c7dc
+          persist-credentials: false
+
+      - name: Verify the source revision
+        run: test "$(git rev-parse HEAD)" = "$EASY_PROOF_SOURCE"
+
+      - name: Install pinned Flutter
+        run: bash .github/scripts/bootstrap-flutter.sh
+
+      - name: Restore locked Dart dependencies
+        run: |
+          flutter pub get --enforce-lockfile
+          git diff --exit-code -- pubspec.lock
+
+      - name: Verify Local retry, provider settings, and paid allowance
+        run: |
+          flutter test --no-pub --concurrency=2 --reporter=expanded \
+            test/ai_loopback_transport_test.dart test/ai_provider_test.dart \
+            test/ai_runtime_test.dart test/ai_automatic_pacing_test.dart \
+            test/ai_allowance_concurrency_test.dart test/ai_device_state_test.dart \
+            test/ai_budget_test.dart
+
+      - name: Verify synthetic paid settlement across two native processes
+        run: |
+          report="$RUNNER_TEMP/easy-ai-allowance-proof.json"
+          python3 tool/benchmark/ai_allowance_process.py \
+            --revision "$EASY_PROOF_SOURCE" --check-policy-ack --output "$report"
+          cat "$report"
