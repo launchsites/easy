@@ -1,0 +1,163 @@
+name: Hosted offline navigation soak
+
+on:
+  push:
+    branches: [proof/native-offline-soak]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  navigation:
+    if: github.event_name == 'push' || github.event.pull_request.head.ref == 'proof/native-offline-soak'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    env:
+      SOURCE_REVISION: 5d2ef907c9a6396e34943606fe8e80b96d099d35
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      DART_SUPPRESS_ANALYTICS: 'true'
+    steps:
+      - name: Check out the pinned application source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: 5d2ef907c9a6396e34943606fe8e80b96d099d35
+          persist-credentials: false
+
+      - name: Install Linux build and native test dependencies
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgl1-mesa-dri \
+            xvfb xauth xdotool dbus-x11 imagemagick tesseract-ocr
+
+      - name: Install pinned Flutter
+        run: bash .github/scripts/bootstrap-flutter.sh
+
+      - name: Build the Linux release
+        run: |
+          flutter pub get --enforce-lockfile
+          git diff --exit-code -- pubspec.lock
+          flutter build linux --release --no-pub
+
+      - name: Exercise offline workspace navigation on one CPU
+        run: |
+          set -euo pipefail
+          run_root=$(mktemp -d "$RUNNER_TEMP/easy-offline-workspace-XXXXXX")
+          export EVIDENCE_DIR="$RUNNER_TEMP/easy-offline-navigation"
+          export XDG_DATA_HOME="$run_root/data"
+          export XDG_CONFIG_HOME="$run_root/config"
+          export XDG_CACHE_HOME="$run_root/cache"
+          export XDG_STATE_HOME="$run_root/state"
+          export XDG_RUNTIME_DIR="$run_root/runtime"
+          export APP_BINARY="$PWD/build/linux/x64/release/bundle/easy"
+          export IP_GUARD="$run_root/deny-ip-sockets"
+          export GDK_BACKEND=x11 GSETTINGS_BACKEND=memory LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe
+          export LP_NUM_THREADS=1 OMP_THREAD_LIMIT=1 MAGICK_THREAD_LIMIT=1 TZ=UTC
+          mkdir -m 700 "$EVIDENCE_DIR" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" \
+            "$XDG_STATE_HOME" "$XDG_RUNTIME_DIR"
+          cc -std=c17 -O2 -Wall -Wextra -Werror tool/benchmark/deny_ip_sockets.c -o "$IP_GUARD"
+          "$IP_GUARD" "$(command -v python3)" - <<'PY' > "$EVIDENCE_DIR/socket-guard.json"
+          import errno
+          import json
+          import socket
+
+          observed = {}
+          for family in (socket.AF_INET, socket.AF_INET6):
+              try:
+                  with socket.socket(family):
+                      raise AssertionError(f"{family.name} unexpectedly opened")
+              except OSError as error:
+                  assert error.errno == errno.EAFNOSUPPORT, error
+                  observed[family.name] = error.errno
+          with socket.socket(socket.AF_UNIX):
+              observed["AF_UNIX"] = "open"
+          print(json.dumps(observed))
+          PY
+          python3 tool/benchmark/native_ui_fixture.py "$XDG_DATA_HOME" --today "$(date -u +%F)"
+          cpu=$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')
+          taskset -c "$cpu" dbus-run-session -- xvfb-run -a \
+            -s '-screen 0 1440x1020x24 -nolisten tcp -noreset' bash -s <<'BASH'
+          set -euo pipefail
+          "$IP_GUARD" "$APP_BINARY" > "$EVIDENCE_DIR/app.log" 2>&1 &
+          app=$!
+          trap 'kill "$app" 2>/dev/null || true; wait "$app" 2>/dev/null || true' EXIT
+          export APP_PID="$app"
+          export WORKSPACE_DB="$XDG_DATA_HOME/app.launchsites.easy/easy/workspace.sqlite3"
+          PYTHONPATH=tool/benchmark python3 - <<'PY'
+          from hashlib import sha256
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import time
+          from native_ui_soak import wait_for_workspace
+
+          path = Path(os.environ["APP_BINARY"])
+          pid = int(os.environ["APP_PID"])
+          assert len(os.sched_getaffinity(pid)) == 1
+          before = wait_for_workspace(Path(os.environ["WORKSPACE_DB"]), timeout=100)
+          assert before["counts"] == {"events": 7320, "tasks": 3100, "notes": 1301}
+          assert before["quick_check"] == "ok"
+          for _ in range(100):
+              candidate = subprocess.run(
+                  ["xdotool", "search", "--onlyvisible", "--pid", str(pid), "--name", "^Easy$"],
+                  capture_output=True, text=True, timeout=5,
+              )
+              windows = candidate.stdout.split()
+              if candidate.returncode == 0 and len(windows) == 1:
+                  break
+              time.sleep(.2)
+          else:
+              raise RuntimeError("The Easy window did not appear")
+          window = windows[0]
+          subprocess.run(["xdotool", "windowmove", window, "0", "0", "windowfocus", window], check=True)
+          status = dict(line.split(":", 1) for line in Path(f"/proc/{pid}/status").read_text().splitlines() if ":" in line)
+          assert status["NoNewPrivs"].strip() == "1" and status["Seccomp"].strip() == "2"
+          evidence = {
+              "app_revision": os.environ["SOURCE_REVISION"],
+              "proof_workflow_revision": os.environ["GITHUB_SHA"],
+              "executable_sha256": sha256(path.read_bytes()).hexdigest(),
+              "aot_library_sha256": sha256((path.parent / "lib/libapp.so").read_bytes()).hexdigest(),
+              "cpu_affinity": sorted(os.sched_getaffinity(pid)),
+              "seccomp_filter_count": int(status["Seccomp_filters"]),
+              "workspace_before": before,
+          }
+          (Path(os.environ["EVIDENCE_DIR"]) / "confinement.json").write_text(json.dumps(evidence, indent=2) + "\n")
+          PY
+          exit_code=0
+          python3 tool/benchmark/native_ui_soak.py \
+            --seconds 2700 --minimum-cycles 100 --check-every 7 \
+            --app-revision "$SOURCE_REVISION" --workspace-database "$WORKSPACE_DB" \
+            --output "$EVIDENCE_DIR/samples.json" || exit_code=$?
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["EVIDENCE_DIR"])
+          sample = json.loads((root / "samples.json").read_text())
+          confinement = json.loads((root / "confinement.json").read_text())
+          for key in ("app_revision", "executable_sha256", "aot_library_sha256"):
+              assert sample[key] == confinement[key], key
+          assert sample["workspace_before"] == confinement["workspace_before"]
+          assert sample["elapsed_seconds"] >= 2700 and sample["workspace_verified"]
+          print({key: sample[key] for key in ("app_revision", "elapsed_seconds", "cycles",
+                "desktop_route_checks", "desktop_route_mismatches", "orbit_checks",
+                "orbit_mismatches", "final_memory_kib", "workspace_verified")})
+          PY
+          exit "$exit_code"
+          BASH
+
+      - name: Upload synthetic navigation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: easy-offline-navigation
+          path: |
+            ${{ runner.temp }}/easy-offline-navigation/*.json
+          retention-days: 7
+          if-no-files-found: warn
