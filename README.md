@@ -61,4 +61,4 @@ python3 tool/set_display_name.py 'My Workspace'
 
 ## Verification
 
-This repository is a development build. Linux has native release, offline, restart, and performance evidence. Android review APKs were built and inspected for ARMv7, ARM64, and x86-64. Hosted Apple SDK builds passed for the iOS simulator and macOS. Physical phone tests, real EventKit account interoperability, and live paid billing verification remain open. [Test evidence](docs/TEST_EVIDENCE.md) · [Acceptance status](docs/ACCEPTANCE.md)
+This repository is a development build. Linux has native release, offline, restart, and performance evidence. Android review APKs were built and inspected for ARMv7, ARM64, and x86-64. A hosted Android 36 emulator installed and launched the x86-64 release. Hosted Apple SDK builds passed for the iOS simulator and macOS. Physical phone tests, real EventKit account interoperability, and live paid billing verification remain open. [Test evidence](docs/TEST_EVIDENCE.md) · [Acceptance status](docs/ACCEPTANCE.md)

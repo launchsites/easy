@@ -10,8 +10,8 @@ Easy has a native Flutter workspace with local records and optional Calendar, mo
 | Recovery and sharing | Native history, selected restores, encrypted backups with original media, and encrypted change files for explicitly paired devices. |
 | Planning and review | Verified gaps, dependencies, hard deadlines, buffers and travel feed day and week plans. Today can flag one due task that fits a verified gap. Review confirms selected blocks before saving and can show known unbooked time. |
 | Workouts and nutrition | Recurring workout plans, freestyle logs, per-set actuals, previous weights, optional health measurements, recipes and manually editable meal drafts and photo suggestions. |
-| AI | Offline capture, optional compatible loopback schemas, reviewed HTTPS requests, a separate GBP ledger and optional adaptive foreground estimates. Local timing can use recent confirmed comparable work. |
+| AI | Offline capture, optional compatible loopback schemas, and reviewed HTTPS requests within a separate GBP allowance. Adaptive foreground estimates use the available allowance, and reviewed ranges include the timing evidence sent. Local timing can use recent confirmed comparable work. |
 | Automations | Enabled rules can prepare local follow-up drafts. Applying a draft rechecks its source and saves the new record with its review state. |
-| Platform verification | Linux release and offline workflow checks, Android APK and lint checks, iOS simulator and macOS SDK builds, and mocked EventKit. Physical device and live paid billing gates remain open. |
+| Platform verification | Linux release and offline workflow checks, Android APK and lint checks, an Android 36 emulator first launch, iOS simulator and macOS SDK builds, and mocked EventKit. Physical device and live paid billing gates remain open. |
 
 [Acceptance status](ACCEPTANCE.md) · [Test evidence](TEST_EVIDENCE.md) · [Engineering decisions](DECISIONS.md) · [Privacy and threat model](privacy-and-threat-model.md)
