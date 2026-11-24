@@ -105,6 +105,10 @@ final class WorkspaceRecordCounts {
     required this.gymSessions,
     required this.workoutPlans,
     this.captures = 0,
+    this.meals = 0,
+    this.foods = 0,
+    this.activities = 0,
+    this.routines = 0,
   });
 
   final int events;
@@ -113,6 +117,10 @@ final class WorkspaceRecordCounts {
   final int gymSessions;
   final int workoutPlans;
   final int captures;
+  final int meals;
+  final int foods;
+  final int activities;
+  final int routines;
 }
 
 final class WorkspaceStoreException implements Exception {
@@ -164,4 +172,106 @@ abstract interface class WorkspaceStore {
   Future<Uint8List?> readRecoveryBackup();
 
   Future<void> close();
+}
+
+final class WorkspaceHistoryPoint {
+  const WorkspaceHistoryPoint({
+    required this.revision,
+    required this.recordedAt,
+    required this.kind,
+    this.name,
+  });
+
+  final int revision;
+  final DateTime recordedAt;
+  final String kind;
+  final String? name;
+}
+
+enum WorkspaceHistoryRecordKind {
+  task,
+  event,
+  note,
+  capture,
+  gymSession,
+  workoutPlan,
+  meal,
+  food,
+  activity,
+  routine,
+}
+
+typedef WorkspaceHistoryRecordKey = ({
+  WorkspaceHistoryRecordKind kind,
+  String id,
+});
+
+enum WorkspaceHistoryReversion { recoverMissing, restorePrevious, removeAdded }
+
+final class WorkspaceHistoryRecordChange {
+  const WorkspaceHistoryRecordChange({
+    required this.key,
+    required this.title,
+    required this.reversion,
+  });
+
+  final WorkspaceHistoryRecordKey key;
+  final String title;
+  final WorkspaceHistoryReversion reversion;
+}
+
+final class WorkspaceHistoryDiff {
+  const WorkspaceHistoryDiff({
+    required this.sourceRevision,
+    required this.expectedRevision,
+    required this.totalChanges,
+    required this.changes,
+  });
+
+  final int sourceRevision;
+  final int expectedRevision;
+  final int totalChanges;
+  final List<WorkspaceHistoryRecordChange> changes;
+}
+
+final class WorkspaceHistorySelectionPreview {
+  const WorkspaceHistorySelectionPreview({
+    required this.expectedRevision,
+    required this.backup,
+    required this.changes,
+  });
+
+  final int expectedRevision;
+  final WorkspaceBackupPreview backup;
+  final List<WorkspaceHistoryRecordChange> changes;
+}
+
+/// Available from native workspace stores that retain reconstructable history.
+abstract interface class WorkspaceHistoryStore implements WorkspaceStore {
+  Future<List<WorkspaceHistoryPoint>> listHistory();
+
+  Future<WorkspaceHistoryPoint> nameHistoryPoint(
+    String name, {
+    required int expectedRevision,
+  });
+
+  Future<void> removeHistoryPointName(
+    int revision, {
+    required int expectedRevision,
+  });
+
+  Future<WorkspaceBackupPreview> previewHistoryPoint(int revision);
+
+  Future<WorkspaceHistoryDiff> diffHistoryPoint(
+    int sourceRevision, {
+    int offset = 0,
+    int limit = 100,
+    int? expectedRevision,
+  });
+
+  Future<WorkspaceHistorySelectionPreview> previewHistorySelection({
+    required int sourceRevision,
+    required int expectedRevision,
+    required Set<WorkspaceHistoryRecordKey> records,
+  });
 }

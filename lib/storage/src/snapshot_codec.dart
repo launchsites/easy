@@ -3,7 +3,10 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import '../../activities/activity_model.dart';
 import '../../capture/capture_archive.dart';
+import '../../notes/note_model.dart';
+import '../../nutrition/nutrition_model.dart';
 import '../../workout_plan.dart';
 import 'contracts.dart';
 
@@ -101,12 +104,14 @@ WorkspaceRecordCounts validateSnapshot(WorkspaceSnapshot snapshot) {
     _boolField(event, 'allDay');
     _optionalString(event, 'location');
     _optionalString(event, 'plannedTaskId');
+    _optionalString(event, 'description');
   }
   for (final task in tasks) {
     stringField(task, 'title');
     stringField(task, 'category');
     _boolField(task, 'done');
     if (task['date'] != null) _dateField(task, 'date');
+    if (task['completedAt'] != null) _dateField(task, 'completedAt');
     _optionalInt(task, 'estimatedMinutes');
     _optionalString(task, 'priority');
     _optionalString(task, 'parentId');
@@ -120,22 +125,27 @@ WorkspaceRecordCounts validateSnapshot(WorkspaceSnapshot snapshot) {
     _optionalInt(task, 'minimumChunkMinutes');
   }
   for (final note in notes) {
-    stringField(note, 'title');
-    stringField(note, 'body');
-    _dateField(note, 'updated');
-    _optionalString(note, 'category');
-    if (note['noteToSelf'] != null) _boolField(note, 'noteToSelf');
+    _validateRecord('note', () => NoteItem.fromJson(note));
   }
   for (final capture in captures) {
-    stringField(capture, 'text');
-    _dateField(capture, 'capturedAt');
-    _optionalInt(capture, 'revision');
-    if (capture['applied'] != null) _boolField(capture, 'applied');
-    if (capture['audio'] != null) {
-      jsonObject(capture['audio'], 'capture audio');
-      CaptureArchiveEntry.fromJson(capture);
-    }
+    _validateRecord('capture', () => CaptureArchiveEntry.fromJson(capture));
   }
+  final nutrition = workspace['nutrition'] == null
+      ? null
+      : _validateRecord(
+          'nutrition',
+          () => NutritionData.fromJson(
+            jsonObject(workspace['nutrition'], 'nutrition'),
+          ),
+        );
+  final activities = workspace['activities'] == null
+      ? null
+      : _validateRecord(
+          'activities',
+          () => ActivityData.fromJson(
+            jsonObject(workspace['activities'], 'activities'),
+          ),
+        );
 
   final sessionStarts = <DateTime>{};
   for (final text in snapshot.gymSessionJson) {
@@ -207,7 +217,23 @@ WorkspaceRecordCounts validateSnapshot(WorkspaceSnapshot snapshot) {
     gymSessions: snapshot.gymSessionJson.length,
     workoutPlans: snapshot.workoutPlanJson.length,
     captures: captures.length,
+    meals: nutrition?.meals.length ?? 0,
+    foods: nutrition?.foods.length ?? 0,
+    activities: activities?.records.length ?? 0,
+    routines: activities?.routines.length ?? 0,
   );
+}
+
+T _validateRecord<T>(String label, T Function() parse) {
+  try {
+    return parse();
+  } on FormatException {
+    throw FormatException('Invalid $label record.');
+  } on TypeError {
+    throw FormatException('Invalid $label record.');
+  } on ArgumentError {
+    throw FormatException('Invalid $label record.');
+  }
 }
 
 Uint8List encodeBackup(WorkspaceRevision revision) {

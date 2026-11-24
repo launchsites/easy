@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../ui_theme.dart';
 import 'encrypted_backup.dart';
+import 'workspace_history_page.dart';
 import 'workspace_store.dart';
 
 /// File selection and export stay with the host platform. A save adapter can
@@ -159,6 +160,19 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
     _showSelection(preview, expected, _BackupSource.recovery);
   });
 
+  Future<void> _openHistory(WorkspaceHistoryStore store) =>
+      Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => WorkspaceHistoryPage(
+            store: store,
+            onRestored: (revision) async {
+              if (mounted) setState(() => _selection = null);
+              await widget.onRestored(revision);
+            },
+          ),
+        ),
+      );
+
   void _showSelection(
     WorkspaceBackupPreview preview,
     int expected,
@@ -284,6 +298,18 @@ class _WorkspaceBackupPageState extends State<WorkspaceBackupPage> {
                             icon: Icons.history_rounded,
                             onTap: enabled ? _chooseRecovery : null,
                           ),
+                          if (widget.store
+                              case final WorkspaceHistoryStore history) ...[
+                            const Divider(),
+                            _BackupAction(
+                              title: 'Version history',
+                              description: 'Review saved versions or restore selected records.',
+                              icon: Icons.bookmarks_outlined,
+                              onTap: enabled
+                                  ? () => _openHistory(history)
+                                  : null,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -452,6 +478,10 @@ class _RestorePreview extends StatelessWidget {
               ('Calendar events', counts.events),
               ('Notes', counts.notes),
               if (counts.captures > 0) ('Captures', counts.captures),
+              if (counts.meals > 0) ('Meals', counts.meals),
+              if (counts.foods > 0) ('Saved foods', counts.foods),
+              if (counts.activities > 0) ('Activities', counts.activities),
+              if (counts.routines > 0) ('Routines', counts.routines),
               ('Gym sessions', counts.gymSessions),
               ('Workout plans', counts.workoutPlans),
             ]) ...[

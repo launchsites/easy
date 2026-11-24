@@ -7,7 +7,11 @@ import 'dart:typed_data';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'contracts.dart';
+import 'history_selection.dart';
 import 'snapshot_codec.dart';
+import 'sqlite_configuration.dart';
+import 'sqlite_documents.dart';
+import 'sqlite_history.dart';
 
 Future<WorkspaceStore> openSqliteWorkspaceStore({
   required String path,
@@ -33,7 +37,7 @@ Future<WorkspaceStore> openSqliteWorkspaceStore({
   }
 }
 
-class _SqliteWorkspaceStore implements WorkspaceStore {
+class _SqliteWorkspaceStore implements WorkspaceHistoryStore {
   _SqliteWorkspaceStore(this._client);
 
   final _DatabaseClient _client;
@@ -69,6 +73,50 @@ class _SqliteWorkspaceStore implements WorkspaceStore {
   Future<Uint8List?> readRecoveryBackup() => _client.request(_Request.recovery);
 
   @override
+  Future<List<WorkspaceHistoryPoint>> listHistory() =>
+      _client.request(_Request.history);
+
+  @override
+  Future<WorkspaceHistoryPoint> nameHistoryPoint(
+    String name, {
+    required int expectedRevision,
+  }) => _client.request(_Request.namePoint, (name, expectedRevision));
+
+  @override
+  Future<void> removeHistoryPointName(
+    int revision, {
+    required int expectedRevision,
+  }) => _client.request(_Request.removePointName, (revision, expectedRevision));
+
+  @override
+  Future<WorkspaceBackupPreview> previewHistoryPoint(int revision) =>
+      _client.request(_Request.previewPoint, revision);
+
+  @override
+  Future<WorkspaceHistoryDiff> diffHistoryPoint(
+    int sourceRevision, {
+    int offset = 0,
+    int limit = 100,
+    int? expectedRevision,
+  }) => _client.request(_Request.diffPoint, (
+    sourceRevision,
+    offset,
+    limit,
+    expectedRevision,
+  ));
+
+  @override
+  Future<WorkspaceHistorySelectionPreview> previewHistorySelection({
+    required int sourceRevision,
+    required int expectedRevision,
+    required Set<WorkspaceHistoryRecordKey> records,
+  }) => _client.request(_Request.selectPoint, (
+    sourceRevision,
+    expectedRevision,
+    Set<WorkspaceHistoryRecordKey>.of(records),
+  ));
+
+  @override
   Future<void> close() => _client.close();
 }
 
@@ -81,6 +129,12 @@ enum _Request {
   preview,
   restore,
   recovery,
+  history,
+  namePoint,
+  removePointName,
+  previewPoint,
+  diffPoint,
+  selectPoint,
   close,
 }
 
@@ -207,6 +261,14 @@ void _startWorker((String path, SendPort response) configuration) {
         ),
         _Request.restore => store.restore(data as _RestoreArguments),
         _Request.recovery => store.readRecovery(),
+        _Request.history => store.history.list(),
+        _Request.namePoint => store.namePoint(data as (String, int)),
+        _Request.removePointName => store.removeName(data as (int, int)),
+        _Request.previewPoint => store.previewPoint(data as int),
+        _Request.diffPoint => store.diffPoint(data as (int, int, int, int?)),
+        _Request.selectPoint => store.selectPoint(
+          data as (int, int, Set<WorkspaceHistoryRecordKey>),
+        ),
         _Request.close => store.close(),
       };
       response.send((id, true, result));
@@ -226,12 +288,16 @@ void _startWorker((String path, SendPort response) configuration) {
 }
 
 class _SqliteDatabase {
-  _SqliteDatabase(this._database);
+  _SqliteDatabase(this._database) : _documents = SqliteDocuments(_database);
 
   static const _applicationId = 0x45535931;
-  static const _schemaVersion = 1;
+  static const _schemaVersion = 2;
 
   final Database _database;
+  final SqliteDocuments _documents;
+  late final history = SqliteWorkspaceHistory(_database, _documents);
+  ({WorkspaceRevision head, _DocumentDigests digests, int dataVersion})?
+  _cached;
 
   static _SqliteDatabase open(String path) {
     final database = sqlite3.open(path);
@@ -240,17 +306,22 @@ class _SqliteDatabase {
       database.execute('PRAGMA busy_timeout = 5000');
       database.execute('PRAGMA foreign_keys = ON');
       database.execute('PRAGMA trusted_schema = OFF');
-      store._ensureSchema();
+      final upgraded = store._ensureSchema();
       final check = database.select('PRAGMA quick_check(1)').single.values;
       if (check.single != 'ok') {
         throw const WorkspaceStoreException(
           'The workspace database is damaged.',
         );
       }
-      database.execute('PRAGMA journal_mode = WAL');
+      configureSqliteWal(database);
       database.execute('PRAGMA synchronous = FULL');
-      final revision = store._readHead();
+      database.execute('PRAGMA wal_autocheckpoint = 512');
+      database.execute('PRAGMA journal_size_limit = 8388608');
+      final revision = store._readTransaction(store._readHead);
       if (revision != null) validateSnapshot(revision.snapshot);
+      if (upgraded && revision != null) {
+        store._transaction(() => store.history.prune(DateTime.now().toUtc()));
+      }
       return store;
     } catch (_) {
       database.close();
@@ -258,14 +329,18 @@ class _SqliteDatabase {
     }
   }
 
-  void _ensureSchema() => _transaction(() {
+  bool _ensureSchema() => _transaction(() {
     final id = _database.select('PRAGMA application_id').single.values.single;
     final version = _database
         .select('PRAGMA user_version')
         .single
         .values
         .single;
-    if (id == _applicationId && version == _schemaVersion) return;
+    if (id == _applicationId && version == _schemaVersion) return false;
+    if (id == _applicationId && version == 1) {
+      _installHistorySchema();
+      return true;
+    }
     if (id == _applicationId) {
       throw const WorkspaceStoreException(
         'Unsupported workspace database version.',
@@ -279,6 +354,7 @@ class _SqliteDatabase {
     if (id != 0 || version != 0 || !empty) {
       throw const WorkspaceStoreException('Unrecognized workspace database.');
     }
+    _database.execute('PRAGMA auto_vacuum = INCREMENTAL');
     _database.execute('''
       CREATE TABLE documents (
         digest TEXT PRIMARY KEY,
@@ -301,9 +377,16 @@ class _SqliteDatabase {
         backup BLOB NOT NULL
       ) STRICT;
       PRAGMA application_id = $_applicationId;
-      PRAGMA user_version = $_schemaVersion;
     ''');
+    _installHistorySchema();
+    return false;
   });
+
+  void _installHistorySchema() {
+    SqliteDocuments.migrate(_database);
+    SqliteWorkspaceHistory.migrate(_database);
+    _database.execute('PRAGMA user_version = $_schemaVersion');
+  }
 
   bool get initialized =>
       _database.select('SELECT 1 FROM revisions LIMIT 1').isNotEmpty;
@@ -315,44 +398,126 @@ class _SqliteDatabase {
     return _append(seed, revision: 1, kind: 'migration');
   });
 
-  WorkspaceRevision read() =>
-      _readHead() ??
-      (throw const WorkspaceStoreException('The workspace is uninitialized.'));
+  WorkspaceRevision read() => _readTransaction(
+    () =>
+        _readHead() ??
+        (throw const WorkspaceStoreException(
+          'The workspace is uninitialized.',
+        )),
+  );
 
   WorkspaceRevision? _readHead() {
     final rows = _database.select('''
-      SELECT revisions.revision AS revision,
-             workspace.body AS workspace, workspace.digest AS workspace_digest,
-             sessions.body AS sessions, sessions.digest AS sessions_digest,
-             plans.body AS plans, plans.digest AS plans_digest
-      FROM revisions
-      LEFT JOIN documents workspace ON workspace.digest = revisions.workspace
-      LEFT JOIN documents sessions ON sessions.digest = revisions.gym_sessions
-      LEFT JOIN documents plans ON plans.digest = revisions.workout_plans
-      ORDER BY revisions.revision DESC
+      SELECT revision, workspace, gym_sessions, workout_plans
+      FROM revisions ORDER BY revision DESC
       LIMIT 1
     ''');
     if (rows.isEmpty) return null;
     final row = rows.single;
-    String checkedBody(String name) {
-      final body = row[name];
-      if (body is! String || digestText(body) != row['${name}_digest']) {
-        throw const WorkspaceStoreException(
-          'A workspace document failed its integrity check.',
-        );
-      }
-      return body;
+    final revision = positiveRevision(row['revision']);
+    final digests = _digests(row);
+    final dataVersion = _dataVersion;
+    final cached = _cached;
+    if (cached != null &&
+        cached.head.revision == revision &&
+        cached.digests == digests &&
+        cached.dataVersion == dataVersion) {
+      return cached.head;
     }
-
-    return WorkspaceRevision(
-      revision: positiveRevision(row['revision']),
-      snapshot: WorkspaceSnapshot(
-        workspaceJson: checkedBody('workspace'),
-        gymSessionJson: _decodeList(checkedBody('sessions')),
-        workoutPlanJson: _decodeList(checkedBody('plans')),
-      ),
+    final current = WorkspaceRevision(
+      revision: revision,
+      snapshot: _snapshot(digests),
     );
+    _cached = (head: current, digests: digests, dataVersion: dataVersion);
+    return current;
   }
+
+  int get _dataVersion =>
+      _database.select('PRAGMA data_version').single.values.single as int;
+
+  _DocumentDigests _digests(Row row) => (
+    workspace: row['workspace'] as String,
+    sessions: row['gym_sessions'] as String,
+    plans: row['workout_plans'] as String,
+  );
+
+  WorkspaceSnapshot _snapshot(_DocumentDigests digests) => WorkspaceSnapshot(
+    workspaceJson: _documents.read(digests.workspace),
+    gymSessionJson: _decodeList(_documents.read(digests.sessions)),
+    workoutPlanJson: _decodeList(_documents.read(digests.plans)),
+  );
+
+  WorkspaceRevision _historyRevision(int revision) {
+    final rows = _database.select(
+      'SELECT workspace, gym_sessions, workout_plans FROM revisions WHERE revision = ?',
+      [revision],
+    );
+    if (rows.isEmpty) {
+      throw const WorkspaceStoreException(
+        'This history point is no longer retained.',
+      );
+    }
+    final snapshot = _snapshot(_digests(rows.single));
+    return WorkspaceRevision(revision: revision, snapshot: snapshot);
+  }
+
+  WorkspaceBackupPreview previewPoint(int revision) => _readTransaction(() {
+    final source = _historyRevision(revision);
+    return WorkspaceBackupPreview(
+      snapshot: source.snapshot,
+      sourceRevision: revision,
+      counts: validateSnapshot(source.snapshot),
+    );
+  });
+
+  WorkspaceHistoryDiff diffPoint((int, int, int, int?) request) =>
+      _readTransaction(() {
+        final (sourceRevision, offset, limit, expectedRevision) = request;
+        final current = read();
+        verifyRevision(expectedRevision, current.revision);
+        final source = sourceRevision == current.revision
+            ? current
+            : _historyRevision(sourceRevision);
+        if (!identical(source, current)) validateSnapshot(source.snapshot);
+        return diffWorkspaceHistory(
+          current: current,
+          source: source,
+          offset: offset,
+          limit: limit,
+        );
+      });
+
+  WorkspaceHistorySelectionPreview selectPoint(
+    (int, int, Set<WorkspaceHistoryRecordKey>) request,
+  ) => _readTransaction(() {
+    final (sourceRevision, expectedRevision, selected) = request;
+    final current = read();
+    verifyRevision(expectedRevision, current.revision);
+    final source = sourceRevision == current.revision
+        ? current
+        : _historyRevision(sourceRevision);
+    if (!identical(source, current)) validateSnapshot(source.snapshot);
+    return previewWorkspaceHistorySelection(
+      current: current,
+      source: source,
+      selected: selected,
+    );
+  });
+
+  WorkspaceHistoryPoint namePoint((String, int) request) => _transaction(() {
+    final (name, expectedRevision) = request;
+    final current = read();
+    verifyRevision(expectedRevision, current.revision);
+    return history.namePoint(name, current.revision);
+  });
+
+  Null removeName((int, int) request) => _transaction(() {
+    final (revision, expectedRevision) = request;
+    verifyRevision(expectedRevision, read().revision);
+    history.removeName(revision);
+    history.prune(DateTime.now().toUtc());
+    return null;
+  });
 
   WorkspaceRevision save(_SaveArguments arguments) => _transaction(() {
     final (mutation, expectedRevision, operationId) = arguments;
@@ -419,30 +584,43 @@ class _SqliteDatabase {
     required int revision,
     required String kind,
   }) {
-    final documents = [
-      snapshot.workspaceJson,
-      jsonEncode(snapshot.gymSessionJson),
-      jsonEncode(snapshot.workoutPlanJson),
-    ];
-    final digests = <String>[];
-    for (final document in documents) {
-      final digest = digestText(document);
-      _database.execute(
-        'INSERT INTO documents(digest, body) VALUES (?, ?) '
-        'ON CONFLICT(digest) DO NOTHING',
-        [digest, document],
-      );
-      digests.add(digest);
-    }
+    final cached = _cached;
+    final prior = cached?.head.snapshot;
+    final digests = (
+      workspace: prior?.workspaceJson == snapshot.workspaceJson
+          ? cached!.digests.workspace
+          : _documents.add(snapshot.workspaceJson),
+      sessions:
+          prior != null &&
+              _sameStrings(prior.gymSessionJson, snapshot.gymSessionJson)
+          ? cached!.digests.sessions
+          : _documents.add(jsonEncode(snapshot.gymSessionJson)),
+      plans:
+          prior != null &&
+              _sameStrings(prior.workoutPlanJson, snapshot.workoutPlanJson)
+          ? cached!.digests.plans
+          : _documents.add(jsonEncode(snapshot.workoutPlanJson)),
+    );
+    final committedAt = DateTime.now().toUtc();
     _database.execute(
       '''
       INSERT INTO revisions
         (revision, workspace, gym_sessions, workout_plans, kind, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
     ''',
-      [revision, ...digests, kind, DateTime.now().toUtc().toIso8601String()],
+      [
+        revision,
+        digests.workspace,
+        digests.sessions,
+        digests.plans,
+        kind,
+        committedAt.toIso8601String(),
+      ],
     );
-    return WorkspaceRevision(revision: revision, snapshot: snapshot);
+    history.prune(committedAt);
+    final next = WorkspaceRevision(revision: revision, snapshot: snapshot);
+    _cached = (head: next, digests: digests, dataVersion: _dataVersion);
+    return next;
   }
 
   Uint8List? readRecovery() {
@@ -455,8 +633,11 @@ class _SqliteDatabase {
     return backup;
   }
 
-  T _transaction<T>(T Function() action) {
-    _database.execute('BEGIN IMMEDIATE');
+  T _readTransaction<T>(T Function() action) =>
+      _database.autocommit ? _transaction(action, write: false) : action();
+
+  T _transaction<T>(T Function() action, {bool write = true}) {
+    _database.execute(write ? 'BEGIN IMMEDIATE' : 'BEGIN');
     try {
       final result = action();
       _database.execute('COMMIT');
@@ -472,6 +653,16 @@ class _SqliteDatabase {
     _database.close();
     return null;
   }
+}
+
+typedef _DocumentDigests = ({String workspace, String sessions, String plans});
+
+bool _sameStrings(List<String> a, List<String> b) {
+  if (a.length != b.length) return false;
+  for (var index = 0; index < a.length; index++) {
+    if (a[index] != b[index]) return false;
+  }
+  return true;
 }
 
 List<String> _decodeList(String source) {

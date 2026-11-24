@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:sqlite3/sqlite3.dart';
 
+import '../../storage/src/sqlite_configuration.dart';
 import 'sync_journal_storage.dart';
 import 'sync_journal_types.dart';
 
@@ -52,7 +53,7 @@ final class SqliteSyncLedger implements SyncLedger {
           PRAGMA user_version = $_schemaVersion;
         ''');
       });
-      database.execute('PRAGMA journal_mode = WAL');
+      configureSqliteWal(database);
       database.execute('PRAGMA synchronous = FULL');
       return ledger;
     } catch (_) {
@@ -70,7 +71,7 @@ final class SqliteSyncLedger implements SyncLedger {
       _db.execute('COMMIT');
       return result;
     } catch (_) {
-      _db.execute('ROLLBACK');
+      if (!_db.autocommit) _db.execute('ROLLBACK');
       rethrow;
     }
   }

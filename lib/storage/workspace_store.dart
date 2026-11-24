@@ -9,6 +9,14 @@ import 'src/preference_store.dart';
 export 'src/contracts.dart'
     show
         WorkspaceBackupPreview,
+        WorkspaceHistoryDiff,
+        WorkspaceHistoryPoint,
+        WorkspaceHistoryRecordChange,
+        WorkspaceHistoryRecordKey,
+        WorkspaceHistoryRecordKind,
+        WorkspaceHistoryReversion,
+        WorkspaceHistorySelectionPreview,
+        WorkspaceHistoryStore,
         WorkspaceMutation,
         WorkspaceRecordCounts,
         WorkspaceRevision,
