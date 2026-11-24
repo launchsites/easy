@@ -1,14 +1,15 @@
 # Easy
 
-Easy brings your calendar, tasks, notes, and activity into one device-first workspace. It opens with example entries you can edit while you try the views.
+Easy brings your calendar, tasks, notes, and activity into one device-first workspace. Start with a blank workspace or try sample data. Minimal, Planner, and Full presets let you choose which features to see. [Appearance previews](docs/DESIGN_PREVIEWS.md)
 
 - **Today** shows a note to self, upcoming events, and tasks due today. A focus mode can bring forward a workout, meal log, or a different group of tasks.
+- **Planning** uses your saved hours, calendar commitments, prerequisites, and task estimates. Open What fits now to review a suggestion or plan the day. Calendar time blocks are saved after you review them.
 - **Calendar** puts the schedule below a tappable date. On a phone, swipe sideways for the next day or scroll vertically through days. Wide windows show a week.
 - **Tasks and notes** use lightweight lists and a contextual detail pane on wider screens. Tasks support nesting, effort and prerequisite fields. Notes support folders, tags, pins, Markdown preview and links to workspace records.
 - **Navigation** starts at the bottom-left button on a phone. Hold, drag toward a destination and release, or tap and choose a destination. The plus opens a single capture field. Hold it to record. Slide up to lock recording or left to cancel.
 - **Capture** stays available in every focus mode. A voice recording is saved as a draft. Review its transcript, category and proposed items before applying them.
-- **Gym** keeps the next exercise and its settings in reach. Plan a workout once, on weekdays or on an interval. Edit individual metrics and sets, skip an exercise, and review previous sessions.
-- **Settings** controls optional features, calendar visibility, focus modes, backups, and AI. Disabling a feature keeps its records in the workspace.
+- **Gym** keeps the next exercise and its settings in reach. Plan a workout once, on weekdays or on an interval. Edit actual sets and metrics while keeping the planned values, or review a spoken result from the live session.
+- **Settings** controls optional features, calendar visibility, focus modes, follow-up rules, backups, and AI. Disabling a feature keeps its records in the workspace.
 
 ## Run
 
@@ -37,9 +38,9 @@ flutter build linux
 
 ## AI and backups
 
-The app starts with offline capture. Optional local inference uses an explicitly configured loopback provider. Paid inference uses an explicitly configured HTTPS endpoint and a GBP ledger that reserves the configured maximum before a request. You can choose which fields to include and separately opt into automatic duration suggestions. The system credential service holds API keys on native platforms.
+Easy starts with offline capture. Connect a local loopback model or configure an HTTPS API with your own key and a monthly limit in GBP. Optional foreground estimates can adjust their pace to the remaining budget. Review which fields and images a provider will receive and confirm the suggestions you want to use. [Local model setup](docs/local-ai-setup.md) · [Privacy and threat model](docs/privacy-and-threat-model.md)
 
-Logical backups preserve workspace records, including local calendar series and the metadata of recordings and photos. Media files are stored separately by content hash. Native version history supports previewing a full restore or selecting records to restore. Restoring a workspace retains the separate device AI spend ledger.
+Use native version history to review a full restore or recover selected records. Encrypted backups can include original recordings and photos. The device keeps AI spend in a separate ledger across restores. Pair devices to review and exchange selected records through encrypted files. [Recovery validation](docs/storage-validation.md) · [Manual sync](docs/manual-sync.md)
 
 ## Change the name
 
@@ -60,4 +61,4 @@ python3 tool/set_display_name.py 'My Workspace'
 
 ## Verification
 
-This repository is a development build. Linux has native release and offline journey evidence. Android has offline release AOT evidence for ARMv7, ARM64, and x86-64. Apple Calendar code has fake-channel and static Swift checks. See the release evidence for the checks that still need native devices. [Test evidence](docs/TEST_EVIDENCE.md) · [Acceptance status](docs/ACCEPTANCE.md)
+This repository is a development build. Linux has native release, offline, restart, and performance evidence. Android review APKs were built and inspected for ARMv7, ARM64, and x86-64. Apple Calendar has fake-channel and static Swift checks. Apple SDK builds, physical phone tests, and live paid billing verification remain open. [Test evidence](docs/TEST_EVIDENCE.md) · [Acceptance status](docs/ACCEPTANCE.md)
