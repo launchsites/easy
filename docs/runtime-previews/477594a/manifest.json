@@ -1,0 +1,19 @@
+{
+  "app_revision": "477594a709487f8f361a993fdb4071dcf86b4502",
+  "source_artifact": {
+    "id": 14905882491,
+    "run": "https://github.com/launchsites/easy/actions/runs/45364549136",
+    "sha256": "77d21c2a217580fda8012e20ede28bf9f13875ad474a01ceb5fa7ba85035ebae"
+  },
+  "extraction_run": "https://github.com/launchsites/easy/actions/runs/45365073011",
+  "source_member": "touch/04-following-day.png",
+  "image": {
+    "name": "android-calendar.webp",
+    "source_sha256": "420f446ef2a68f8cb8edbb6e869f2f6c82ca989f2d788b236b48c75cb7da0328",
+    "sha256": "e4b8019ae07953b43590d434f05d623ff02bbedaa7637ee83870ba9c310d32af",
+    "bytes": 8564,
+    "width": 420,
+    "height": 933
+  },
+  "verified_visual_range": "8 AM through 7 PM"
+}
