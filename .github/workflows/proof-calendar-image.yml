@@ -1,0 +1,75 @@
+name: Read the refreshed Android calendar ruler
+
+on:
+  push:
+    branches: [codex/compact-calendar-image-proof]
+    paths: [.github/workflows/proof-calendar-image.yml]
+
+permissions:
+  actions: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify the pinned emulator screenshot and expose a preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail --silent --show-error --location --retry 2 \
+            --proto '=https' -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/launchsites/easy/actions/artifacts/14905882491/zip" \
+            --output android.zip
+          printf '%s  %s\n' '77d21c2a217580fda8012e20ede28bf9f13875ad474a01ceb5fa7ba85035ebae' android.zip | sha256sum --check -
+          if ! python3 -m pip --version; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends python3-pip
+          fi
+          python3 -m pip install --disable-pip-version-check --only-binary=:all: \
+            --target "$RUNNER_TEMP/easy-ui-pillow" Pillow==11.3.0
+          PYTHONPATH="$RUNNER_TEMP/easy-ui-pillow" python3 - <<'PY'
+          from base64 import b64encode
+          from hashlib import sha256
+          from io import BytesIO
+          from pathlib import PurePosixPath
+          import json
+          import re
+          import zipfile
+          from PIL import Image
+
+          with zipfile.ZipFile('android.zip') as archive:
+              def read_member(basename):
+                  members = []
+                  for item in archive.infolist():
+                      path = PurePosixPath(item.filename)
+                      if path.name != basename or path.is_absolute() or '..' in path.parts:
+                          continue
+                      if re.fullmatch(r'[A-Za-z0-9._/-]+', item.filename) and item.file_size <= 8_000_000:
+                          members.append(item)
+                  assert len(members) == 1, (basename, members)
+                  return archive.read(members[0])
+              report = json.loads(read_member('touch-review.json'))
+              png = read_member('04-following-day.png')
+          source_sha = sha256(png).hexdigest()
+          assert report['screenshots_sha256']['04-following-day.png'] == source_sha
+          assert report['android_api'] == 36 and report['saved_revision'] == 3
+          with Image.open(BytesIO(png)) as original:
+              assert original.format == 'PNG' and original.size == (1080, 2400)
+              for name, image in [
+                  ('calendar.webp', original.resize((420, 933), Image.Resampling.LANCZOS)),
+                  ('hour-gutter.webp', original.crop((68, 245, 205, 1995))),
+              ]:
+                  buffer = BytesIO()
+                  image.convert('RGB').save(buffer, format='WEBP', quality=85, method=5)
+                  content = buffer.getvalue()
+                  assert len(content) <= 100_000
+                  print('CLOCK_META', json.dumps({
+                      'name': name, 'source_sha256': source_sha,
+                      'sha256': sha256(content).hexdigest(), 'bytes': len(content),
+                      'width': image.width, 'height': image.height,
+                  }))
+                  encoded = b64encode(content).decode('ascii')
+                  for index, offset in enumerate(range(0, len(encoded), 4096)):
+                      print('CLOCK_B64', name, index, encoded[offset:offset+4096])
+          PY
