@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'appearance/appearance.dart' show readableTint;
 import 'calendar_page.dart';
 import 'list_pages.dart';
 import 'workspace_data.dart';
@@ -34,6 +35,7 @@ class TodayPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final mobile = MediaQuery.sizeOf(context).width < 720;
     final localizations = MaterialLocalizations.of(context);
     final tomorrow = plusDays(date, 1);
@@ -69,13 +71,17 @@ class TodayPage extends StatelessWidget {
               children: [
                 Semantics(
                   header: true,
-                  child: Text(title, style: workspaceHeadingStyle(mobile)),
+                  child: Text(
+                    title,
+                    style: workspaceHeadingStyle(mobile)
+                        .copyWith(color: colors.onSurface),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   localizations.formatFullDate(date),
                   style: TextStyle(
-                    color: muted,
+                    color: colors.onSurfaceVariant,
                     fontSize: mobile ? 13.5 : 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -141,8 +147,15 @@ class _SectionHeading extends StatelessWidget {
   final String title;
 
   @override
-  Widget build(BuildContext context) =>
-      Semantics(header: true, child: Text(title, style: sectionHeadingStyle));
+  Widget build(BuildContext context) => Semantics(
+    header: true,
+    child: Text(
+      title,
+      style: sectionHeadingStyle.copyWith(
+        color: Theme.of(context).colorScheme.onSurface,
+      ),
+    ),
+  );
 }
 
 class _EmptyMessage extends StatelessWidget {
@@ -153,7 +166,13 @@ class _EmptyMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 10),
-    child: Text(message, style: const TextStyle(color: muted, fontSize: 14)),
+    child: Text(
+      message,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontSize: 14,
+      ),
+    ),
   );
 }
 
@@ -172,7 +191,8 @@ class _ScheduleItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tone = spaceColor(event.category);
+    final colors = Theme.of(context).colorScheme;
+    final tone = event.color ?? spaceColor(event.category);
     final localizations = MaterialLocalizations.of(context);
     final use24Hours = MediaQuery.alwaysUse24HourFormatOf(context);
     String time(DateTime value) => localizations.formatTimeOfDay(
@@ -189,7 +209,21 @@ class _ScheduleItem extends StatelessWidget {
         ? spaceName(event.category)
         : place;
     final shape = BorderRadius.circular(11);
-    final fill = Color.alphaBlend(tone.withValues(alpha: .09), paper);
+    final fill = Color.alphaBlend(
+      tone.withValues(alpha: colors.brightness == Brightness.dark ? .18 : .09),
+      colors.surface,
+    );
+    final toneLabel = readableTint(
+      Color.lerp(tone, colors.onSurface, .22)!,
+      surface: fill,
+      foreground: colors.onSurface,
+    );
+    final edge = readableTint(
+      tone,
+      surface: fill,
+      foreground: colors.onSurface,
+      minimumContrast: 3,
+    );
     final textScale = MediaQuery.textScalerOf(context);
     final compact = narrow || textScale.scale(14) > 18;
 
@@ -202,12 +236,12 @@ class _ScheduleItem extends StatelessWidget {
             padding: const EdgeInsetsDirectional.only(end: 6),
             child: Text(
               start,
-              style: const TextStyle(
-                color: muted,
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
                 fontSize: 12.5,
                 fontWeight: FontWeight.w500,
                 height: 1.2,
-                fontFeatures: [FontFeature.tabularFigures()],
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),
@@ -229,7 +263,7 @@ class _ScheduleItem extends StatelessWidget {
                     child: Container(
                       width: 3,
                       decoration: BoxDecoration(
-                        color: tone,
+                        color: edge,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -252,7 +286,8 @@ class _ScheduleItem extends StatelessWidget {
                               children: [
                                 Text(
                                   event.title,
-                                  style: const TextStyle(
+                                  style: TextStyle(
+                                    color: colors.onSurface,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                     letterSpacing: -.22,
@@ -265,7 +300,7 @@ class _ScheduleItem extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
-                                    color: Color.lerp(tone, ink, .22),
+                                    color: toneLabel,
                                     height: 1.2,
                                   ),
                                 ),
@@ -276,10 +311,16 @@ class _ScheduleItem extends StatelessWidget {
                             const SizedBox(width: 12),
                             Text(
                               'Until ${time(event.end)}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: muted,
-                                fontFeatures: [FontFeature.tabularFigures()],
+                                color: readableTint(
+                                  colors.onSurfaceVariant,
+                                  surface: fill,
+                                  foreground: colors.onSurface,
+                                ),
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
                               ),
                             ),
                           ],
@@ -310,6 +351,7 @@ class _TodayTask extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Column(
       children: [
         Row(
@@ -340,7 +382,9 @@ class _TodayTask extends StatelessWidget {
                         task.title,
                         style: TextStyle(
                           fontSize: 15,
-                          color: task.done ? muted : ink,
+                          color: task.done
+                              ? colors.onSurfaceVariant
+                              : colors.onSurface,
                           fontWeight: FontWeight.w600,
                           letterSpacing: -.2,
                           decoration: task.done
@@ -352,10 +396,14 @@ class _TodayTask extends StatelessWidget {
                       Text(
                         spaceName(task.category),
                         style: TextStyle(
-                          color: Color.lerp(
-                            spaceColor(task.category),
-                            ink,
-                            .16,
+                          color: readableTint(
+                            Color.lerp(
+                              spaceColor(task.category),
+                              colors.onSurface,
+                              .16,
+                            )!,
+                            surface: colors.surface,
+                            foreground: colors.onSurface,
                           ),
                           fontSize: 12,
                           fontWeight: FontWeight.w500,

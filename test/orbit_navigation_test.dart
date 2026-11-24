@@ -1,5 +1,5 @@
 import 'package:easy/orbit_navigation.dart';
-import 'package:easy/ui_theme.dart' show accent;
+import 'package:easy/ui_theme.dart' show accent, easyTheme;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -20,16 +20,19 @@ Future<void> _mount(
   Size surface = const Size(390, 844),
   double bottomPadding = 0,
   bool reduceMotion = false,
+  double textScale = 1,
 }) async {
   await tester.binding.setSurfaceSize(surface);
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
   await tester.pumpWidget(
     MaterialApp(
+      theme: easyTheme(),
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(
           padding: EdgeInsets.only(bottom: bottomPadding),
-          disableAnimations: reduceMotion,
+          reduceMotion: reduceMotion,
+          textScaler: TextScaler.linear(textScale),
         ),
         child: child!,
       ),
@@ -230,6 +233,55 @@ void main() {
       }
     },
   );
+
+  testWidgets(
+    'large text offers full tap labels and preserves drag selection',
+    (tester) async {
+      final selections = <int>[];
+      await _mount(
+        tester,
+        selections,
+        surface: const Size(320, 568),
+        textScale: 2,
+      );
+      await tester.tap(_launcher);
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(ListTile, 'Calendar'), findsOneWidget);
+      await tester.tap(find.text('Calendar'));
+      await tester.pumpAndSettle();
+      expect(selections, [1]);
+
+      final gesture = await _holdLauncher(tester);
+      final tasks = find.bySemanticsLabel('Tasks');
+      expect(tasks, findsOneWidget);
+      expect(find.text('Tasks'), findsNothing);
+      await gesture.moveTo(tester.getCenter(tasks));
+      await tester.pump();
+      expect(find.text('Tasks'), findsOneWidget);
+      expect(selections, [1]);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(selections, [1, 2]);
+    },
+  );
+
+  testWidgets('platform reduced motion skips the orbit reveal animation', (
+    tester,
+  ) async {
+    final selections = <int>[];
+    await _mount(tester, selections, reduceMotion: true);
+    await tester.tap(_launcher);
+    await tester.pump();
+
+    final animations = tester.widgetList<TweenAnimationBuilder<double>>(
+      find.byType(TweenAnimationBuilder<double>),
+    );
+    expect(animations, hasLength(_destinations.length));
+    expect(
+      animations.map((animation) => animation.duration),
+      everyElement(Duration.zero),
+    );
+  });
 
   testWidgets('the orbit fits landscape and a short body', (tester) async {
     for (final (surface, targetSize) in [

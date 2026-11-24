@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
+import 'appearance/appearance.dart' show readableTint;
 import 'calendar_page.dart';
 import 'list_pages.dart';
 import 'ui_theme.dart';
@@ -230,6 +231,7 @@ class _HomeHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final selectedMode = mode;
     final fontSize = switch ((selectedMode != null, compact)) {
       (true, true) => 42.0,
@@ -247,8 +249,11 @@ class _HomeHeading extends StatelessWidget {
                 ? dayLabel
                 : modeName ?? spaceName(selectedMode),
             semanticsLabel: selectedMode == null ? fullDate : null,
-            style: workspaceHeadingStyle(true)
-                .copyWith(fontSize: fontSize, letterSpacing: -fontSize * .051),
+            style: workspaceHeadingStyle(true).copyWith(
+              color: colors.onSurface,
+              fontSize: fontSize,
+              letterSpacing: -fontSize * .051,
+            ),
           ),
         ),
         if (selectedMode != null) ...[
@@ -256,7 +261,10 @@ class _HomeHeading extends StatelessWidget {
           Text(
             dayLabel,
             semanticsLabel: fullDate,
-            style: contentMetadataStyle.copyWith(fontWeight: FontWeight.w500),
+            style: contentMetadataStyle.copyWith(
+              color: colors.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ],
@@ -297,23 +305,24 @@ class _HomeSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final heading = Semantics(
+      header: true,
+      child: Text(
+        title,
+        style: sectionHeadingStyle.copyWith(
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
+      ),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (onPlanDay == null)
-          Semantics(
-            header: true,
-            child: Text(title, style: sectionHeadingStyle),
-          )
+          heading
         else
           Row(
             children: [
-              Expanded(
-                child: Semantics(
-                  header: true,
-                  child: Text(title, style: sectionHeadingStyle),
-                ),
-              ),
+              Expanded(child: heading),
               TextButton(onPressed: onPlanDay, child: const Text('Plan day')),
             ],
           ),
@@ -333,7 +342,12 @@ class _EmptySection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Text(message, style: contentMetadataStyle),
+      child: Text(
+        message,
+        style: contentMetadataStyle.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
     );
   }
 }
@@ -351,20 +365,25 @@ class _HomeNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final titleStyle = contentTitleStyle.copyWith(color: colors.onSurface);
+    final metadata = contentMetadataStyle.copyWith(
+      color: colors.onSurfaceVariant,
+    );
     final title = note?.title.trim() ?? '';
     final body = note?.body.trim() ?? '';
     final showTitle = title.isNotEmpty && title.toLowerCase() != 'note to self';
     final isEmpty = !showTitle && body.isEmpty;
     final iconSize = compact ? 31.0 : 35.0;
     final verticalInset = compact ? 10.0 : 13.0;
-    const shape = RoundedRectangleBorder(
-      side: BorderSide(color: line),
+    final shape = RoundedRectangleBorder(
+      side: BorderSide(color: colors.outlineVariant),
       borderRadius: contentSurfaceRadius,
     );
     return Material(
-      color: raisedPaper,
+      color: colors.surfaceContainerLow,
       elevation: .6,
-      shadowColor: const Color(0x24373b2f),
+      shadowColor: colors.shadow.withAlpha(0x24),
       surfaceTintColor: Colors.transparent,
       shape: shape,
       clipBehavior: Clip.antiAlias,
@@ -385,13 +404,18 @@ class _HomeNote extends StatelessWidget {
                 Container(
                   width: iconSize,
                   height: iconSize,
-                  decoration: const BoxDecoration(
-                    color: softAccent,
-                    borderRadius: BorderRadius.all(Radius.circular(9)),
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer,
+                    borderRadius: const BorderRadius.all(Radius.circular(9)),
                   ),
                   child: Icon(
                     isEmpty ? Icons.edit_outlined : Icons.notes_rounded,
-                    color: accent,
+                    color: readableTint(
+                      colors.primary,
+                      surface: colors.primaryContainer,
+                      foreground: colors.onPrimaryContainer,
+                      minimumContrast: 3,
+                    ),
                     size: 18,
                   ),
                 ),
@@ -400,7 +424,7 @@ class _HomeNote extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (showTitle) Text(title, style: contentTitleStyle),
+                      if (showTitle) Text(title, style: titleStyle),
                       if (showTitle && body.isNotEmpty)
                         const SizedBox(height: 3),
                       if (body.isNotEmpty || !showTitle)
@@ -409,14 +433,18 @@ class _HomeNote extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: isEmpty
-                              ? contentTitleStyle.copyWith(color: accent)
-                              : contentMetadataStyle,
+                              ? titleStyle.copyWith(color: colors.primary)
+                              : metadata,
                         ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 5),
-                const Icon(Icons.chevron_right_rounded, color: muted, size: 17),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: colors.onSurfaceVariant,
+                  size: 17,
+                ),
               ],
             ),
           ),
@@ -444,8 +472,17 @@ class _HomeEvent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final format = MaterialLocalizations.of(context);
-    final tone = event.color ?? spaceColor(event.category);
+    final tone = readableTint(
+      event.color ?? spaceColor(event.category),
+      surface: colors.surface,
+      foreground: colors.onSurface,
+      minimumContrast: 3,
+    );
+    final metadata = contentMetadataStyle.copyWith(
+      color: colors.onSurfaceVariant,
+    );
     final compact = MediaQuery.sizeOf(context).width < 360;
     final time = event.allDay
         ? 'All day'
@@ -476,7 +513,7 @@ class _HomeEvent extends StatelessWidget {
                         padding: const EdgeInsetsDirectional.only(end: 9),
                         child: Text(
                           time,
-                          style: contentMetadataStyle.copyWith(
+                          style: metadata.copyWith(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                             fontFeatures: const [FontFeature.tabularFigures()],
@@ -496,10 +533,15 @@ class _HomeEvent extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(event.title, style: contentTitleStyle),
+                          Text(
+                            event.title,
+                            style: contentTitleStyle.copyWith(
+                              color: colors.onSurface,
+                            ),
+                          ),
                           if (location?.isNotEmpty ?? false) ...[
                             const SizedBox(height: 2),
-                            Text(location!, style: contentMetadataStyle),
+                            Text(location!, style: metadata),
                           ],
                         ],
                       ),
@@ -532,6 +574,7 @@ class _HomeTask extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Row(
       children: [
         Checkbox(
@@ -556,12 +599,14 @@ class _HomeTask extends StatelessWidget {
                   children: [
                     Text(
                       task.title,
-                      style: task.done
-                          ? contentTitleStyle.copyWith(
-                              color: muted,
-                              decoration: TextDecoration.lineThrough,
-                            )
-                          : contentTitleStyle,
+                      style: contentTitleStyle.copyWith(
+                        color: task.done
+                            ? colors.onSurfaceVariant
+                            : colors.onSurface,
+                        decoration: task.done
+                            ? TextDecoration.lineThrough
+                            : null,
+                      ),
                     ),
                     if (showCategory && task.category.trim().isNotEmpty)
                       Text(
@@ -569,7 +614,15 @@ class _HomeTask extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           height: 1.3,
-                          color: Color.lerp(spaceColor(task.category), ink, .2),
+                          color: readableTint(
+                            Color.lerp(
+                              spaceColor(task.category),
+                              colors.onSurface,
+                              .2,
+                            )!,
+                            surface: colors.surface,
+                            foreground: colors.onSurface,
+                          ),
                         ),
                       ),
                   ],

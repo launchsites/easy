@@ -4,8 +4,8 @@ import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'appearance/appearance.dart' show readableTint;
 import 'calendar_event_index.dart';
-import 'ui_theme.dart' as palette;
 import 'workspace_data.dart' show spaceColor;
 
 class CalendarEvent {
@@ -471,7 +471,7 @@ class _CalendarPageState extends State<CalendarPage> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: selected ? colors.accent : colors.muted,
+              color: selected ? colors.onAccentFill : colors.muted,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               fontSize: 12,
               height: 1.2,
@@ -1002,37 +1002,42 @@ Widget _calendarSurface(_CalendarColors colors, Widget child) => Material(
 );
 
 class _CalendarColors {
-  const _CalendarColors(this.dark);
+  const _CalendarColors(this.scheme);
 
   factory _CalendarColors.of(BuildContext context) =>
-      _CalendarColors(Theme.of(context).brightness == Brightness.dark);
+      _CalendarColors(Theme.of(context).colorScheme);
 
-  final bool dark;
+  final ColorScheme scheme;
 
-  Color get surface => dark ? palette.shellSurface : palette.raisedPaper;
-  Color get ink => dark ? const Color(0xFFF0F1EC) : palette.ink;
-  Color get muted => dark ? const Color(0xFFAAB2A7) : palette.muted;
-  Color get line => dark ? const Color(0xFF393F39) : palette.line;
-  Color get accent => dark ? const Color(0xFFA4C3A9) : palette.accent;
-  Color get accentFill => dark ? const Color(0xFF303F33) : palette.softAccent;
+  bool get dark => scheme.brightness == Brightness.dark;
+  Color get surface => scheme.surfaceContainerLow;
+  Color get ink => scheme.onSurface;
+  Color get muted => scheme.onSurfaceVariant;
+  Color get line => scheme.outlineVariant;
+  Color get accent => scheme.primary;
+  Color get accentFill => scheme.primaryContainer;
+  Color get onAccentFill => readableTint(
+    accent,
+    surface: accentFill,
+    foreground: scheme.onPrimaryContainer,
+  );
 
   ({Color ink, Color fill, Color edge}) event(CalendarEvent event) {
     final hue = event.color ?? spaceColor(event.category);
     final fill = Color.alphaBlend(
       hue.withValues(alpha: dark ? .24 : .09),
-      dark ? surface : palette.paper,
+      dark ? surface : scheme.surface,
     );
     final label = Color.lerp(ink, hue, dark ? .36 : .68)!;
     return (
-      ink: event.color != null && _contrast(label, fill) < 4.5 ? ink : label,
+      ink: readableTint(label, surface: fill, foreground: ink),
       fill: fill,
-      edge: dark ? Color.lerp(ink, hue, .66)! : hue,
+      edge: readableTint(
+        dark ? Color.lerp(ink, hue, .66)! : hue,
+        surface: fill,
+        foreground: ink,
+        minimumContrast: 3,
+      ),
     );
-  }
-
-  double _contrast(Color foreground, Color background) {
-    final first = Color.alphaBlend(foreground, background).computeLuminance();
-    final second = background.computeLuminance();
-    return (math.max(first, second) + .05) / (math.min(first, second) + .05);
   }
 }

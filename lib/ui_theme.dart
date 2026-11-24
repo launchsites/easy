@@ -1,45 +1,43 @@
 import 'package:material_ui/material_ui.dart';
 
-const paper = Color(0xfffaf9f5);
-const ink = Color(0xff242922);
-const muted = Color(0xff686d63);
-const line = Color(0xffe7e7df);
-const accent = Color(0xff426651);
-const shell = Color(0xff171c18);
-const sidebarText = Color(0xffc2c9bd);
-const raisedPaper = Color(0xfffffefa);
-const softAccent = Color(0xffe7eee4);
-const shellSurface = Color(0xff222923);
+import 'appearance/appearance.dart';
+
+export 'appearance/appearance.dart'
+    show
+        accent,
+        ink,
+        line,
+        muted,
+        paper,
+        raisedPaper,
+        shell,
+        shellSurface,
+        sidebarText,
+        softAccent;
 
 const contentSurfaceRadius = BorderRadius.all(Radius.circular(16));
 const contentControlShape = RoundedRectangleBorder(
   borderRadius: BorderRadius.all(Radius.circular(11)),
 );
 
-ThemeData easyTheme() {
-  final colors = ColorScheme.fromSeed(
-    seedColor: accent,
-    primary: accent,
-    onPrimary: Colors.white,
-    primaryContainer: softAccent,
-    onPrimaryContainer: const Color(0xff293e2f),
-    surface: paper,
-    onSurface: ink,
-    onSurfaceVariant: muted,
-    surfaceContainerLow: raisedPaper,
-    surfaceContainer: const Color(0xfff1f1eb),
-    outline: const Color(0xff808a7e),
-    outlineVariant: line,
-  );
+ThemeData easyTheme() => _buildTheme(AppearanceProfile.mixed);
+
+/// Preview surfaces that use semantic colors throughout.
+ThemeData previewEasyTheme(AppearanceProfile profile) => _buildTheme(profile);
+
+ThemeData _buildTheme(AppearanceProfile profile) {
+  final appearance = WorkspaceAppearance.forProfile(profile);
+  final colors = appearance.content;
   final theme = ThemeData(
     colorScheme: colors,
+    extensions: [appearance.chrome],
     fontFamily: 'Geist',
-    scaffoldBackgroundColor: paper,
-    canvasColor: paper,
-    dividerColor: line,
-    hoverColor: const Color(0x0b426651),
-    focusColor: const Color(0x16426651),
-    splashColor: const Color(0x17426651),
+    scaffoldBackgroundColor: colors.surface,
+    canvasColor: colors.surface,
+    dividerColor: colors.outlineVariant,
+    hoverColor: colors.primary.withAlpha(0x0b),
+    focusColor: colors.primary.withAlpha(0x16),
+    splashColor: colors.primary.withAlpha(0x17),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size(64, 44),
@@ -55,39 +53,46 @@ ThemeData easyTheme() {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(shape: contentControlShape),
     ),
-    dividerTheme: const DividerThemeData(color: line, thickness: 1, space: 1),
+    dividerTheme: DividerThemeData(
+      color: colors.outlineVariant,
+      thickness: 1,
+      space: 1,
+    ),
     checkboxTheme: CheckboxThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-      side: const BorderSide(color: Color(0xff91988e), width: 1.4),
+      side: BorderSide(color: colors.outline, width: 1.4),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: paper,
+      backgroundColor: colors.surface,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
     ),
-    bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: paper,
-      modalBackgroundColor: paper,
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: colors.surface,
+      modalBackgroundColor: colors.surface,
       surfaceTintColor: Colors.transparent,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
     ),
     menuTheme: MenuThemeData(
       style: MenuStyle(
-        backgroundColor: const WidgetStatePropertyAll(raisedPaper),
+        backgroundColor: WidgetStatePropertyAll(colors.surfaceContainerLow),
         surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
         shape: WidgetStatePropertyAll(
           RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: line),
+            side: BorderSide(color: colors.outlineVariant),
           ),
         ),
       ),
     ),
   );
-  final text = theme.textTheme.apply(bodyColor: ink, displayColor: ink);
+  final text = theme.textTheme.apply(
+    bodyColor: colors.onSurface,
+    displayColor: colors.onSurface,
+  );
   return theme.copyWith(
     textTheme: text.copyWith(
       labelLarge: text.labelLarge?.copyWith(

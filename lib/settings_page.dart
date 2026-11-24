@@ -47,10 +47,11 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final shownSections = sections.where((section) => section.items.isNotEmpty);
     final canGoBack = Navigator.canPop(context);
     return Scaffold(
-      backgroundColor: paper,
+      backgroundColor: colors.surface,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -81,6 +82,7 @@ class SettingsPage extends StatelessWidget {
                               child: Text(
                                 'Settings',
                                 style: workspaceHeadingStyle(true).copyWith(
+                                  color: colors.onSurface,
                                   fontSize: wide ? 32 : 25,
                                   letterSpacing: wide ? -1.3 : -.8,
                                 ),
@@ -125,35 +127,41 @@ class _SettingsGroup extends StatelessWidget {
   final SettingsSection section;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Padding(
-        padding: const EdgeInsetsDirectional.only(start: 2, bottom: 10),
-        child: Semantics(
-          header: true,
-          child: Text(section.title, style: sectionHeadingStyle),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 2, bottom: 10),
+          child: Semantics(
+            header: true,
+            child: Text(
+              section.title,
+              style: sectionHeadingStyle.copyWith(color: colors.onSurface),
+            ),
+          ),
         ),
-      ),
-      Material(
-        color: raisedPaper,
-        surfaceTintColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(
-          borderRadius: contentSurfaceRadius,
-          side: BorderSide(color: line),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          children: [
-            for (final (index, item) in section.items.indexed) ...[
-              if (index > 0) const Divider(indent: 57, endIndent: 13),
-              _SettingsRow(item: item),
+        Material(
+          color: colors.surfaceContainerLow,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: contentSurfaceRadius,
+            side: BorderSide(color: colors.outlineVariant),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (final (index, item) in section.items.indexed) ...[
+                if (index > 0) const Divider(indent: 57, endIndent: 13),
+                _SettingsRow(item: item),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
 class _SettingsRow extends StatefulWidget {
@@ -174,16 +182,23 @@ class _SettingsRowState extends State<_SettingsRow> {
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
+    final colors = Theme.of(context).colorScheme;
+    final metadata = contentMetadataStyle.copyWith(
+      color: colors.onSurfaceVariant,
+    );
     final leading = Container(
       width: 34,
       height: 34,
-      decoration: const BoxDecoration(
-        color: softAccent,
-        borderRadius: BorderRadius.all(Radius.circular(9)),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: const BorderRadius.all(Radius.circular(9)),
       ),
-      child: Icon(item.icon, color: accent, size: 17),
+      child: Icon(item.icon, color: colors.primary, size: 17),
     );
-    final title = Text(item.title, style: contentTitleStyle);
+    final title = Text(
+      item.title,
+      style: contentTitleStyle.copyWith(color: colors.onSurface),
+    );
     final subtitle = item.subtitle?.trim();
     final value = item.value?.trim();
 
@@ -192,7 +207,7 @@ class _SettingsRowState extends State<_SettingsRow> {
       decoration: BoxDecoration(
         border: BorderDirectional(
           start: BorderSide(
-            color: _focused ? accent : Colors.transparent,
+            color: _focused ? colors.primary : Colors.transparent,
             width: 2,
           ),
         ),
@@ -205,7 +220,7 @@ class _SettingsRowState extends State<_SettingsRow> {
           title: title,
           subtitle: subtitle == null || subtitle.isEmpty
               ? null
-              : Text(subtitle, style: contentMetadataStyle),
+              : Text(subtitle, style: metadata),
           contentPadding: _insets,
           minTileHeight: 60,
           horizontalTitleGap: 10,
@@ -223,15 +238,15 @@ class _SettingsRowState extends State<_SettingsRow> {
             final valueText = hasValue
                 ? Text(
                     value,
-                    style: contentMetadataStyle.copyWith(
-                      color: accent,
+                    style: metadata.copyWith(
+                      color: colors.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   )
                 : null;
             final supportingText = [
               if (subtitle != null && subtitle.isNotEmpty)
-                Text(subtitle, style: contentMetadataStyle),
+                Text(subtitle, style: metadata),
               if (valueText != null && !trailingValue) valueText,
             ];
             return ListTile(
@@ -257,9 +272,9 @@ class _SettingsRowState extends State<_SettingsRow> {
                     ),
                     const SizedBox(width: 6),
                   ],
-                  const Icon(
+                  Icon(
                     Icons.chevron_right_rounded,
-                    color: muted,
+                    color: colors.onSurfaceVariant,
                     size: 19,
                   ),
                 ],
@@ -269,7 +284,7 @@ class _SettingsRowState extends State<_SettingsRow> {
               horizontalTitleGap: 10,
               onTap: item.onTap,
               onFocusChange: _focusChanged,
-              focusColor: softAccent,
+              focusColor: colors.primaryContainer,
             );
           },
         ),

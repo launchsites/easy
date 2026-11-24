@@ -4,8 +4,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
-import 'ui_theme.dart' show accent, ink, line, paper, shell;
-
 class OrbitDestination {
   const OrbitDestination(this.label, this.icon);
 
@@ -53,6 +51,9 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
   @override
   void didUpdateWidget(covariant OrbitNavigation oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if ((_highlightedIndex ?? -1) >= widget.destinations.length) {
+      _highlightedIndex = null;
+    }
     if (widget.destinations.isEmpty) {
       _isOpen = false;
       _isDragging = false;
@@ -150,7 +151,7 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
     }
   }
 
-  Widget _buildLauncher(double bottom, Duration motion) {
+  Widget _buildLauncher(double bottom, Duration motion, ColorScheme colors) {
     return Positioned(
       key: const ValueKey('orbit-launcher'),
       left: _edgeInset,
@@ -183,11 +184,11 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
                 focusNode: _launcherFocus,
                 onPressed: _toggle,
                 style: IconButton.styleFrom(
-                  backgroundColor: shell,
-                  foregroundColor: paper,
-                  overlayColor: Colors.white,
+                  backgroundColor: colors.inverseSurface,
+                  foregroundColor: colors.onInverseSurface,
+                  overlayColor: colors.onInverseSurface,
                   elevation: 2,
-                  shadowColor: shell.withValues(alpha: 0.24),
+                  shadowColor: colors.shadow.withValues(alpha: 0.24),
                   animationDuration: motion,
                   shape: const CircleBorder(),
                 ),
@@ -209,24 +210,29 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
     double radius,
     double size,
     Duration motion,
+    ColorScheme colors,
+    bool showLabel,
   ) {
     final destination = widget.destinations[index];
     final angle = _angleFor(index);
     final isCurrent = widget.selectedIndex == index;
     final isHighlighted = _highlightedIndex == index;
     final background = isHighlighted
-        ? accent
+        ? colors.primary
         : isCurrent
-        ? Color.lerp(paper, accent, 0.10)!
-        : paper;
+        ? colors.primaryContainer
+        : colors.surface;
     final foreground = isHighlighted
-        ? Colors.white
-        : (isCurrent ? accent : ink);
+        ? colors.onPrimary
+        : (isCurrent ? colors.onPrimaryContainer : colors.onSurface);
     final border = isHighlighted
-        ? accent
-        : (isCurrent ? accent.withValues(alpha: 0.42) : line);
+        ? colors.primary
+        : (isCurrent
+              ? colors.primary.withValues(alpha: 0.42)
+              : colors.outlineVariant);
     final centerOffset = (_launcherSize - size) / 2;
     final button = Semantics(
+      label: showLabel ? null : destination.label,
       selected: isCurrent,
       child: TextButton(
         onPressed: () => _select(index),
@@ -238,27 +244,29 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
           shape: const CircleBorder(),
           side: BorderSide(color: border),
           elevation: isHighlighted ? 3 : 1,
-          shadowColor: shell.withValues(alpha: 0.24),
+          shadowColor: colors.shadow.withValues(alpha: 0.24),
           animationDuration: motion,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(destination.icon, size: 20, color: foreground),
-            const SizedBox(height: 3),
-            Flexible(
-              child: Text(
-                destination.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.16,
-                  height: 1.1,
+            if (showLabel) ...[
+              const SizedBox(height: 3),
+              Flexible(
+                child: Text(
+                  destination.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.16,
+                    height: 1.1,
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -282,14 +290,91 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
     );
   }
 
+  Widget _buildLabeledMenu(double bottom, double height, ColorScheme colors) =>
+      Positioned(
+        left: _edgeInset,
+        right: _edgeInset,
+        bottom: bottom,
+        child: Align(
+          alignment: Alignment.bottomLeft,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 280, maxHeight: height),
+            child: Material(
+              color: colors.surface,
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: const BorderRadius.all(Radius.circular(16)),
+                side: BorderSide(color: colors.outlineVariant),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                children: [
+                  for (final (index, destination)
+                      in widget.destinations.indexed)
+                    ListTile(
+                      leading: Icon(destination.icon, size: 22),
+                      title: Text(destination.label),
+                      selected: index == widget.selectedIndex,
+                      selectedColor: colors.onPrimaryContainer,
+                      selectedTileColor: colors.primaryContainer,
+                      focusColor: colors.primary.withValues(alpha: 0.18),
+                      onTap: () => _select(index),
+                      minTileHeight: 48,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+  Widget _buildDragLabel(int index, ColorScheme colors) => Positioned(
+    top: 8,
+    left: _edgeInset,
+    right: _edgeInset,
+    child: ExcludeSemantics(
+      child: IgnorePointer(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Material(
+            color: colors.inverseSurface,
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              child: Text(
+                widget.destinations[index].label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.onInverseSurface,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     if (widget.destinations.isEmpty) return const SizedBox.expand();
 
+    final colors = Theme.of(context).colorScheme;
     final bottom = MediaQuery.paddingOf(context).bottom + _edgeInset;
-    final motion = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : _revealDuration;
+    // Keep the drag gesture in place and fit full labels on deliberate taps.
+    final largeLabels = MediaQuery.textScalerOf(context).scale(11) > 16;
+    final showOrbit = _isOpen && (!largeLabels || _isDragging);
+    final menuBottom = bottom + _launcherSize + 10;
+    final reduceMotion =
+        MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.reduceMotionOf(context);
+    final motion = reduceMotion ? Duration.zero : _revealDuration;
     return PopScope<Object?>(
       canPop: !_isOpen,
       onPopInvokedWithResult: (didPop, _) {
@@ -324,14 +409,22 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
                   children: [
                     if (_isOpen)
                       ModalBarrier(
-                        color: shell.withValues(alpha: 0.12),
+                        color: colors.scrim.withValues(
+                          alpha: colors.brightness == Brightness.dark
+                              ? 0.30
+                              : 0.12,
+                        ),
                         semanticsLabel: 'Close navigation',
                         onDismiss: _dismiss,
                       ),
-                    if (_isOpen)
+                    if (showOrbit)
                       IgnorePointer(
                         child: CustomPaint(
                           painter: _OrbitTrack(
+                            trackColor: colors.brightness == Brightness.dark
+                                ? colors.outline
+                                : colors.onInverseSurface,
+                            highlightColor: colors.primary,
                             center: center,
                             radius: radius,
                             startAngle: _angleFor(0),
@@ -342,14 +435,30 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
                           ),
                         ),
                       ),
-                    _buildLauncher(bottom, motion),
-                    if (_isOpen)
+                    _buildLauncher(bottom, motion, colors),
+                    if (showOrbit)
                       for (
                         var index = 0;
                         index < widget.destinations.length;
                         index++
                       )
-                        _buildDestination(index, bottom, radius, size, motion),
+                        _buildDestination(
+                          index,
+                          bottom,
+                          radius,
+                          size,
+                          motion,
+                          colors,
+                          !largeLabels,
+                        ),
+                    if (_isOpen && !showOrbit)
+                      _buildLabeledMenu(
+                        menuBottom,
+                        math.max(0, constraints.maxHeight - menuBottom - 8),
+                        colors,
+                      ),
+                    if (largeLabels && _isDragging && _highlightedIndex != null)
+                      _buildDragLabel(_highlightedIndex!, colors),
                   ],
                 );
               },
@@ -363,6 +472,8 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
 
 class _OrbitTrack extends CustomPainter {
   const _OrbitTrack({
+    required this.trackColor,
+    required this.highlightColor,
     required this.center,
     required this.radius,
     required this.startAngle,
@@ -370,6 +481,8 @@ class _OrbitTrack extends CustomPainter {
     required this.highlightedAngle,
   });
 
+  final Color trackColor;
+  final Color highlightColor;
   final Offset center;
   final double radius;
   final double startAngle;
@@ -379,7 +492,7 @@ class _OrbitTrack extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final track = Paint()
-      ..color = paper.withValues(alpha: 0.82)
+      ..color = trackColor.withValues(alpha: 0.82)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.3;
     canvas.drawArc(
@@ -396,7 +509,7 @@ class _OrbitTrack extends CustomPainter {
         center,
         center + Offset(math.cos(selected), math.sin(selected)) * radius,
         Paint()
-          ..color = accent.withValues(alpha: 0.56)
+          ..color = highlightColor.withValues(alpha: 0.56)
           ..strokeWidth = 1.5,
       );
     }
@@ -404,6 +517,8 @@ class _OrbitTrack extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _OrbitTrack oldDelegate) =>
+      oldDelegate.trackColor != trackColor ||
+      oldDelegate.highlightColor != highlightColor ||
       oldDelegate.center != center ||
       oldDelegate.radius != radius ||
       oldDelegate.startAngle != startAngle ||

@@ -55,69 +55,82 @@ class _FocusModesPageState extends State<FocusModesPage> {
   }
 
   @override
-  Widget build(BuildContext context) => _ModePage(
-    title: 'Focus modes',
-    action: FilledButton.icon(
-      onPressed: _edit,
-      icon: const Icon(Icons.add_rounded, size: 19),
-      label: const Text('New mode'),
-    ),
-    builder: (context, padding) => ListView(
-      padding: padding,
-      children: [
-        if (_modes.isEmpty)
-          const Text('No focus modes yet.', style: contentMetadataStyle)
-        else
-          Material(
-            color: raisedPaper,
-            surfaceTintColor: Colors.transparent,
-            shape: const RoundedRectangleBorder(
-              borderRadius: contentSurfaceRadius,
-              side: BorderSide(color: line),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                for (final (index, mode) in _modes.indexed) ...[
-                  if (index > 0) const Divider(indent: 48, endIndent: 12),
-                  ListTile(
-                    leading: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Color(mode.color),
-                        shape: BoxShape.circle,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final metadata = contentMetadataStyle.copyWith(
+      color: colors.onSurfaceVariant,
+    );
+    return _ModePage(
+      title: 'Focus modes',
+      action: FilledButton.icon(
+        onPressed: _edit,
+        icon: const Icon(Icons.add_rounded, size: 19),
+        label: const Text('New mode'),
+      ),
+      builder: (context, padding) => ListView(
+        padding: padding,
+        children: [
+          if (_modes.isEmpty)
+            Text('No focus modes yet.', style: metadata)
+          else
+            Material(
+              color: colors.surfaceContainerLow,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: contentSurfaceRadius,
+                side: BorderSide(color: colors.outlineVariant),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  for (final (index, mode) in _modes.indexed) ...[
+                    if (index > 0) const Divider(indent: 48, endIndent: 12),
+                    ListTile(
+                      leading: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Color(mode.color),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const SizedBox.square(dimension: 17),
                       ),
-                      child: const SizedBox.square(dimension: 17),
+                      title: Text(
+                        mode.name,
+                        style: contentTitleStyle.copyWith(
+                          color: colors.onSurface,
+                        ),
+                      ),
+                      subtitle: mode.sections.isEmpty
+                          ? null
+                          : Text(
+                              mode.sections
+                                  .map((item) => item.label)
+                                  .join(' · '),
+                              style: metadata,
+                            ),
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: colors.onSurfaceVariant,
+                        size: 19,
+                      ),
+                      contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                        16,
+                        2,
+                        12,
+                        2,
+                      ),
+                      minLeadingWidth: 17,
+                      minTileHeight: 57,
+                      focusColor: colors.primaryContainer,
+                      onTap: () => _edit(mode),
                     ),
-                    title: Text(mode.name, style: contentTitleStyle),
-                    subtitle: mode.sections.isEmpty
-                        ? null
-                        : Text(
-                            mode.sections.map((item) => item.label).join(' · '),
-                            style: contentMetadataStyle,
-                          ),
-                    trailing: const Icon(
-                      Icons.chevron_right_rounded,
-                      color: muted,
-                      size: 19,
-                    ),
-                    contentPadding: const EdgeInsetsDirectional.fromSTEB(
-                      16,
-                      2,
-                      12,
-                      2,
-                    ),
-                    minLeadingWidth: 17,
-                    minTileHeight: 57,
-                    focusColor: softAccent,
-                    onTap: () => _edit(mode),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 typedef _ModeChange = ({String id, FocusMode? replacement});
@@ -226,6 +239,7 @@ class _ModeEditorState extends State<_ModeEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final categories = {
       ...widget.categories,
       for (final category in {
@@ -258,7 +272,7 @@ class _ModeEditorState extends State<_ModeEditor> {
                 TextFormField(
                   key: _nameField,
                   initialValue: _name,
-                  decoration: _field('Mode name'),
+                  decoration: _field('Mode name', colors),
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
                   validator: (value) => value == null || value.trim().isEmpty
@@ -283,7 +297,10 @@ class _ModeEditorState extends State<_ModeEditor> {
                 const _SectionTitle('Categories shown'),
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('All categories', style: contentTitleStyle),
+                  title: Text(
+                    'All categories',
+                    style: contentTitleStyle.copyWith(color: colors.onSurface),
+                  ),
                   value: _showAllCategories,
                   onChanged: (value) => setState(() {
                     _showAllCategories = value;
@@ -336,7 +353,7 @@ class _ModeEditorState extends State<_ModeEditor> {
                 DropdownButtonFormField<String>(
                   isExpanded: true,
                   initialValue: _preferredCategory,
-                  decoration: _field('Preferred category'),
+                  decoration: _field('Preferred category', colors),
                   hint: const Text('No preference'),
                   items: [
                     const DropdownMenuItem(child: Text('No preference')),
@@ -351,11 +368,13 @@ class _ModeEditorState extends State<_ModeEditor> {
                     _dirty = true;
                   }),
                 ),
-                const Padding(
-                  padding: EdgeInsetsDirectional.only(start: 2, top: 6),
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 2, top: 6),
                   child: Text(
                     'Default category for new captures.',
-                    style: contentMetadataStyle,
+                    style: contentMetadataStyle.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 if (widget.mode != null) ...[
@@ -379,20 +398,20 @@ class _ModeEditorState extends State<_ModeEditor> {
     );
   }
 
-  InputDecoration _field(String label) => InputDecoration(
+  InputDecoration _field(String label, ColorScheme colors) => InputDecoration(
     labelText: label,
-    labelStyle: const TextStyle(color: muted),
+    labelStyle: TextStyle(color: colors.onSurfaceVariant),
     floatingLabelBehavior: FloatingLabelBehavior.always,
     filled: true,
-    fillColor: raisedPaper,
+    fillColor: colors.surfaceContainerLow,
     border: const OutlineInputBorder(borderRadius: _fieldRadius),
-    enabledBorder: const OutlineInputBorder(
+    enabledBorder: OutlineInputBorder(
       borderRadius: _fieldRadius,
-      borderSide: BorderSide(color: line),
+      borderSide: BorderSide(color: colors.outline),
     ),
-    focusedBorder: const OutlineInputBorder(
+    focusedBorder: OutlineInputBorder(
       borderRadius: _fieldRadius,
-      borderSide: BorderSide(color: accent, width: 1.5),
+      borderSide: BorderSide(color: colors.primary, width: 1.5),
     ),
   );
 }
@@ -411,15 +430,22 @@ class _ModeFilter extends StatelessWidget {
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) => FilterChip(
-    label: Text(label),
-    selected: selected,
-    selectedColor: softAccent,
-    checkmarkColor: accent,
-    shape: contentControlShape,
-    side: BorderSide(color: selected ? accent.withValues(alpha: .38) : line),
-    onSelected: onChanged,
-  );
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      selectedColor: colors.primaryContainer,
+      checkmarkColor: colors.onPrimaryContainer,
+      shape: contentControlShape,
+      side: BorderSide(
+        color: selected
+            ? colors.primary.withValues(alpha: .38)
+            : colors.outline,
+      ),
+      onSelected: onChanged,
+    );
+  }
 }
 
 class _ColorChoices extends StatelessWidget {
@@ -475,7 +501,12 @@ class _SectionTitle extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 8),
     child: Semantics(
       header: true,
-      child: Text(label, style: sectionHeadingStyle),
+      child: Text(
+        label,
+        style: sectionHeadingStyle.copyWith(
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
+      ),
     ),
   );
 }
@@ -493,16 +524,18 @@ class _ModePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final width = MediaQuery.sizeOf(context).width;
     final inset = width < 360 ? 16.0 : (width < 720 ? 22.0 : 32.0);
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
         titleTextStyle: contentTitleStyle.copyWith(
+          color: colors.onSurface,
           fontSize: 19,
           fontWeight: FontWeight.w700,
         ),
-        backgroundColor: paper,
+        backgroundColor: colors.surface,
         surfaceTintColor: Colors.transparent,
         titleSpacing: 2,
       ),

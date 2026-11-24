@@ -49,7 +49,14 @@ Override the in-app name when running or building.
 flutter run -d linux --dart-define=APP_NAME='My Workspace'
 ```
 
-Platform launcher labels are in the Android manifest, Apple runner settings, Linux runner, and Web manifest. Keep the installed app’s bundle identifiers when changing its display name so the operating system can retain its data. [App entry point](lib/main.dart)
+Use the display-name tool to update the default in-app name and the platform labels in a local checkout. It preserves the identifiers that tie an installed app to its data.
+
+```sh
+python3 tool/set_display_name.py --dry-run 'My Workspace'
+python3 tool/set_display_name.py 'My Workspace'
+```
+
+[Display-name tool](tool/set_display_name.py)
 
 ## Verification
 
