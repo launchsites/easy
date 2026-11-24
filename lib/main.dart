@@ -19,6 +19,7 @@ import 'ai/ai_device_state.dart';
 import 'ai/ai_linux_credential_vault.dart';
 import 'ai/ai_runtime.dart';
 import 'ai/ai_settings_page.dart';
+import 'ai/automatic_estimate_order.dart';
 import 'ai/duration_evidence_estimate.dart';
 import 'ai/task_estimates_page.dart';
 import 'ai/vision/vision_image.dart';
@@ -136,6 +137,7 @@ part 'workspace_automation.dart';
 part 'workspace_apple_access.dart';
 part 'workspace_task_completion.dart';
 part 'workspace_review_availability.dart';
+part 'workspace_automatic_estimates.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -369,6 +371,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   final _aiViewChanges = ValueNotifier(0);
   Timer? _estimateTimer;
   int? _lastEstimateCheck;
+  Object? _rankedEstimateKey;
+  List<TaskItem>? _rankedEstimateTasks;
+  var _rankingEstimateTasks = false;
   DateTime _lastWorkspaceInput = DateTime.now();
   int _taskHistoryRevision = 0;
   Object? _taskHistoryCacheKey;
@@ -498,6 +503,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _savedWorkspace = data;
       _contentRevision++;
       _taskHistoryRevision++;
+      _rankedEstimateKey = null;
+      _rankedEstimateTasks = null;
       _gymSessions = _savedGymSessions = sessions;
       _workoutPlans = _savedWorkoutPlans = plans;
       _inspected = null;
@@ -1246,22 +1253,8 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
 
   Future<void> _runAutomaticEstimate() async {
     final runtime = _ai;
-    if (!mounted ||
-        _loading ||
-        _reviewSaving ||
-        _reviewingMealPhoto ||
-        runtime == null ||
-        runtime.busy ||
-        !_allows(EasyFeature.ai) ||
-        !runtime.settings.automaticEstimates ||
-        !identical(_savedWorkspace, _data) ||
-        ModalRoute.of(context)?.isCurrent != true) {
-      return;
-    }
+    if (runtime == null || !_idleForAutomaticEstimates(runtime)) return;
     final now = DateTime.now();
-    if (now.difference(_lastWorkspaceInput) < const Duration(seconds: 25)) {
-      return;
-    }
     final pulse =
         now.millisecondsSinceEpoch ~/ (2 * Duration.millisecondsPerMinute);
     if (pulse == _lastEstimateCheck) return;
@@ -1271,40 +1264,25 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       return;
     }
     if (_needsEstimateHistory && !await _prepareTaskHistory()) return;
-    if (!mounted ||
-        !identical(_savedWorkspace, _data) ||
-        ModalRoute.of(context)?.isCurrent != true ||
-        DateTime.now().difference(_lastWorkspaceInput) <
-            const Duration(seconds: 25) ||
-        runtime.busy) {
-      return;
-    }
+    if (!_idleForAutomaticEstimates(runtime)) return;
     if (runtime.pendingEstimates.length >= 32) {
       await runtime.discardObsoleteEstimates(_estimateRevision);
-      if (!mounted ||
-          !identical(_savedWorkspace, _data) ||
-          ModalRoute.of(context)?.isCurrent != true) {
-        return;
-      }
+      if (!_idleForAutomaticEstimates(runtime)) return;
     }
     if (!runtime.automaticEstimateOpportunity) return;
-    final candidates =
-        _data.tasks
-            .where((task) => !task.done && task.estimatedMinutes == null)
-            .toList()
-          ..sort((first, second) {
-            final a = first.dueAt ?? first.date;
-            final b = second.dueAt ?? second.date;
-            if (a != null && b != null) {
-              final order = a.compareTo(b);
-              if (order != 0) return order;
-            }
-            if ((a == null) != (b == null)) return a == null ? 1 : -1;
-            final priority = (second.priority ?? TaskPriority.normal).index
-                .compareTo((first.priority ?? TaskPriority.normal).index);
-            return priority == 0 ? first.id.compareTo(second.id) : priority;
-          });
+    final key = _estimateCandidateOrderKey;
+    final candidates = await _rankEstimateTasks(runtime);
+    bool stillCurrent() =>
+        _idleForAutomaticEstimates(runtime) &&
+        runtime.automaticEstimateOpportunity &&
+        _estimateCandidateOrderKey == key;
+    if (candidates == null || !stillCurrent()) return;
+    var inspected = 0;
     for (final task in candidates) {
+      if (++inspected % 128 == 0) {
+        await Future<void>.delayed(Duration.zero);
+        if (!stillCurrent()) return;
+      }
       final candidate = _estimateCandidate(task);
       if (candidate != null && runtime.canAutomaticallyEstimate(candidate)) {
         await runtime.runAutomaticEstimate(
@@ -2464,6 +2442,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       data.sections[recurringTasksSection],
       _data.sections[recurringTasksSection],
     );
+    if (taskSeriesChanged || !identical(data.tasks, _data.tasks)) {
+      _rankedEstimateKey = null;
+      _rankedEstimateTasks = null;
+    }
     if (!identical(data.tasks, _data.tasks) ||
         !identical(data.events, _data.events) ||
         !identical(data.notes, _data.notes) ||
