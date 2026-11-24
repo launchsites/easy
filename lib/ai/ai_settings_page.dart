@@ -129,6 +129,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _metadata = false;
   bool _confirmLocal = true;
   bool _localCaptureJsonSchema = false;
+  bool _localEstimateRanges = false;
   bool _estimates = false;
   bool _automatic = false;
   bool _adaptive = false;
@@ -181,6 +182,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       _metadata = settings.includeOptionalMetadata;
       _confirmLocal = settings.confirmLocal;
       _localCaptureJsonSchema = settings.localCaptureJsonSchema;
+      _localEstimateRanges = settings.localEstimateRanges;
       _estimates = settings.allowEstimates;
       _automatic = settings.automaticEstimates;
       _adaptive = settings.adaptiveEstimatePacing;
@@ -213,6 +215,10 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       _route = route;
       _error = null;
     });
+  }
+
+  void _resetLocalEstimateRanges() {
+    if (_localEstimateRanges) setState(() => _localEstimateRanges = false);
   }
 
   Future<void> _save() async {
@@ -268,6 +274,9 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       localCaptureJsonSchema: local
           ? _localCaptureJsonSchema
           : prior.localCaptureJsonSchema,
+      localEstimateRanges: local
+          ? _localEstimateRanges
+          : prior.localEstimateRanges,
       monthlyCapMicros: cap,
       inputMicrosPerMillion: inputRate,
       outputMicrosPerMillion: outputRate,
@@ -446,7 +455,9 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             controller: api ? _apiUrl : _localUrl,
             keyboardType: TextInputType.url,
             autocorrect: false,
-            onChanged: api ? (_) => setState(() {}) : null,
+            onChanged: api
+                ? (_) => setState(() {})
+                : (_) => _resetLocalEstimateRanges(),
             decoration: InputDecoration(
               labelText: 'Base URL',
               hintText: api
@@ -458,6 +469,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           TextField(
             controller: api ? _apiModel : _localModel,
             autocorrect: false,
+            onChanged: local ? (_) => _resetLocalEstimateRanges() : null,
             decoration: const InputDecoration(labelText: 'Model'),
           ),
         ],
@@ -582,6 +594,16 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             if (!value) _automatic = false;
           }),
         ),
+        if (_estimates && local)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _localEstimateRanges,
+            title: const Text('Suggest duration ranges'),
+            subtitle: const Text(
+              'Use with a local model that can return a structured range',
+            ),
+            onChanged: (value) => setState(() => _localEstimateRanges = value),
+          ),
         if (_estimates && (api || local))
           SwitchListTile(
             contentPadding: EdgeInsets.zero,

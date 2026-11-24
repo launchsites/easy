@@ -68,6 +68,7 @@ class AiRuntimeSettings {
     this.localBaseUrl = 'http://127.0.0.1:11434/v1',
     this.localModel = '',
     this.localCaptureJsonSchema = false,
+    this.localEstimateRanges = false,
     this.monthlyCapMicros = 0,
     this.inputMicrosPerMillion,
     this.outputMicrosPerMillion,
@@ -89,6 +90,7 @@ class AiRuntimeSettings {
   final String localBaseUrl;
   final String localModel;
   final bool localCaptureJsonSchema;
+  final bool localEstimateRanges;
   final int monthlyCapMicros;
   final int? inputMicrosPerMillion;
   final int? outputMicrosPerMillion;
@@ -216,6 +218,7 @@ class AiRuntimeSettings {
     'localBaseUrl': localBaseUrl.trim(),
     'localModel': localModel.trim(),
     'localCaptureJsonSchema': localCaptureJsonSchema,
+    'localEstimateRanges': localEstimateRanges,
     'monthlyCapMicros': monthlyCapMicros,
     'inputMicrosPerMillion': inputMicrosPerMillion,
     'outputMicrosPerMillion': outputMicrosPerMillion,
@@ -240,6 +243,7 @@ class AiRuntimeSettings {
     localBaseUrl: values['localBaseUrl'] as String,
     localModel: values['localModel'] as String,
     localCaptureJsonSchema: values['localCaptureJsonSchema'] as bool? ?? false,
+    localEstimateRanges: values['localEstimateRanges'] as bool? ?? false,
     monthlyCapMicros: values['monthlyCapMicros'] as int,
     inputMicrosPerMillion: values['inputMicrosPerMillion'] as int?,
     outputMicrosPerMillion: values['outputMicrosPerMillion'] as int?,

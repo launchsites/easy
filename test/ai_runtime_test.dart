@@ -817,7 +817,12 @@ void main() {
         );
         addTearDown(runtime.dispose);
         await runtime.saveSettings(
-          _paid(cap: cap, automatic: true, adaptive: adaptive),
+          _paid(
+            cap: cap,
+            automatic: true,
+            adaptive: adaptive,
+            localEstimateRanges: true,
+          ),
           apiKey: _testKey,
           authorizeAutomatic: (_) async => true,
         );
@@ -1296,10 +1301,12 @@ AiRuntimeSettings _paid({
   bool metadata = false,
   int maxInputTokens = 8192,
   int maxOutputTokens = 512,
+  bool localEstimateRanges = false,
 }) => AiRuntimeSettings(
   route: AiRoute.api,
   apiBaseUrl: endpoint,
   apiModel: model,
+  localEstimateRanges: localEstimateRanges,
   monthlyCapMicros: cap,
   inputMicrosPerMillion: 1000000,
   outputMicrosPerMillion: 2000000,

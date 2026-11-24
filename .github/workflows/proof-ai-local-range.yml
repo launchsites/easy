@@ -1,0 +1,42 @@
+name: Local estimate range proof
+
+on:
+  push:
+    branches: [codex/local-estimate-ranges-proof]
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  DART_SUPPRESS_ANALYTICS: 'true'
+
+jobs:
+  focused:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out the candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - run: bash .github/scripts/bootstrap-flutter.sh
+      - run: flutter pub get --enforce-lockfile
+      - name: Format and inspect the changed Dart files
+        run: |
+          dart format \
+            lib/ai/ai_runtime_settings.dart \
+            lib/ai/ai_settings_page.dart \
+            lib/ai/ai_runtime.dart \
+            test/ai_runtime_settings_schema_test.dart \
+            test/ai_runtime_test.dart \
+            test/ai_local_estimate_ranges_test.dart
+          git diff --check
+          git diff
+      - run: flutter analyze --no-pub
+      - name: Run the AI verification suites
+        run: |
+          flutter test --no-pub --concurrency=2 test/ai_*_test.dart \
+            test/duration_evidence_estimate_test.dart \
+            test/automatic_estimate_order_test.dart
