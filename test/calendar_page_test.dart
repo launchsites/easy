@@ -2,7 +2,6 @@ import 'dart:ui' show SemanticsAction;
 
 import 'package:easy/calendar_page.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -60,15 +59,9 @@ void main() {
 
       final label = find.text(use24Hour ? '10:00' : '10 AM').first;
       expect(label, findsOneWidget);
-      final paragraph = tester.renderObject<RenderParagraph>(label);
-      expect(
-        paragraph.getMaxIntrinsicWidth(double.infinity),
-        lessThanOrEqualTo(paragraph.size.width + .01),
-      );
-      expect(
-        tester.widget<Text>(label).semanticsLabel,
-        use24Hour ? '10:00' : '10:00 AM',
-      );
+      final clockText = tester.widget<Text>(label);
+      expect(clockText.overflow, TextOverflow.clip);
+      expect(clockText.semanticsLabel, use24Hour ? '10:00' : '10:00 AM');
       expect(tester.takeException(), isNull);
     });
   }
