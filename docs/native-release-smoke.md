@@ -62,6 +62,15 @@ The same Linux release opened a synthetic `.ics` file through GTK at 390×844 wh
 
 After removing the original file and restarting, Today showed the first occurrence. Swiping through Calendar showed the override on day two and the original series title on day three. The workspace digest stayed the same. To repeat the check with the offline launcher above, open Settings, Calendar files, and Import or export events. Choose a test calendar with a short recurring series and a standalone event, clear the standalone event, and import. Open the imported calendar under Calendar files to export it. [Verification report](benchmark-results/native-calendar-transfer-d1ac727-epyc-20261124.json)
 
+The `6f18fe9` release repeated the transfer after a cancelled chooser and two rejected files. Cancelling, selecting an incomplete calendar, and choosing a file one byte above 4 MiB each left the same SQLite revision. The valid file still imported and exported after those attempts. Vertical wheel input advanced to the next date and scrolled back, and horizontal swipes then reached the next two dates. The exception occurrence stayed visible on the right day and the workspace digest stayed the same. [Calendar navigation report](benchmark-results/native-calendar-navigation-6f18fe9-20261124.json)
+
+```sh
+python3 tool/benchmark/native_calendar_transfer.py \
+  --binary build/linux/x64/release/bundle/easy \
+  --app-revision "$(git rev-parse HEAD)" \
+  --deny-ip /tmp/easy-deny-ip-sockets --output "$(mktemp -d)"
+```
+
 ## A day across Focus modes
 
 The extracted `12730c8` archive passed 37 visual checkpoints in one compact, offline profile. Today showed the note, upcoming events, and due tasks. The navigation hold opened Calendar. The three-step event input rejected an end equal to the start without saving and committed one 14:00–14:45 appointment for the next day. During the Gym workout, one reviewed capture kept the original targets, logged a stretch and the completed sets, and saved a Work task. Health opened from Gym and saved a fixture photo and a measured 150 g portion. After a forced process exit and removal of the original photo, the Work task, swiped calendar appointment, active workout, and managed photo reopened. SQLite stayed at revision 6 with the same document checksum. [Journey report](benchmark-results/native-persona-journey-12730c8-epyc-20261124.json)
