@@ -1,0 +1,34 @@
+name: Compact mobile Calendar clock proof
+on:
+  push:
+    branches: [codex/compact-calendar-clock-proof]
+permissions:
+  contents: read
+env:
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+  DART_SUPPRESS_ANALYTICS: 'true'
+jobs:
+  calendar-clock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - name: Set up the locked SDK and dependencies
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash .github/scripts/bootstrap-flutter.sh
+          flutter pub get --enforce-lockfile
+          git diff --exit-code -- pubspec.lock
+      - name: Check formatting and static analysis
+        run: |
+          dart format lib/calendar_page.dart test/calendar_page_test.dart
+          git diff -- lib/calendar_page.dart test/calendar_page_test.dart
+          flutter analyze --no-pub
+      - name: Check clock format, layout, navigation and DST
+        run: |
+          for tz in Europe/London America/New_York Australia/Lord_Howe; do
+            TZ="$tz" flutter test --no-pub --concurrency=2 \
+              test/calendar_page_test.dart test/calendar_timeline_traversal_test.dart
+          done

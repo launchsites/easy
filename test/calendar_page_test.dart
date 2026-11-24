@@ -42,6 +42,29 @@ void main() {
     );
   }
 
+  for (final use24Hour in [false, true]) {
+    testWidgets('Mobile hour gutter preserves the $use24Hour 24-hour setting', (
+      tester,
+    ) async {
+      final date = DateTime(2026, 11, 24);
+      await _mountCalendar(
+        tester,
+        width: 320,
+        date: date,
+        events: [_event('Calendar appointment', date, 10, 15, 45)],
+        use24Hour: use24Hour,
+      );
+
+      final label = find.text(use24Hour ? '10:00' : '10 AM').hitTestable();
+      expect(label, findsOneWidget);
+      expect(
+        tester.widget<Text>(label).semanticsLabel,
+        use24Hour ? '10:00' : '10:00 AM',
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('Mobile day swipes keep the visible clock time', (tester) async {
     final date = DateTime(2024, 3, 8);
     final nextDay = DateTime(2024, 3, 9);
@@ -328,10 +351,10 @@ void main() {
           closeTo(tester.getSize(_card(guide.title)).height, .5),
         );
         if (hours == 23) {
-          expect(find.text('2:00 AM').hitTestable(), findsNothing);
+          expect(find.text('2 AM').hitTestable(), findsNothing);
         } else {
-          expect(find.text('1:00 AM\nEDT').hitTestable(), findsOneWidget);
-          expect(find.text('1:00 AM\nEST').hitTestable(), findsOneWidget);
+          expect(find.text('1 AM\nEDT').hitTestable(), findsOneWidget);
+          expect(find.text('1 AM\nEST').hitTestable(), findsOneWidget);
         }
         for (final label in [
           'Day',
@@ -470,7 +493,7 @@ void main() {
       await tester.pumpAndSettle();
       await _wheel(tester, -400);
       expect(find.text('1:30 AM').hitTestable(), findsOneWidget);
-      expect(find.text('2:00 AM').hitTestable(), findsOneWidget);
+      expect(find.text('2 AM').hitTestable(), findsOneWidget);
       final span = find.byTooltip(
         'Half-hour change, 1:55 AM UTC+11:00 – 2:24 AM UTC+10:30',
       );
@@ -525,6 +548,7 @@ Future<ValueNotifier<DateTime>> _mountCalendar(
   required DateTime date,
   required List<CalendarEvent> events,
   double textScale = 1,
+  bool use24Hour = false,
   ValueChanged<CalendarEvent>? onEventTap,
 }) async {
   tester.view.physicalSize = Size(width, 844);
@@ -536,8 +560,10 @@ Future<ValueNotifier<DateTime>> _mountCalendar(
   await tester.pumpWidget(
     MaterialApp(
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context)
-            .copyWith(textScaler: TextScaler.linear(textScale)),
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.linear(textScale),
+          alwaysUse24HourFormat: use24Hour,
+        ),
         child: child!,
       ),
       home: Scaffold(

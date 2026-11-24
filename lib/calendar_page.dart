@@ -412,24 +412,11 @@ class _CalendarPageState extends State<CalendarPage> {
                           left: 0,
                           right: multiDay ? 10 : 8,
                           top: ruler.offset(mark.minute) + 5,
-                          child: Text(
-                            mark.repeatedAt == null
-                                ? _time(context, mark.time)
-                                : '${_time(context, mark.time)}\n${mark.repeatedAt!.timeZoneName}',
-                            semanticsLabel: mark.repeatedAt == null
-                                ? null
-                                : '${_time(context, mark.time)}, '
-                                      '${_utcOffset(mark.repeatedAt!.timeZoneOffset)}',
-                            textAlign: TextAlign.right,
-                            maxLines: mark.repeatedAt == null ? null : 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: colors.muted,
-                              fontSize: 11,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
+                          child: _timelineTick(
+                            context,
+                            colors,
+                            mark,
+                            compact: !multiDay,
                           ),
                         ),
                     ],
@@ -883,6 +870,54 @@ String _time(BuildContext context, TimeOfDay time) =>
       time,
       alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
     );
+
+Widget _timelineTick(
+  BuildContext context,
+  _CalendarColors colors,
+  _TimelineMark mark, {
+  required bool compact,
+}) {
+  final fullTime = _time(context, mark.time);
+  final visibleTime = compact ? _mobileAxisTime(context, mark.time, fullTime) : fullTime;
+  final repeated = mark.repeatedAt;
+  return Text(
+    repeated == null ? visibleTime : '$visibleTime\n${repeated.timeZoneName}',
+    semanticsLabel: repeated == null
+        ? compact ? fullTime : null
+        : '$fullTime, ${_utcOffset(repeated.timeZoneOffset)}',
+    textAlign: TextAlign.right,
+    maxLines: repeated == null ? null : 2,
+    overflow: TextOverflow.ellipsis,
+    style: TextStyle(
+      color: colors.muted,
+      fontSize: 11,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    ),
+  );
+}
+
+String _mobileAxisTime(
+  BuildContext context,
+  TimeOfDay time,
+  String fullTime,
+) {
+  if (time.minute != 0 || MediaQuery.alwaysUse24HourFormatOf(context)) {
+    return fullTime;
+  }
+  final localizations = MaterialLocalizations.of(context);
+  final format = localizations.timeOfDayFormat();
+  if (format != TimeOfDayFormat.h_colon_mm_space_a &&
+      format != TimeOfDayFormat.a_space_h_colon_mm) {
+    return fullTime;
+  }
+  final hour = localizations.formatHour(time);
+  final period = time.period == DayPeriod.am
+      ? localizations.anteMeridiemAbbreviation
+      : localizations.postMeridiemAbbreviation;
+  return format == TimeOfDayFormat.h_colon_mm_space_a
+      ? '$hour $period'
+      : '$period $hour';
+}
 
 String _utcOffset(Duration offset) {
   final sign = offset.isNegative ? '−' : '+';
