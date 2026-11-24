@@ -19,6 +19,7 @@ import 'ai/ai_device_state.dart';
 import 'ai/ai_linux_credential_vault.dart';
 import 'ai/ai_runtime.dart';
 import 'ai/ai_settings_page.dart';
+import 'ai/duration_evidence_estimate.dart';
 import 'ai/task_estimates_page.dart';
 import 'ai/vision/vision_image.dart';
 import 'calendar_page.dart';
@@ -1197,7 +1198,9 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       return null;
     }
     if (_needsEstimateHistory && !_taskHistoryReady) return null;
-    final history = _needsEstimateHistory ? _timingFor(task)?.duration : null;
+    final history = _needsEstimateHistory
+        ? _providerDurationHistoryFor(task)
+        : null;
     final samples = history?.compatibleMinutes ?? const <int>[];
     return AiEnrichmentCandidate(
       taskId: task.id,
@@ -4127,7 +4130,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }
     final revision = _contentRevision;
     final historyKey = _taskHistoryKey;
-    final history = _timingFor(task)?.duration;
+    final history = _providerDurationHistoryFor(task);
     final scope = CaptureInput(
       id: 'estimate:${task.id}',
       revision: revision,

@@ -9,9 +9,16 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
-  testWidgets(
-    'recorded task history offers an explicit local median estimate',
-    (tester) async {
+  const title = 'Review today’s drawings';
+  for (final (description, priorTitle, daysAgo, canUse) in [
+    ('recent exact work', title, [2, 3, 4], true),
+    ('category-only work', 'Review the mockups', [2, 3, 4], false),
+    ('an isolated exact observation', title, [2], false),
+    ('older exact work', title, [93, 94, 95], false),
+  ]) {
+    testWidgets('timing history shows $description with a grounded action', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(1440, 900);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -22,20 +29,40 @@ void main() {
       addTearDown(() => SharedPreferencesAsyncPlatform.instance = platform);
 
       final today = dateOnly(DateTime.now());
-      final start = plusDays(today, -2).add(const Duration(hours: 10));
-      final end = start.add(const Duration(minutes: 34));
-      const title = 'Review today’s drawings';
+      final history = <TaskItem>[];
+      final records = <ActivityRecord>[];
+      for (final (index, days) in daysAgo.indexed) {
+        final start = plusDays(today, -days).add(const Duration(hours: 10));
+        final end = start.add(Duration(minutes: 30 + 4 * index));
+        final prior = TaskItem(
+          id: 'old-review-$index',
+          title: priorTitle,
+          category: 'work',
+          done: true,
+          completedAt: end,
+        );
+        history.add(prior);
+        records.add(
+          ActivityRecord(
+            id: 'linked-$index',
+            title: prior.title,
+            category: prior.category,
+            target: ActivityTarget(
+              id: prior.id,
+              title: prior.title,
+              category: prior.category,
+              kind: ActivityTargetKind.task,
+            ),
+            spans: [ActivitySpan(start: start, end: end)],
+            finishedAt: end,
+          ),
+        );
+      }
       final workspace = WorkspaceData(
         events: [],
         notes: [],
         tasks: [
-          TaskItem(
-            id: 'old-review',
-            title: 'Review the mockups',
-            category: 'work',
-            done: true,
-            completedAt: end,
-          ),
+          ...history,
           TaskItem(
             id: 'new-review',
             title: title,
@@ -43,25 +70,7 @@ void main() {
             date: today,
           ),
         ],
-        sections: {
-          'activities': ActivityData(
-            records: [
-              ActivityRecord(
-                id: 'linked',
-                title: 'Review the mockups',
-                category: 'work',
-                target: const ActivityTarget(
-                  id: 'old-review',
-                  title: 'Review the mockups',
-                  category: 'work',
-                  kind: ActivityTargetKind.task,
-                ),
-              spans: [ActivitySpan(start: start, end: end)],
-                finishedAt: end,
-              ),
-            ],
-          ).toJson(),
-        },
+        sections: {'activities': ActivityData(records: records).toJson()},
       );
       late WorkspaceStore store;
       await tester.pumpWidget(
@@ -83,9 +92,13 @@ void main() {
       await tester.tap(find.text(title));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Timing history'));
+      final expectedMedian = daysAgo.length == 1 ? 30 : 34;
+      final observation = find.text(
+        '$expectedMedian min median · ${daysAgo.length} observed',
+      );
       for (
         var attempt = 0;
-        attempt < 100 && find.text('Use median estimate').evaluate().isEmpty;
+        attempt < 100 && observation.evaluate().isEmpty;
         attempt++
       ) {
         await tester.pump(const Duration(milliseconds: 20));
@@ -94,16 +107,32 @@ void main() {
         );
       }
       await tester.pumpAndSettle();
-      expect(find.text('Same category'), findsOneWidget);
-      expect(find.text('34 min median · 1 observed'), findsOneWidget);
-      expect((await store.read()).revision, original.revision);
-      await tester.tap(find.text('Use median estimate'));
-      await tester.pumpAndSettle();
-      final changed = WorkspaceData.decode(
-        (await store.read()).snapshot.workspaceJson,
+      expect(observation, findsOneWidget);
+      expect(
+        find.text(
+          priorTitle == title
+              ? 'Same task title and category'
+              : 'Same category',
+        ),
+        findsOneWidget,
       );
-      expect(changed.tasks.last.estimatedMinutes, 34);
+      expect((await store.read()).revision, original.revision);
+      final useEstimate = find.text('Use median estimate');
+      if (canUse) {
+        await tester.tap(useEstimate);
+      } else {
+        expect(useEstimate, findsNothing);
+        await tester.tap(find.text('Close'));
+      }
+      await tester.pumpAndSettle();
+      final saved = await store.read();
+      final changed = WorkspaceData.decode(saved.snapshot.workspaceJson);
+      expect(saved.revision, original.revision + (canUse ? 1 : 0));
+      expect(
+        changed.tasks.last.estimatedMinutes,
+        canUse ? expectedMedian : null,
+      );
       expect(changed.tasks.last.done, isFalse);
-    },
-  );
+    });
+  }
 }

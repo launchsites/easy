@@ -113,6 +113,11 @@ extension _WorkspaceTaskContext on _WorkspaceState {
     );
   }
 
+  TaskDurationEvidence? _providerDurationHistoryFor(TaskItem task) {
+    final history = _timingFor(task)?.duration;
+    return estimateFromConfirmedHistory(history) == null ? null : history;
+  }
+
   bool _canSeeTaskTiming(Object? record) =>
       record is TaskItem && _hasTaskHistory;
 
@@ -127,11 +132,9 @@ extension _WorkspaceTaskContext on _WorkspaceState {
     final duration = observed?.duration;
     final exact = observed?.exactElapsed;
     final recurrence = observed?.recurrence;
-    final minutes = duration?.median.inMinutes;
+    final minutes = estimateFromConfirmedHistory(duration)?.duration.inMinutes;
     final canUse =
         minutes != null &&
-        minutes >= 1 &&
-        minutes <= 1440 &&
         !task.done &&
         task.estimatedMinutes == null &&
         _repeatingTask(task) == null &&
