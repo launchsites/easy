@@ -4,6 +4,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'ui_theme.dart' show accent, ink, line, paper, shell;
+
 class OrbitDestination {
   const OrbitDestination(this.label, this.icon);
 
@@ -29,19 +31,13 @@ class OrbitNavigation extends StatefulWidget {
 
 class _OrbitNavigationState extends State<OrbitNavigation> {
   static const _holdDuration = Duration(milliseconds: 320);
+  static const _revealDuration = Duration(milliseconds: 140);
   static const _edgeInset = 20.0;
   static const _launcherSize = 56.0;
-  static const _destinationSize = 56.0;
   static const _deadZone = 32.0;
   static const _firstAngle = -88 * math.pi / 180;
   static const _lastAngle = -10 * math.pi / 180;
   static const _edgeTolerance = 18 * math.pi / 180;
-
-  static const _ink = Color(0xFF1B201E);
-  static const _accent = Color(0xFF466955);
-  static const _paper = Color(0xFFFAF9F6);
-  static const _selectedPaper = Color(0xFFE5EDE5);
-  static const _border = Color(0xFFDADFD9);
 
   final _launcherKey = GlobalKey();
   final _launcherFocus = FocusNode(debugLabel: 'Navigation launcher');
@@ -154,7 +150,7 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
     }
   }
 
-  Widget _buildLauncher(double bottom) {
+  Widget _buildLauncher(double bottom, Duration motion) {
     return Positioned(
       key: const ValueKey('orbit-launcher'),
       left: _edgeInset,
@@ -187,11 +183,17 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
                 focusNode: _launcherFocus,
                 onPressed: _toggle,
                 style: IconButton.styleFrom(
-                  backgroundColor: _ink,
-                  foregroundColor: _paper,
+                  backgroundColor: shell,
+                  foregroundColor: paper,
+                  overlayColor: Colors.white,
+                  elevation: 2,
+                  shadowColor: shell.withValues(alpha: 0.24),
+                  animationDuration: motion,
+                  shape: const CircleBorder(),
                 ),
                 icon: Icon(
-                  _isOpen ? Icons.close_rounded : Icons.explore_outlined,
+                  _isOpen ? Icons.close_rounded : Icons.grid_view_rounded,
+                  size: 22,
                 ),
               ),
             ),
@@ -201,56 +203,80 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
     );
   }
 
-  Widget _buildDestination(int index, double bottom, double radius) {
+  Widget _buildDestination(
+    int index,
+    double bottom,
+    double radius,
+    double size,
+    Duration motion,
+  ) {
     final destination = widget.destinations[index];
     final angle = _angleFor(index);
     final isCurrent = widget.selectedIndex == index;
     final isHighlighted = _highlightedIndex == index;
     final background = isHighlighted
-        ? _accent
+        ? accent
         : isCurrent
-        ? _selectedPaper
-        : _paper;
-    final foreground = isHighlighted ? _paper : _ink;
-    final border = isHighlighted || isCurrent ? _accent : _border;
-    final centerOffset = (_launcherSize - _destinationSize) / 2;
+        ? Color.lerp(paper, accent, 0.10)!
+        : paper;
+    final foreground = isHighlighted
+        ? Colors.white
+        : (isCurrent ? accent : ink);
+    final border = isHighlighted
+        ? accent
+        : (isCurrent ? accent.withValues(alpha: 0.42) : line);
+    final centerOffset = (_launcherSize - size) / 2;
+    final button = Semantics(
+      selected: isCurrent,
+      child: TextButton(
+        onPressed: () => _select(index),
+        style: TextButton.styleFrom(
+          backgroundColor: background,
+          foregroundColor: foreground,
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: const CircleBorder(),
+          side: BorderSide(color: border),
+          elevation: isHighlighted ? 3 : 1,
+          shadowColor: shell.withValues(alpha: 0.24),
+          animationDuration: motion,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(destination.icon, size: 20, color: foreground),
+            const SizedBox(height: 3),
+            Flexible(
+              child: Text(
+                destination.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.16,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
 
     return Positioned(
-      key: ValueKey(destination.label),
+      key: ValueKey(index),
       left: _edgeInset + centerOffset + radius * math.cos(angle),
       bottom: bottom + centerOffset - radius * math.sin(angle),
       child: SizedBox.square(
-        dimension: _destinationSize,
-        child: Semantics(
-          selected: isCurrent,
-          child: TextButton(
-            onPressed: () => _select(index),
-            style: TextButton.styleFrom(
-              backgroundColor: background,
-              foregroundColor: foreground,
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: CircleBorder(side: BorderSide(color: border)),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(destination.icon, size: 19, color: foreground),
-                const SizedBox(height: 2),
-                Flexible(
-                  child: Text(
-                    destination.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        dimension: size,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: _isDragging ? Duration.zero : motion,
+          curve: Curves.easeOutCubic,
+          child: button,
+          builder: (context, opacity, child) =>
+              Opacity(opacity: opacity, child: child),
         ),
       ),
     );
@@ -261,6 +287,9 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
     if (widget.destinations.isEmpty) return const SizedBox.expand();
 
     final bottom = MediaQuery.paddingOf(context).bottom + _edgeInset;
+    final motion = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : _revealDuration;
     return PopScope<Object?>(
       canPop: !_isOpen,
       onPopInvokedWithResult: (didPop, _) {
@@ -277,24 +306,50 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
             },
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final radius = constraints.maxWidth < 360 ? 128.0 : 144.0;
+                final narrow = constraints.maxWidth < 360;
+                final compact =
+                    constraints.maxWidth < 320 ||
+                    constraints.maxHeight - bottom < 190;
+                final size = compact ? 48.0 : (narrow ? 56.0 : 60.0);
+                final idealRadius = compact ? 118.0 : (narrow ? 134.0 : 146.0);
+                final openHeight =
+                    constraints.maxHeight - bottom - (_launcherSize + size) / 2;
+                final radius = math.max(0.0, math.min(idealRadius, openHeight));
+                final center = Offset(
+                  _edgeInset + _launcherSize / 2,
+                  constraints.maxHeight - bottom - _launcherSize / 2,
+                );
                 return Stack(
                   fit: StackFit.expand,
                   children: [
                     if (_isOpen)
                       ModalBarrier(
-                        color: const Color(0x151B201E),
+                        color: shell.withValues(alpha: 0.12),
                         semanticsLabel: 'Close navigation',
                         onDismiss: _dismiss,
                       ),
-                    _buildLauncher(bottom),
+                    if (_isOpen)
+                      IgnorePointer(
+                        child: CustomPaint(
+                          painter: _OrbitTrack(
+                            center: center,
+                            radius: radius,
+                            startAngle: _angleFor(0),
+                            endAngle: _angleFor(widget.destinations.length - 1),
+                            highlightedAngle: _highlightedIndex == null
+                                ? null
+                                : _angleFor(_highlightedIndex!),
+                          ),
+                        ),
+                      ),
+                    _buildLauncher(bottom, motion),
                     if (_isOpen)
                       for (
                         var index = 0;
                         index < widget.destinations.length;
                         index++
                       )
-                        _buildDestination(index, bottom, radius),
+                        _buildDestination(index, bottom, radius, size, motion),
                   ],
                 );
               },
@@ -304,4 +359,54 @@ class _OrbitNavigationState extends State<OrbitNavigation> {
       ),
     );
   }
+}
+
+class _OrbitTrack extends CustomPainter {
+  const _OrbitTrack({
+    required this.center,
+    required this.radius,
+    required this.startAngle,
+    required this.endAngle,
+    required this.highlightedAngle,
+  });
+
+  final Offset center;
+  final double radius;
+  final double startAngle;
+  final double endAngle;
+  final double? highlightedAngle;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final track = Paint()
+      ..color = paper.withValues(alpha: 0.82)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      endAngle - startAngle,
+      false,
+      track,
+    );
+
+    final selected = highlightedAngle;
+    if (selected != null) {
+      canvas.drawLine(
+        center,
+        center + Offset(math.cos(selected), math.sin(selected)) * radius,
+        Paint()
+          ..color = accent.withValues(alpha: 0.56)
+          ..strokeWidth = 1.5,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _OrbitTrack oldDelegate) =>
+      oldDelegate.center != center ||
+      oldDelegate.radius != radius ||
+      oldDelegate.startAngle != startAngle ||
+      oldDelegate.endAngle != endAngle ||
+      oldDelegate.highlightedAngle != highlightedAngle;
 }

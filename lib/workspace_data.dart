@@ -4,14 +4,10 @@ import 'package:material_ui/material_ui.dart';
 
 import 'calendar_page.dart';
 import 'list_pages.dart';
+import 'ui_theme.dart';
 
-const paper = Color(0xfffaf9f6);
-const ink = Color(0xff202521);
-const muted = Color(0xff696e66);
-const line = Color(0xffe9e8e1);
-const accent = Color(0xff466955);
-const shell = Color(0xff171a18);
-const sidebarText = Color(0xffbfc5bc);
+export 'ui_theme.dart';
+
 const spaceColors = <String, Color>{
   'work': Color(0xff4e6c9b),
   'personal': Color(0xff8a6235),
@@ -101,6 +97,13 @@ class WorkspaceData {
       ],
       tasks: [
         TaskItem(
+          id: 'sample-venue',
+          title: 'Send venue options',
+          category: 'work',
+          date: plusDays(today, -1),
+          done: false,
+        ),
+        TaskItem(
           id: 'sample-outline',
           title: 'Send the project outline',
           category: 'work',
@@ -128,6 +131,13 @@ class WorkspaceData {
           date: null,
           done: false,
         ),
+        TaskItem(
+          id: 'sample-notebook',
+          title: 'Order a replacement notebook',
+          category: 'personal',
+          date: plusDays(today, -1),
+          done: true,
+        ),
       ],
       notes: [
         NoteItem(
@@ -141,6 +151,18 @@ class WorkspaceData {
           title: 'Reading list',
           body: 'Start here on the next library visit.\n\n• The Creative Act\n• A Field Guide to Getting Lost\n• The Practice of Everyday Life',
           updated: plusDays(today, -2),
+        ),
+        NoteItem(
+          id: 'sample-weekend-note',
+          title: 'A weekend in Glasgow',
+          body: 'Take the train before lunch. Meet at the bookshop and come back Sunday evening.',
+          updated: plusDays(today, -4),
+        ),
+        NoteItem(
+          id: 'sample-training-note',
+          title: 'Training plan',
+          body: 'Keep the warm-up short and repeatable. Start the next session with the same weight and focus on control.',
+          updated: plusDays(today, -6),
         ),
       ],
     );

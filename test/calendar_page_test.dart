@@ -1,5 +1,8 @@
+import 'dart:ui' show SemanticsAction;
+
 import 'package:easy/calendar_page.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -20,28 +23,20 @@ void main() {
           onEventTap: (event) => opened = event,
         );
 
-        expect(
-          find.byTooltip(width < 720 ? 'Calendar date options' : 'Next week'),
-          findsOneWidget,
-        );
-        if (width >= 720) await _chooseView(tester, CalendarView.day);
+        expect(find.byKey(const ValueKey('calendar-date')), findsOneWidget);
+        for (final control in [
+          'Day',
+          'Week',
+          'Month',
+          'Today',
+          'Previous day',
+          'Next day',
+        ]) {
+          expect(find.text(control), findsNothing);
+        }
         await tester.tap(find.text('Planning meeting'));
         expect(opened, same(meeting));
-
-        await _nextDay(tester);
-        expect(view.value, DateTime(2020, 11, 24));
-
-        await _chooseView(tester, CalendarView.week);
-        expect(find.byTooltip('Next week'), findsOneWidget);
-        await _chooseView(tester, CalendarView.month);
-        await tester.ensureVisible(find.text('Open day'));
-        await tester.tap(find.text('Open day'));
-        await tester.pumpAndSettle();
-        expect(
-          find.byTooltip(width < 720 ? 'Calendar date options' : 'Next day'),
-          findsOneWidget,
-        );
-        expect(view.value, DateTime(2020, 11, 24));
+        expect(view.value, monday);
         expect(tester.takeException(), isNull);
       },
     );
@@ -108,18 +103,71 @@ void main() {
     expect(selected.value, DateTime(2024, 3, 7));
   });
 
-  testWidgets('Mobile date menu opens the date picker', (tester) async {
-    await _mountCalendar(
+  testWidgets('Tapping the mobile date opens the picker directly', (
+    tester,
+  ) async {
+    final selected = await _mountCalendar(
       tester,
       width: 390,
       date: DateTime(2024, 3, 8),
       events: [],
     );
-    await tester.tap(find.byTooltip('Calendar date options'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Jump to date'));
+    await tester.tap(find.byKey(const ValueKey('calendar-date')));
     await tester.pumpAndSettle();
     expect(find.byType(DatePickerDialog), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(DatePickerDialog),
+        matching: find.text('9'),
+      ),
+    );
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(selected.value, DateTime(2024, 3, 9));
+  });
+
+  testWidgets('Date supports accessible navigation without visible controls', (
+    tester,
+  ) async {
+    final monday = DateTime(2020, 11, 23);
+    final selected = await _mountCalendar(
+      tester,
+      width: 390,
+      date: monday,
+      events: [],
+    );
+    final button = tester.getSemantics(
+      find.bySemanticsLabel('Monday, November 23, 2020'),
+    );
+    expect(
+      button.getSemanticsData().hasAction(SemanticsAction.customAction),
+      isTrue,
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(selected.value, DateTime(2020, 11, 24));
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(selected.value, monday);
+  });
+
+  testWidgets('Wide schedule date headings select the displayed day', (
+    tester,
+  ) async {
+    final selected = await _mountCalendar(
+      tester,
+      width: 1110,
+      date: DateTime(2020, 11, 23),
+      events: [],
+    );
+    final headings = find.text('Wed, Nov 25');
+    expect(headings, findsOneWidget);
+    await tester.tap(headings);
+    await tester.pumpAndSettle();
+    expect(selected.value, DateTime(2020, 11, 25));
+    expect(find.text('Wednesday, November 25, 2020'), findsOneWidget);
   });
 
   testWidgets('Adjacent short events stay separate from overlapping events', (
@@ -148,7 +196,7 @@ void main() {
     expect(review.right, lessThan(studio.left));
   });
 
-  testWidgets('Month preview handles dense dates and large text', (
+  testWidgets('Mobile schedule handles busy days and large text', (
     tester,
   ) async {
     final date = DateTime(2020, 11, 23);
@@ -162,11 +210,7 @@ void main() {
           _event('Event $index', date, 9 + index, 0, 30),
       ],
     );
-    await _chooseView(tester, CalendarView.month);
-    expect(
-      find.bySemanticsLabel('Monday, November 23, 2020, 5 events'),
-      findsOneWidget,
-    );
+    expect(find.bySemanticsLabel('Monday, November 23, 2020'), findsOneWidget);
     expect(find.text('Event 4'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -191,33 +235,13 @@ void main() {
       ],
     );
     expect(find.text('Trip'), findsOneWidget);
-    await _nextDay(tester);
+    await tester.dragFrom(const Offset(318, 295), const Offset(-180, 0));
+    await tester.pumpAndSettle();
     expect(find.text('Trip'), findsOneWidget);
-    await _nextDay(tester);
+    await tester.dragFrom(const Offset(318, 295), const Offset(-180, 0));
+    await tester.pumpAndSettle();
     expect(find.text('Trip'), findsNothing);
   });
-}
-
-Future<void> _chooseView(WidgetTester tester, CalendarView view) async {
-  final viewMenu = find.byTooltip('Calendar view');
-  if (viewMenu.evaluate().isNotEmpty) {
-    await tester.tap(viewMenu);
-    await tester.pumpAndSettle();
-  }
-  await tester.tap(find.text(view.label).last);
-  await tester.pumpAndSettle();
-}
-
-Future<void> _nextDay(WidgetTester tester) async {
-  final dateMenu = find.byTooltip('Calendar date options');
-  if (dateMenu.evaluate().isNotEmpty) {
-    await tester.tap(dateMenu);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Next day'));
-  } else {
-    await tester.tap(find.byTooltip('Next day'));
-  }
-  await tester.pumpAndSettle();
 }
 
 CalendarEvent _event(

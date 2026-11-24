@@ -2,8 +2,8 @@
 
 Easy is a local workspace for your calendar, tasks, and notes. It opens with sample entries so you can try the views and interactions right away. New entries and edits are saved on the device.
 
-- **Today** shows the selected day’s schedule and tasks.
-- **Calendar** offers day, week, and month views, with an agenda, date jumping, and event editing. On a phone in Day view, swipe sideways to jump a day or scroll through days vertically.
+- **Today** shows your schedule and tasks for the current day.
+- **Calendar** puts the schedule below a single tappable date. On a phone, swipe sideways to jump a day or scroll through days vertically. Wide windows show the week together.
 - **Tasks** groups open and completed work by date. **Notes** supports search across titles and text.
 - **Mobile navigation** opens from the bottom-left button. Hold, drag toward a destination, and release to switch views. Return to the center before releasing to cancel. You can also tap to open the menu, then tap a destination. The bottom-right plus opens the editor.
 

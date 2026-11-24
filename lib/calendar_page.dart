@@ -1,6 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:flutter/semantics.dart' show CustomSemanticsAction;
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+
+import 'ui_theme.dart' as palette;
+import 'workspace_data.dart' show spaceColor;
 
 class CalendarEvent {
   const CalendarEvent({
@@ -22,27 +27,6 @@ class CalendarEvent {
   final String? location;
 }
 
-enum CalendarView {
-  day('Day'),
-  week('Week'),
-  month('Month');
-
-  const CalendarView(this.label);
-
-  final String label;
-}
-
-enum _MobileDateAction {
-  today('Today'),
-  previous('Previous day'),
-  next('Next day'),
-  jump('Jump to date');
-
-  const _MobileDateAction(this.label);
-
-  final String label;
-}
-
 class CalendarPage extends StatefulWidget {
   const CalendarPage({
     required this.date,
@@ -62,11 +46,6 @@ class CalendarPage extends StatefulWidget {
 }
 
 class _CalendarPageState extends State<CalendarPage> {
-  CalendarView? _selectedView;
-  bool _dayShowsAgenda = false;
-  bool _weekShowsAgenda = false;
-  double _swipeDistance = 0;
-
   DateTime get _date => DateUtils.dateOnly(widget.date);
 
   List<CalendarEvent> _eventsOn(DateTime day) {
@@ -76,26 +55,13 @@ class _CalendarPageState extends State<CalendarPage> {
         return DateUtils.isSameDay(event.start.toLocal(), day);
       }
       return event.start.isBefore(nextDay) && event.end.isAfter(day);
-    }).toList()..sort((first, second) {
-      if (first.allDay != second.allDay) return first.allDay ? -1 : 1;
-      return first.start.compareTo(second.start);
-    });
+    }).toList()..sort((first, second) => first.start.compareTo(second.start));
   }
 
-  void _advance(CalendarView view, int step) {
-    final date = switch (view) {
-      CalendarView.day => DateUtils.addDaysToDate(_date, step),
-      CalendarView.week => DateUtils.addDaysToDate(_date, step * 7),
-      CalendarView.month => _otherMonth(step),
-    };
-    widget.onDateChanged(date);
-  }
+  void _step(int days) =>
+      widget.onDateChanged(DateUtils.addDaysToDate(_date, days));
 
-  DateTime _otherMonth(int step) {
-    final month = DateTime(_date.year, _date.month + step);
-    final lastDay = DateUtils.getDaysInMonth(month.year, month.month);
-    return DateTime(month.year, month.month, math.min(_date.day, lastDay));
-  }
+  void _today() => widget.onDateChanged(DateUtils.dateOnly(DateTime.now()));
 
   Future<void> _jumpToDate() async {
     final date = await showDatePicker(
@@ -107,487 +73,157 @@ class _CalendarPageState extends State<CalendarPage> {
     if (mounted && date != null) widget.onDateChanged(date);
   }
 
-  void _openDay(DateTime day) {
-    setState(() => _selectedView = CalendarView.day);
-    widget.onDateChanged(day);
-  }
-
   @override
   Widget build(BuildContext context) {
     final mobile = MediaQuery.sizeOf(context).width < 720;
-    final view =
-        _selectedView ?? (mobile ? CalendarView.day : CalendarView.week);
     final colors = _CalendarColors.of(context);
-    if (mobile && view == CalendarView.day) {
-      final allDay = _eventsOn(_date).where((event) => event.allDay);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _mobileDayHeader(context, colors),
-          if (allDay.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 96),
-                child: SingleChildScrollView(
-                  child: _allDayStrip(colors, allDay),
-                ),
-              ),
-            ),
-          Expanded(
-            child: _ContinuousDayTimeline(
-              date: _date,
-              onDateChanged: widget.onDateChanged,
-              eventsOn: _eventsOn,
-              section: (context, date, timelineKey) =>
-                  _mobileDaySection(context, colors, date, timelineKey),
-            ),
-          ),
-        ],
-      );
-    }
-    final week = _weekContaining(_date);
-    final inset = mobile ? 22.0 : 44.0;
+    final inset = mobile ? 28.0 : 48.0;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final canShowWeekTimeline =
-            !mobile && constraints.maxWidth - 2 * inset >= 660;
-        return SingleChildScrollView(
-          key: PageStorageKey('calendar-${view.name}'),
-          padding: EdgeInsets.fromLTRB(
-            inset,
-            mobile ? 22 : 41,
-            inset,
-            mobile ? 107 + MediaQuery.paddingOf(context).bottom : 38,
-          ),
-          child: Column(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () => _step(-1),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () => _step(1),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft, shift: true): () =>
+            _step(-7),
+        const SingleActivator(LogicalKeyboardKey.arrowRight, shift: true): () =>
+            _step(7),
+        const SingleActivator(LogicalKeyboardKey.home, alt: true): _today,
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final showWeek = !mobile && constraints.maxWidth - 2 * inset >= 652;
+          final allDay = showWeek
+              ? const <CalendarEvent>[]
+              : _eventsOn(_date).where((event) => event.allDay);
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _header(context, colors, view, mobile, canShowWeekTimeline),
-              const SizedBox(height: 18),
-              if (view == CalendarView.day) ...[
-                _dateStrip(context, colors, week),
-                const SizedBox(height: 16),
-              ],
-              GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onHorizontalDragStart: (_) => _swipeDistance = 0,
-                onHorizontalDragUpdate: (details) {
-                  _swipeDistance += details.delta.dx;
-                },
-                onHorizontalDragEnd: (_) {
-                  if (_swipeDistance.abs() >= 48) {
-                    _advance(view, _swipeDistance < 0 ? 1 : -1);
-                  }
-                },
-                child: switch (view) {
-                  CalendarView.day => _day(context, colors, mobile),
-                  CalendarView.week =>
-                    _weekShowsAgenda || !canShowWeekTimeline
-                        ? _weekAgenda(context, colors, week)
-                        : _timeline(context, colors, week, mobile: false),
-                  CalendarView.month => _month(context, colors, mobile),
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _mobileDayHeader(BuildContext context, _CalendarColors colors) {
-    final dateLabel = MaterialLocalizations.of(context).formatMediumDate(_date);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 5, 22, 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: PopupMenuButton<_MobileDateAction>(
-              tooltip: 'Calendar date options',
-              onSelected: (action) {
-                switch (action) {
-                  case _MobileDateAction.today:
-                    widget.onDateChanged(DateUtils.dateOnly(DateTime.now()));
-                  case _MobileDateAction.previous:
-                    _advance(CalendarView.day, -1);
-                  case _MobileDateAction.next:
-                    _advance(CalendarView.day, 1);
-                  case _MobileDateAction.jump:
-                    _jumpToDate();
-                }
-              },
-              itemBuilder: (_) => [
-                for (final action in _MobileDateAction.values)
-                  PopupMenuItem(value: action, child: Text(action.label)),
-              ],
-              child: SizedBox(
-                height: 44,
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        dateLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: colors.ink,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 18,
-                          letterSpacing: -.3,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.expand_more_rounded,
-                      size: 19,
-                      color: colors.muted,
-                    ),
-                  ],
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  inset,
+                  mobile ? 8 : 32,
+                  inset,
+                  mobile ? 10 : 22,
                 ),
+                child: _dateHeading(context, colors, mobile),
               ),
-            ),
-          ),
-          PopupMenuButton<CalendarView>(
-            tooltip: 'Calendar view',
-            initialValue: CalendarView.day,
-            onSelected: (view) => setState(() => _selectedView = view),
-            itemBuilder: (_) => [
-              for (final view in CalendarView.values)
-                PopupMenuItem(value: view, child: Text(view.label)),
-            ],
-            child: SizedBox(
-              height: 44,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Day',
-                    style: TextStyle(
-                      color: colors.muted,
-                      fontWeight: FontWeight.w600,
+              if (allDay.isNotEmpty)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(inset, 0, inset, 8),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 96),
+                    child: SingleChildScrollView(
+                      child: _allDayStrip(colors, allDay),
                     ),
                   ),
-                  const SizedBox(width: 2),
-                  Icon(
-                    Icons.expand_more_rounded,
-                    size: 17,
-                    color: colors.muted,
-                  ),
-                ],
+                ),
+              Expanded(
+                child: showWeek
+                    ? SingleChildScrollView(
+                        key: const PageStorageKey('calendar-week-schedule'),
+                        padding: EdgeInsets.fromLTRB(inset, 0, inset, 32),
+                        child: _timeline(
+                          context,
+                          colors,
+                          _weekContaining(_date),
+                        ),
+                      )
+                    : _ContinuousDayTimeline(
+                        date: _date,
+                        inset: inset,
+                        onDateChanged: widget.onDateChanged,
+                        eventsOn: _eventsOn,
+                        section: (context, date, timelineKey) =>
+                            _daySection(context, colors, date, timelineKey),
+                      ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _mobileDaySection(
+  Widget _dateHeading(
+    BuildContext context,
+    _CalendarColors colors,
+    bool mobile,
+  ) {
+    final localizations = MaterialLocalizations.of(context);
+    final spokenDate = localizations.formatFullDate(_date);
+    final displayDate = mobile
+        ? localizations.formatMediumDate(_date)
+        : spokenDate;
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Semantics(
+        header: true,
+        button: true,
+        label: spokenDate,
+        hint: 'Choose a date',
+        excludeSemantics: true,
+        onTap: _jumpToDate,
+        customSemanticsActions: {
+          const CustomSemanticsAction(label: 'Previous day'): () => _step(-1),
+          const CustomSemanticsAction(label: 'Next day'): () => _step(1),
+          const CustomSemanticsAction(label: 'Today'): _today,
+        },
+        child: InkWell(
+          key: const ValueKey('calendar-date'),
+          onTap: _jumpToDate,
+          borderRadius: BorderRadius.circular(5),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              widthFactor: 1,
+              child: Text(
+                displayDate,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.ink,
+                  fontSize: mobile ? 25 : 34,
+                  height: 1.15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: mobile ? -.75 : -1.05,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _daySection(
     BuildContext context,
     _CalendarColors colors,
     DateTime date,
     GlobalKey timelineKey,
   ) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 17),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(0, 6, 0, 10),
+            padding: const EdgeInsets.fromLTRB(0, 3, 0, 10),
             child: Semantics(
               header: true,
               child: Text(
-                MaterialLocalizations.of(context).formatFullDate(date),
+                MaterialLocalizations.of(context).formatMediumDate(date),
                 style: TextStyle(
-                  color: colors.ink,
+                  color: colors.muted,
                   fontWeight: FontWeight.w600,
-                  fontSize: 14,
+                  fontSize: 13,
                 ),
               ),
             ),
           ),
-          _day(context, colors, true, date: date, timelineKey: timelineKey),
+          _timeline(context, colors, [date], timelineKey: timelineKey),
         ],
       ),
-    );
-  }
-
-  Widget _header(
-    BuildContext context,
-    _CalendarColors colors,
-    CalendarView view,
-    bool mobile,
-    bool canShowWeekTimeline,
-  ) {
-    final localizations = MaterialLocalizations.of(context);
-    final dateLabel = switch (view) {
-      CalendarView.day => localizations.formatMediumDate(_date),
-      CalendarView.week ||
-      CalendarView.month => localizations.formatMonthYear(_date),
-    };
-    final title = Semantics(
-      header: true,
-      child: Text(
-        'Calendar',
-        style: TextStyle(
-          color: colors.ink,
-          fontSize: mobile ? 32 : 36,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -1.2,
-          height: 1.15,
-        ),
-      ),
-    );
-    final date = Tooltip(
-      message: 'Jump to date',
-      child: TextButton(
-        onPressed: _jumpToDate,
-        style: TextButton.styleFrom(
-          foregroundColor: colors.ink,
-          padding: const EdgeInsetsDirectional.only(end: 7),
-          alignment: AlignmentDirectional.centerStart,
-          minimumSize: const Size(0, 44),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                dateLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(width: 5),
-            Icon(Icons.expand_more, size: 17, color: colors.muted),
-          ],
-        ),
-      ),
-    );
-    final navigationActions = [
-      TextButton(
-        onPressed: () =>
-            widget.onDateChanged(DateUtils.dateOnly(DateTime.now())),
-        style: TextButton.styleFrom(
-          foregroundColor: colors.accent,
-          padding: const EdgeInsets.symmetric(horizontal: 9),
-          minimumSize: const Size(0, 44),
-        ),
-        child: const Text('Today'),
-      ),
-      IconButton(
-        tooltip: 'Previous ${view.name}',
-        onPressed: () => _advance(view, -1),
-        icon: const Icon(Icons.chevron_left_rounded, size: 22),
-        color: colors.ink,
-        constraints: const BoxConstraints.tightFor(width: 44, height: 44),
-      ),
-      IconButton(
-        tooltip: 'Next ${view.name}',
-        onPressed: () => _advance(view, 1),
-        icon: const Icon(Icons.chevron_right_rounded, size: 22),
-        color: colors.ink,
-        constraints: const BoxConstraints.tightFor(width: 44, height: 44),
-      ),
-    ];
-    final largeMobileText =
-        mobile && MediaQuery.textScalerOf(context).scale(15) > 23;
-    final dateNavigation = largeMobileText
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              date,
-              Wrap(alignment: WrapAlignment.end, children: navigationActions),
-            ],
-          )
-        : Row(
-            children: [
-              Expanded(child: date),
-              ...navigationActions,
-            ],
-          );
-    final viewPicker = _viewPicker(colors, view);
-    final canSwitchAgenda =
-        view == CalendarView.day ||
-        (view == CalendarView.week && canShowWeekTimeline);
-    final showsAgenda = view == CalendarView.day
-        ? _dayShowsAgenda
-        : _weekShowsAgenda;
-    final agendaButton = IconButton(
-      tooltip: showsAgenda ? 'Show timeline' : 'Show agenda',
-      onPressed: () => setState(() {
-        if (view == CalendarView.day) {
-          _dayShowsAgenda = !_dayShowsAgenda;
-        } else {
-          _weekShowsAgenda = !_weekShowsAgenda;
-        }
-      }),
-      icon: Icon(
-        showsAgenda ? Icons.schedule_rounded : Icons.view_list_outlined,
-        size: 21,
-      ),
-      color: colors.muted,
-      constraints: const BoxConstraints.tightFor(width: 44, height: 44),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (mobile) ...[
-          title,
-          const SizedBox(height: 12),
-          dateNavigation,
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(child: viewPicker),
-              if (canSwitchAgenda) ...[const SizedBox(width: 8), agendaButton],
-            ],
-          ),
-        ] else ...[
-          Row(
-            children: [
-              Expanded(child: title),
-              SizedBox(width: 207, child: viewPicker),
-              if (canSwitchAgenda) ...[const SizedBox(width: 6), agendaButton],
-            ],
-          ),
-          const SizedBox(height: 14),
-          dateNavigation,
-        ],
-      ],
-    );
-  }
-
-  Widget _viewPicker(_CalendarColors colors, CalendarView view) {
-    return Material(
-      color: colors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(9),
-        side: BorderSide(color: colors.line),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(3),
-        child: Row(
-          children: CalendarView.values.map((value) {
-            final selected = value == view;
-            return Expanded(
-              child: Semantics(
-                selected: selected,
-                child: TextButton(
-                  onPressed: () => setState(() => _selectedView = value),
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(0, 42),
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
-                    foregroundColor: selected ? colors.accent : colors.muted,
-                    backgroundColor: selected
-                        ? colors.accentFill
-                        : Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  child: Text(value.label),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _dateStrip(
-    BuildContext context,
-    _CalendarColors colors,
-    List<DateTime> days,
-  ) {
-    final localizations = MaterialLocalizations.of(context);
-    return Row(
-      children: days.map((day) {
-        final selected = DateUtils.isSameDay(day, _date);
-        final hasEvents = _eventsOn(day).isNotEmpty;
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Semantics(
-              selected: selected,
-              child: Tooltip(
-                message: localizations.formatFullDate(day),
-                child: Material(
-                  color: selected ? colors.accentFill : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(9),
-                    onTap: () => widget.onDateChanged(day),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Column(
-                        children: [
-                          Text(
-                            _weekday(localizations, day),
-                            style: TextStyle(color: colors.muted, fontSize: 11),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            localizations.formatDecimal(day.day),
-                            style: TextStyle(
-                              color: selected ? colors.accent : colors.ink,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          _dot(hasEvents ? colors.accent : Colors.transparent),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _day(
-    BuildContext context,
-    _CalendarColors colors,
-    bool mobile, {
-    DateTime? date,
-    GlobalKey? timelineKey,
-  }) {
-    final day = date ?? _date;
-    final events = _eventsOn(day);
-    if (!mobile && _dayShowsAgenda) return _eventList(context, colors, events);
-    final allDay = events.where((event) => event.allDay);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (!mobile && allDay.isNotEmpty) ...[
-          _allDayStrip(colors, allDay),
-          const SizedBox(height: 12),
-        ],
-        _timeline(
-          context,
-          colors,
-          [day],
-          mobile: mobile,
-          timelineKey: timelineKey,
-        ),
-      ],
     );
   }
 
@@ -626,7 +262,6 @@ class _CalendarPageState extends State<CalendarPage> {
     BuildContext context,
     _CalendarColors colors,
     List<DateTime> days, {
-    required bool mobile,
     GlobalKey? timelineKey,
   }) {
     final multiDay = days.length > 1;
@@ -637,10 +272,10 @@ class _CalendarPageState extends State<CalendarPage> {
     ];
     final ruler = _TimelineRuler(
       placements.expand((day) => day),
-      mobile ? _mobileHourHeight : 59,
-      fullDay: mobile,
+      multiDay ? 57 : _dayHourHeight,
+      fullDay: !multiDay,
     );
-    final hourColumn = mobile ? 47.0 : 60.0;
+    final hourColumn = multiDay ? 62.0 : 50.0;
     final localizations = MaterialLocalizations.of(context);
     final showAllDay =
         multiDay &&
@@ -655,17 +290,15 @@ class _CalendarPageState extends State<CalendarPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (multiDay)
-              Row(
-                children: [
-                  SizedBox(width: hourColumn),
-                  for (final day in days)
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _openDay(day),
-                        child: _weekHeading(localizations, colors, day, now),
-                      ),
-                    ),
-                ],
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(width: hourColumn),
+                    for (final day in days)
+                      Expanded(child: _weekHeading(localizations, colors, day)),
+                  ],
+                ),
               ),
             if (showAllDay)
               Row(
@@ -715,13 +348,19 @@ class _CalendarPageState extends State<CalendarPage> {
                       )
                         Positioned(
                           left: 0,
-                          right: mobile ? 6 : 9,
-                          top: ruler.offset(hour * 60) + 4,
+                          right: multiDay ? 10 : 8,
+                          top: ruler.offset(hour * 60) + 5,
                           child: Text(
                             _time(context, TimeOfDay(hour: hour, minute: 0)),
                             textAlign: TextAlign.right,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: colors.muted, fontSize: 10),
+                            style: TextStyle(
+                              color: colors.muted,
+                              fontSize: 11,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
                           ),
                         ),
                     ],
@@ -751,40 +390,33 @@ class _CalendarPageState extends State<CalendarPage> {
     MaterialLocalizations localizations,
     _CalendarColors colors,
     DateTime day,
-    DateTime today,
   ) {
-    final isToday = DateUtils.isSameDay(day, today);
-    return Container(
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: colors.line)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            _weekday(localizations, day),
-            style: TextStyle(color: colors.muted, fontSize: 11),
+    final selected = DateUtils.isSameDay(day, _date);
+    return Semantics(
+      selected: selected,
+      child: InkWell(
+        onTap: () => widget.onDateChanged(day),
+        child: Container(
+          alignment: Alignment.center,
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+          decoration: BoxDecoration(
+            color: selected ? colors.accentFill : Colors.transparent,
+            border: Border(left: BorderSide(color: colors.line)),
           ),
-          const SizedBox(height: 3),
-          Container(
-            width: 27,
-            height: 27,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: isToday ? colors.accent : Colors.transparent,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              localizations.formatDecimal(day.day),
-              style: TextStyle(
-                color: isToday ? colors.onAccent : colors.ink,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
+          child: Text(
+            localizations.formatMediumDate(day),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: selected ? colors.accent : colors.muted,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 12,
+              height: 1.2,
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -873,10 +505,10 @@ class _CalendarPageState extends State<CalendarPage> {
   }) {
     final tone = colors.event(event.category);
     final time = _eventTime(context, event);
-    final radius = BorderRadius.circular(5);
+    final radius = BorderRadius.circular(7);
     final textScaler = MediaQuery.textScalerOf(context);
-    final titleSize = compact ? 11.0 : 13.0;
-    final timeSize = compact ? 9.0 : 11.0;
+    final titleSize = compact ? 11.0 : 13.5;
+    final timeSize = compact ? 10.0 : 11.0;
     final twoLineHeight =
         5 + (textScaler.scale(titleSize) + textScaler.scale(timeSize)) * 1.35;
     return Tooltip(
@@ -888,18 +520,13 @@ class _CalendarPageState extends State<CalendarPage> {
         child: InkWell(
           onTap: () => widget.onEventTap(event),
           child: Container(
-            padding: EdgeInsets.only(left: compact ? 4 : 7, right: 3),
+            padding: EdgeInsets.only(left: compact ? 4 : 8, right: 4),
             decoration: BoxDecoration(
-              border: Border(left: BorderSide(color: tone.ink, width: 3)),
+              border: Border(left: BorderSide(color: tone.edge, width: 2)),
             ),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final showTime = constraints.maxHeight >= twoLineHeight;
-                final showLocation =
-                    !compact &&
-                    (event.location?.isNotEmpty ?? false) &&
-                    constraints.maxHeight >=
-                        twoLineHeight + textScaler.scale(10) * 1.35;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: showTime
@@ -926,339 +553,11 @@ class _CalendarPageState extends State<CalendarPage> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: tone.ink, fontSize: timeSize),
                       ),
-                    if (showLocation)
-                      Text(
-                        event.location!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: tone.ink, fontSize: 10),
-                      ),
                   ],
                 );
               },
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _weekAgenda(
-    BuildContext context,
-    _CalendarColors colors,
-    List<DateTime> week,
-  ) {
-    final localizations = MaterialLocalizations.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final day in week) ...[
-          Row(
-            children: [
-              Expanded(
-                child: _sectionTitle(
-                  colors,
-                  localizations.formatMediumDate(day),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Open ${localizations.formatFullDate(day)}',
-                icon: Icon(
-                  Icons.arrow_forward_rounded,
-                  size: 17,
-                  color: colors.accent,
-                ),
-                onPressed: () => _openDay(day),
-              ),
-            ],
-          ),
-          _eventList(context, colors, _eventsOn(day)),
-          const SizedBox(height: 10),
-        ],
-      ],
-    );
-  }
-
-  Widget _month(BuildContext context, _CalendarColors colors, bool mobile) {
-    final localizations = MaterialLocalizations.of(context);
-    final first = DateTime(_date.year, _date.month);
-    final start = DateUtils.addDaysToDate(first, 1 - first.weekday);
-    final dayCount = DateUtils.getDaysInMonth(_date.year, _date.month);
-    final weekCount = ((first.weekday - 1 + dayCount) / 7).ceil();
-    final selectedEvents = _eventsOn(_date);
-    final previewHeading = _sectionTitle(
-      colors,
-      localizations.formatMediumDate(_date),
-    );
-    final openDay = TextButton.icon(
-      onPressed: () => _openDay(_date),
-      style: TextButton.styleFrom(foregroundColor: colors.accent),
-      icon: const Icon(Icons.arrow_forward_rounded, size: 17),
-      label: const Text('Open day'),
-      iconAlignment: IconAlignment.end,
-    );
-    final largeText = MediaQuery.textScalerOf(context).scale(15) > 23;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _calendarSurface(
-          colors,
-          Column(
-            children: [
-              Row(
-                children: [
-                  for (final day in _weekContaining(first))
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 9),
-                        child: Text(
-                          _weekday(localizations, day),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: colors.muted,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              for (var row = 0; row < weekCount; row++)
-                Row(
-                  children: [
-                    for (var column = 0; column < 7; column++)
-                      Expanded(
-                        child: _monthDay(
-                          context,
-                          localizations,
-                          colors,
-                          DateUtils.addDaysToDate(start, row * 7 + column),
-                          mobile: mobile,
-                          firstColumn: column == 0,
-                        ),
-                      ),
-                  ],
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 13),
-        if (largeText)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              previewHeading,
-              Align(alignment: AlignmentDirectional.centerEnd, child: openDay),
-            ],
-          )
-        else
-          Row(
-            children: [
-              Expanded(child: previewHeading),
-              openDay,
-            ],
-          ),
-        _eventList(context, colors, selectedEvents),
-      ],
-    );
-  }
-
-  Widget _monthDay(
-    BuildContext context,
-    MaterialLocalizations localizations,
-    _CalendarColors colors,
-    DateTime day, {
-    required bool mobile,
-    required bool firstColumn,
-  }) {
-    final inMonth = _date.month == day.month;
-    final selected = DateUtils.isSameDay(day, _date);
-    final today = DateUtils.isSameDay(day, DateTime.now());
-    final events = _eventsOn(day);
-    final displayedEvents = events.take(mobile ? 3 : 2);
-    final remaining = events.length - displayedEvents.length;
-    final dateLabel = localizations.formatFullDate(day);
-    final eventCount = events.length == 1
-        ? '1 event'
-        : '${events.length} events';
-    final textScaler = MediaQuery.textScalerOf(context);
-    final dayHeight = math.max(25.0, textScaler.scale(12) * 1.35);
-    final cellHeight = mobile
-        ? math.max(52.0, dayHeight + 24)
-        : math.max(86.0, dayHeight + textScaler.scale(10) * 4.1 + 12);
-    return Semantics(
-      label: '$dateLabel, $eventCount',
-      selected: selected,
-      button: true,
-      excludeSemantics: true,
-      onTap: () => widget.onDateChanged(day),
-      child: InkWell(
-        onTap: () => widget.onDateChanged(day),
-        child: Container(
-          height: cellHeight,
-          padding: EdgeInsets.fromLTRB(mobile ? 3 : 5, 4, mobile ? 3 : 5, 2),
-          decoration: BoxDecoration(
-            color: selected ? colors.accentFill : null,
-            border: Border(
-              top: BorderSide(color: colors.line),
-              left: firstColumn
-                  ? BorderSide.none
-                  : BorderSide(color: colors.line),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: mobile
-                ? CrossAxisAlignment.center
-                : CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: dayHeight,
-                height: dayHeight,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: today ? colors.accent : null,
-                ),
-                child: Text(
-                  localizations.formatDecimal(day.day),
-                  maxLines: 1,
-                  overflow: TextOverflow.clip,
-                  style: TextStyle(
-                    color: today
-                        ? colors.onAccent
-                        : inMonth
-                        ? colors.ink
-                        : colors.muted,
-                    fontSize: 12,
-                    fontWeight: selected || today
-                        ? FontWeight.w700
-                        : FontWeight.w500,
-                  ),
-                ),
-              ),
-              if (mobile) ...[
-                const SizedBox(height: 5),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (final event in displayedEvents)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 1.5),
-                        child: _dot(
-                          colors.event(event.category).ink,
-                          size: 3.5,
-                        ),
-                      ),
-                    if (remaining > 0)
-                      Icon(Icons.add_rounded, size: 9, color: colors.muted),
-                  ],
-                ),
-              ] else ...[
-                for (final event in displayedEvents)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Row(
-                      children: [
-                        _dot(colors.event(event.category).ink, size: 4),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            event.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: colors.ink, fontSize: 10),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (remaining > 0)
-                  Text(
-                    '+$remaining more',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: colors.muted, fontSize: 9),
-                  ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _eventList(
-    BuildContext context,
-    _CalendarColors colors,
-    List<CalendarEvent> events,
-  ) {
-    return _calendarSurface(
-      colors,
-      events.isEmpty
-          ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 13),
-              child: Text(
-                'No events scheduled',
-                style: TextStyle(color: colors.muted, fontSize: 13),
-              ),
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var index = 0; index < events.length; index++) ...[
-                  if (index > 0)
-                    Divider(
-                      color: colors.line,
-                      height: 1,
-                      indent: 13,
-                      endIndent: 13,
-                    ),
-                  _eventRow(context, colors, events[index]),
-                ],
-              ],
-            ),
-    );
-  }
-
-  Widget _eventRow(
-    BuildContext context,
-    _CalendarColors colors,
-    CalendarEvent event,
-  ) {
-    return InkWell(
-      onTap: () => widget.onEventTap(event),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        child: Row(
-          children: [
-            _dot(colors.event(event.category).ink, size: 7),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    style: TextStyle(
-                      color: colors.ink,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    [
-                      _eventTime(context, event),
-                      if (event.location?.isNotEmpty ?? false) event.location!,
-                    ].join(' · '),
-                    style: TextStyle(color: colors.muted, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: colors.muted, size: 19),
-          ],
         ),
       ),
     );
@@ -1296,17 +595,19 @@ List<DateTime> _weekContaining(DateTime date) {
   return List.generate(7, (index) => DateUtils.addDaysToDate(monday, index));
 }
 
-const _mobileHourHeight = 53.0;
+const _dayHourHeight = 53.0;
 
 class _ContinuousDayTimeline extends StatefulWidget {
   const _ContinuousDayTimeline({
     required this.date,
+    required this.inset,
     required this.onDateChanged,
     required this.eventsOn,
     required this.section,
   });
 
   final DateTime date;
+  final double inset;
   final ValueChanged<DateTime> onDateChanged;
   final List<CalendarEvent> Function(DateTime) eventsOn;
   final Widget Function(BuildContext, DateTime, GlobalKey) section;
@@ -1353,7 +654,7 @@ class _ContinuousDayTimelineState extends State<_ContinuousDayTimeline> {
 
   _TimelineRuler _ruler(DateTime date) => _TimelineRuler(
     _placeEvents(widget.eventsOn(date), date),
-    _mobileHourHeight,
+    _dayHourHeight,
     fullDay: true,
   );
 
@@ -1440,7 +741,7 @@ class _ContinuousDayTimelineState extends State<_ContinuousDayTimeline> {
 
   Widget _daySliver({required bool before}) => SliverPadding(
     key: before ? null : _centerKey,
-    padding: const EdgeInsets.symmetric(horizontal: 22),
+    padding: EdgeInsets.symmetric(horizontal: widget.inset),
     sliver: SliverList.builder(
       itemCount: 3660,
       itemBuilder: (context, index) {
@@ -1482,9 +783,6 @@ class _ContinuousDayTimelineState extends State<_ContinuousDayTimeline> {
     );
   }
 }
-
-String _weekday(MaterialLocalizations localizations, DateTime date) =>
-    localizations.narrowWeekdays[date.weekday % 7];
 
 String _eventTime(BuildContext context, CalendarEvent event) {
   if (event.allDay) return 'All day';
@@ -1626,15 +924,6 @@ class _TimelineRuler {
   }
 }
 
-Widget _sectionTitle(_CalendarColors colors, String label) => Text(
-  label,
-  style: TextStyle(
-    color: colors.ink,
-    fontSize: 15,
-    fontWeight: FontWeight.w600,
-  ),
-);
-
 Widget _dot(Color color, {double size = 5}) => Container(
   width: size,
   height: size,
@@ -1659,30 +948,22 @@ class _CalendarColors {
 
   final bool dark;
 
-  Color get surface => dark ? const Color(0xFF222623) : Colors.white;
-  Color get ink => dark ? const Color(0xFFF0F1EC) : const Color(0xFF202521);
-  Color get muted => dark ? const Color(0xFFAAB2A7) : const Color(0xFF696E66);
-  Color get line => dark ? const Color(0xFF393F39) : const Color(0xFFE9E8E1);
-  Color get accent => dark ? const Color(0xFFA4C3A9) : const Color(0xFF466955);
-  Color get onAccent => dark ? const Color(0xFF17231B) : Colors.white;
-  Color get accentFill =>
-      dark ? const Color(0xFF303F33) : const Color(0xFFEDF2EC);
+  Color get surface => dark ? palette.shellSurface : palette.raisedPaper;
+  Color get ink => dark ? const Color(0xFFF0F1EC) : palette.ink;
+  Color get muted => dark ? const Color(0xFFAAB2A7) : palette.muted;
+  Color get line => dark ? const Color(0xFF393F39) : palette.line;
+  Color get accent => dark ? const Color(0xFFA4C3A9) : palette.accent;
+  Color get accentFill => dark ? const Color(0xFF303F33) : palette.softAccent;
 
-  ({Color ink, Color fill}) event(String category) {
-    return switch (category.toLowerCase()) {
-      'work' =>
-        dark
-            ? (ink: const Color(0xFFB7C8DF), fill: const Color(0xFF303A49))
-            : (ink: const Color(0xFF435B78), fill: const Color(0xFFEAF0F7)),
-      'study' =>
-        dark
-            ? (ink: const Color(0xFFCCC0E0), fill: const Color(0xFF3E354C))
-            : (ink: const Color(0xFF625078), fill: const Color(0xFFF0EBF6)),
-      'health' =>
-        dark
-            ? (ink: const Color(0xFFE1B8AC), fill: const Color(0xFF49352E))
-            : (ink: const Color(0xFF884F41), fill: const Color(0xFFF8EBE6)),
-      _ => (ink: accent, fill: accentFill),
-    };
+  ({Color ink, Color fill, Color edge}) event(String category) {
+    final hue = spaceColor(category);
+    return (
+      ink: Color.lerp(ink, hue, dark ? .36 : .68)!,
+      fill: Color.alphaBlend(
+        hue.withValues(alpha: dark ? .24 : .09),
+        dark ? surface : palette.paper,
+      ),
+      edge: dark ? Color.lerp(ink, hue, .66)! : hue,
+    );
   }
 }

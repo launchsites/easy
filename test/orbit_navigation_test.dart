@@ -1,4 +1,5 @@
 import 'package:easy/orbit_navigation.dart';
+import 'package:easy/ui_theme.dart' show accent;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -16,12 +17,22 @@ Future<void> _mount(
   WidgetTester tester,
   List<int> selections, {
   VoidCallback? onAdd,
+  Size surface = const Size(390, 844),
+  double bottomPadding = 0,
+  bool reduceMotion = false,
 }) async {
-  await tester.binding.setSurfaceSize(const Size(390, 844));
+  await tester.binding.setSurfaceSize(surface);
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
   await tester.pumpWidget(
     MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          disableAnimations: reduceMotion,
+        ),
+        child: child!,
+      ),
       home: Scaffold(
         body: Stack(
           fit: StackFit.expand,
@@ -84,7 +95,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final button = tester.widget<TextButton>(tasks);
-    expect(button.style?.backgroundColor?.resolve({}), const Color(0xFF466955));
+    expect(button.style?.backgroundColor?.resolve({}), accent);
     expect(selections, isEmpty);
 
     await gesture.up();
@@ -184,5 +195,64 @@ void main() {
 
     expect(find.text('Calendar'), findsNothing);
     expect(selections, isEmpty);
+  });
+
+  testWidgets(
+    'every destination is reachable on a narrow phone with safe area',
+    (tester) async {
+      final selections = <int>[];
+      const surface = Size(320, 568);
+      await _mount(
+        tester,
+        selections,
+        surface: surface,
+        bottomPadding: 34,
+        reduceMotion: true,
+      );
+
+      expect(tester.getRect(_launcher).bottom, surface.height - 34 - 20);
+
+      for (final (index, destination) in _destinations.indexed) {
+        final gesture = await _holdLauncher(tester);
+        final button = find.widgetWithText(TextButton, destination.label);
+        final bounds = tester.getRect(button);
+        expect(bounds.width, closeTo(56, .001));
+        expect(bounds.height, closeTo(56, .001));
+        expect((Offset.zero & surface).contains(bounds.topLeft), isTrue);
+        expect((Offset.zero & surface).contains(bounds.bottomRight), isTrue);
+
+        await gesture.moveTo(bounds.center);
+        await gesture.up();
+        await tester.pumpAndSettle();
+
+        expect(selections.last, index);
+        expect(button, findsNothing);
+      }
+    },
+  );
+
+  testWidgets('the orbit fits landscape and a short body', (tester) async {
+    for (final (surface, targetSize) in [
+      (const Size(640, 320), 60.0),
+      (const Size(320, 205), 48.0),
+    ]) {
+      final selections = <int>[];
+      await _mount(tester, selections, surface: surface);
+      await tester.tap(_launcher);
+      await tester.pumpAndSettle();
+
+      for (final destination in _destinations) {
+        final button = find.widgetWithText(TextButton, destination.label);
+        final bounds = tester.getRect(button);
+        expect(bounds.width, closeTo(targetSize, .001));
+        expect(bounds.height, closeTo(targetSize, .001));
+        expect((Offset.zero & surface).contains(bounds.topLeft), isTrue);
+        expect((Offset.zero & surface).contains(bounds.bottomRight), isTrue);
+      }
+
+      await tester.tap(find.text('Notes'));
+      await tester.pumpAndSettle();
+      expect(selections, [3]);
+    }
   });
 }

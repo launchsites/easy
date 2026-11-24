@@ -1,11 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 
-const _paper = Color(0xFFFAF9F6);
-const _ink = Color(0xFF202521);
-const _muted = Color(0xFF696E66);
-const _line = Color(0xFFE9E8E1);
-const _accent = Color(0xFF466955);
-const _softAccent = Color(0xFFE9EFE8);
+import 'ui_theme.dart';
+import 'workspace_data.dart' show spaceColor, spaceName;
+
+const _softSurface = Color(0xFFF1F0E9);
+const _overdueInk = Color(0xFF954A3D);
 
 class TaskItem {
   const TaskItem({
@@ -48,10 +47,10 @@ enum _TaskFilter {
 }
 
 enum _TaskGroup {
-  inbox('Inbox'),
   overdue('Overdue'),
   today('Today'),
   upcoming('Upcoming'),
+  inbox('Inbox'),
   completed('Completed');
 
   const _TaskGroup(this.label);
@@ -110,11 +109,12 @@ class _TasksPageState extends State<TasksPage> {
   @override
   Widget build(BuildContext context) {
     final groups = _groupedTasks();
+    final labels = Theme.of(context).textTheme.labelLarge;
     return _ListPageLayout(
       title: 'Tasks',
       scrollKey: const PageStorageKey('tasks-scroll'),
       actions: Wrap(
-        spacing: 3,
+        spacing: 4,
         children: [
           for (final filter in _TaskFilter.values)
             Semantics(
@@ -122,15 +122,18 @@ class _TasksPageState extends State<TasksPage> {
               child: TextButton(
                 onPressed: () => setState(() => _filter = filter),
                 style: TextButton.styleFrom(
-                  foregroundColor: _filter == filter ? _ink : _muted,
-                  backgroundColor: _filter == filter ? _softAccent : null,
-                  minimumSize: const Size(48, 36),
-                  padding: const EdgeInsets.symmetric(horizontal: 11),
+                  foregroundColor: _filter == filter ? ink : muted,
+                  backgroundColor: _filter == filter ? _softSurface : null,
+                  minimumSize: const Size(48, 42),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  side: _filter == filter
+                      ? const BorderSide(color: line)
+                      : BorderSide.none,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(9),
                   ),
-                  textStyle: const TextStyle(
-                    fontSize: 13,
+                  textStyle: labels?.copyWith(
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -151,12 +154,12 @@ class _TasksPageState extends State<TasksPage> {
             ),
           ),
         for (final MapEntry(key: group, value: tasks) in groups.entries) ...[
-          const SliverToBoxAdapter(child: Divider(height: 1, color: _line)),
-          const SliverToBoxAdapter(child: SizedBox(height: 9)),
+          const SliverToBoxAdapter(child: Divider(height: 1, color: line)),
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
           if (!wide)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(2, 8, 0, 3),
+                padding: const EdgeInsets.fromLTRB(0, 5, 0, 6),
                 child: _GroupLabel(
                   group: group,
                   count: tasks.length,
@@ -169,8 +172,9 @@ class _TasksPageState extends State<TasksPage> {
             itemBuilder: (context, index) {
               final task = tasks[index];
               final row = _TaskRow(
+                key: ValueKey(task.id),
                 task: task,
-                overdue: group == _TaskGroup.overdue,
+                group: group,
                 onToggle: () => widget.onToggle(task),
                 onTap: () => widget.onTaskTap(task),
               );
@@ -179,10 +183,10 @@ class _TasksPageState extends State<TasksPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
-                    width: 150,
+                    width: 154,
                     child: index == 0
                         ? Padding(
-                            padding: const EdgeInsets.only(top: 12),
+                            padding: const EdgeInsets.only(top: 14, right: 16),
                             child: _GroupLabel(
                               group: group,
                               count: tasks.length,
@@ -196,7 +200,7 @@ class _TasksPageState extends State<TasksPage> {
               );
             },
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 17)),
+          const SliverToBoxAdapter(child: SizedBox(height: 21)),
         ],
       ],
     );
@@ -224,17 +228,18 @@ class _GroupLabel extends StatelessWidget {
           header: true,
           child: Text(
             group.label,
-            style: const TextStyle(
-              color: _ink,
-              fontSize: 15,
+            style: TextStyle(
+              color: group == _TaskGroup.overdue ? _overdueInk : ink,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
+              letterSpacing: -0.25,
             ),
           ),
         ),
         if (wide)
           Text(
             '$count ${count == 1 ? 'task' : 'tasks'}',
-            style: const TextStyle(color: _muted, fontSize: 12),
+            style: const TextStyle(color: muted, fontSize: 12),
           ),
       ],
     );
@@ -244,34 +249,35 @@ class _GroupLabel extends StatelessWidget {
 class _TaskRow extends StatelessWidget {
   const _TaskRow({
     required this.task,
-    required this.overdue,
+    required this.group,
     required this.onToggle,
     required this.onTap,
+    super.key,
   });
 
   final TaskItem task;
-  final bool overdue;
+  final _TaskGroup group;
   final VoidCallback onToggle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final localizations = MaterialLocalizations.of(context);
-    final date = task.date?.toLocal();
+    final date = group == _TaskGroup.today ? null : task.date?.toLocal();
+    final category = task.category.trim();
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Tooltip(
           message: task.done
-              ? 'Mark ${task.title} open'
+              ? 'Reopen ${task.title}'
               : 'Complete ${task.title}',
           child: Checkbox(
             value: task.done,
             semanticLabel: task.title,
             onChanged: (_) => onToggle(),
-            activeColor: _accent,
+            activeColor: accent,
             checkColor: Colors.white,
-            side: const BorderSide(color: Color(0xFF858C81), width: 1.2),
+            side: const BorderSide(color: Color(0xFF899083), width: 1.35),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(5),
             ),
@@ -280,43 +286,60 @@ class _TaskRow extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: _ListHitTarget(
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(1, 11, 10, 11),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    task.title,
-                    style: TextStyle(
-                      color: task.done ? _muted : _ink,
-                      fontSize: 15,
-                      height: 1.25,
-                      fontWeight: FontWeight.w600,
-                      decoration: task.done ? TextDecoration.lineThrough : null,
-                    ),
-                  ),
-                  if (date != null || task.category.trim().isNotEmpty) ...[
-                    const SizedBox(height: 5),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 5,
-                      children: [
-                        if (date != null)
-                          Text(
-                            localizations.formatMediumDate(date),
-                            style: TextStyle(
-                              color: overdue ? const Color(0xFF9A4D3F) : _muted,
-                              fontSize: 12,
-                            ),
-                          ),
-                        if (task.category.trim().isNotEmpty)
-                          _CategoryLabel(name: task.category.trim()),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(9),
+              hoverColor: _softSurface,
+              focusColor: softAccent,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 58),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(8, 9, 10, 9),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        task.title,
+                        style: TextStyle(
+                          color: task.done ? muted : ink,
+                          fontSize: 16,
+                          height: 1.3,
+                          fontWeight: FontWeight.w600,
+                          decoration: task.done
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      if (date != null || category.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 13,
+                          runSpacing: 5,
+                          children: [
+                            if (category.isNotEmpty)
+                              _CategoryLabel(name: category),
+                            if (date != null)
+                              Text(
+                                date.year == DateTime.now().year
+                                    ? localizations.formatMediumDate(date)
+                                    : localizations.formatShortDate(date),
+                                style: TextStyle(
+                                  color: group == _TaskGroup.overdue
+                                      ? _overdueInk
+                                      : muted,
+                                  fontSize: 12,
+                                  height: 1.25,
+                                ),
+                              ),
+                          ],
+                        ),
                       ],
-                    ),
-                  ],
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -333,27 +356,22 @@ class _CategoryLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (dot, label) = switch (name.toLowerCase()) {
-      'work' => (const Color(0xFF778794), 'Work'),
-      'study' => (const Color(0xFF857BB0), 'Study'),
-      'health' => (const Color(0xFF7D9B80), 'Health'),
-      'fitness' => (const Color(0xFF7D9B80), 'Fitness'),
-      'personal' => (const Color(0xFFB58C72), 'Personal'),
-      _ => (const Color(0xFF939990), name),
-    };
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 6,
           height: 6,
-          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: spaceColor(name),
+            shape: BoxShape.circle,
+          ),
         ),
         const SizedBox(width: 5),
         Flexible(
           child: Text(
-            label,
-            style: const TextStyle(color: _muted, fontSize: 12),
+            spaceName(name),
+            style: const TextStyle(color: muted, fontSize: 12, height: 1.25),
           ),
         ),
       ],
@@ -409,17 +427,24 @@ class _NotesPageState extends State<NotesPage> {
       title: 'Notes',
       scrollKey: const PageStorageKey('notes-scroll'),
       inlineActions: true,
-      actions: IconButton(
+      actions: IconButton.outlined(
         tooltip: _searchOpen ? 'Close note search' : 'Search notes',
         onPressed: _toggleSearch,
-        color: _muted,
-        icon: Icon(_searchOpen ? Icons.close_rounded : Icons.search_rounded),
+        style: IconButton.styleFrom(
+          foregroundColor: ink,
+          backgroundColor: _searchOpen ? softAccent : raisedPaper,
+          side: const BorderSide(color: line),
+        ),
+        icon: Icon(
+          _searchOpen ? Icons.close_rounded : Icons.search_rounded,
+          size: 20,
+        ),
       ),
-      slivers: (_) => [
+      slivers: (wide) => [
         if (_searchOpen)
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.only(bottom: 20),
               child: TextField(
                 controller: _search,
                 focusNode: _searchFocus,
@@ -428,46 +453,86 @@ class _NotesPageState extends State<NotesPage> {
                 decoration: InputDecoration(
                   hintText: 'Search notes',
                   prefixIcon: const Icon(Icons.search_rounded, size: 19),
-                  fillColor: _paper,
+                  fillColor: raisedPaper,
                   filled: true,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: _line),
+                    borderSide: const BorderSide(color: line),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: _line),
+                    borderSide: const BorderSide(color: line),
                   ),
                 ),
               ),
             ),
           ),
-        const SliverToBoxAdapter(child: Divider(height: 1, color: _line)),
+        const SliverToBoxAdapter(child: Divider(height: 1, color: line)),
         if (notes.isEmpty)
           SliverToBoxAdapter(
             child: _EmptyList(
               message: query.isEmpty ? 'No notes yet' : 'No matching notes',
             ),
           ),
-        SliverList.builder(
-          itemCount: notes.length,
-          itemBuilder: (context, index) {
-            final note = notes[index];
-            return Column(
-              children: [
-                _NoteRow(note: note, onTap: () => widget.onNoteTap(note)),
-                const Divider(height: 1, color: _line),
-              ],
-            );
-          },
-        ),
+        if (notes.isNotEmpty) ...[
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+          _NoteIndex(notes: notes, wide: wide, onNoteTap: widget.onNoteTap),
+        ],
       ],
     );
   }
 }
 
-class _NoteRow extends StatelessWidget {
-  const _NoteRow({required this.note, required this.onTap});
+class _NoteIndex extends StatelessWidget {
+  const _NoteIndex({
+    required this.notes,
+    required this.wide,
+    required this.onNoteTap,
+  });
+
+  final List<NoteItem> notes;
+  final bool wide;
+  final ValueChanged<NoteItem> onNoteTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final columns = wide ? 2 : 1;
+    return SliverList.separated(
+      itemCount: (notes.length + columns - 1) ~/ columns,
+      separatorBuilder: (_, _) => SizedBox(height: wide ? 15 : 12),
+      itemBuilder: (context, index) {
+        final first = index * columns;
+        final firstTile = _NoteTile(
+          note: notes[first],
+          onTap: () => onNoteTap(notes[first]),
+        );
+        if (!wide) return firstTile;
+
+        final second = first + 1;
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: firstTile),
+              const SizedBox(width: 15),
+              Expanded(
+                child: second < notes.length
+                    ? _NoteTile(
+                        note: notes[second],
+                        onTap: () => onNoteTap(notes[second]),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _NoteTile extends StatelessWidget {
+  const _NoteTile({required this.note, required this.onTap});
 
   final NoteItem note;
   final VoidCallback onTap;
@@ -475,88 +540,101 @@ class _NoteRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final updated = MaterialLocalizations.of(context)
-        .formatMediumDate(note.updated.toLocal());
-    final preview = note.body.trim().replaceAll(RegExp(r'\s+'), ' ');
-    return _ListHitTarget(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Icon(
-                Icons.description_outlined,
-                size: 19,
-                color: _accent.withValues(alpha: 0.85),
-              ),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    note.title.isEmpty ? 'Untitled note' : note.title,
-                    style: const TextStyle(
-                      color: _ink,
-                      fontSize: 16,
-                      height: 1.25,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (preview.isNotEmpty) ...[
-                    const SizedBox(height: 5),
-                    Text(
-                      preview,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: _muted,
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 7),
-                  Text(
-                    updated,
-                    style: const TextStyle(color: _muted, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Padding(
-              padding: EdgeInsets.only(top: 1),
-              child: Icon(Icons.chevron_right_rounded, color: _muted, size: 18),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ListHitTarget extends StatelessWidget {
-  const _ListHitTarget({required this.onTap, required this.child});
-
-  final VoidCallback onTap;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
+        .formatShortDate(note.updated.toLocal());
+    final preview = note.body.trim().split(RegExp(r'\n\s*\n')).first;
+    const borderRadius = BorderRadius.all(Radius.circular(13));
     return Material(
-      type: MaterialType.transparency,
+      color: raisedPaper,
+      shape: const RoundedRectangleBorder(
+        borderRadius: borderRadius,
+        side: BorderSide(color: line),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        hoverColor: _paper,
-        focusColor: _softAccent,
+        borderRadius: borderRadius,
+        hoverColor: _softSurface,
+        focusColor: softAccent,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
-          child: child,
+          constraints: const BoxConstraints(minHeight: 172),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 19, 15),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            note.title.trim().isEmpty
+                                ? 'Untitled note'
+                                : note.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: ink,
+                              fontSize: 22,
+                              height: 1.2,
+                              letterSpacing: -0.7,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 3),
+                          child: Icon(
+                            Icons.arrow_outward_rounded,
+                            color: muted,
+                            size: 17,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (preview.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 9),
+                        child: Text(
+                          preview,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: muted,
+                            fontSize: 14,
+                            height: 1.52,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Divider(height: 1, color: line),
+                      const SizedBox(height: 10),
+                      Text(
+                        updated,
+                        style: const TextStyle(
+                          color: muted,
+                          fontSize: 12,
+                          height: 1.3,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -572,7 +650,7 @@ class _EmptyList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Text(message, style: const TextStyle(color: _muted, fontSize: 15)),
+      child: Text(message, style: const TextStyle(color: muted, fontSize: 15)),
     );
   }
 }
@@ -595,25 +673,19 @@ class _ListPageLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mobile = MediaQuery.sizeOf(context).width < 720;
-    final horizontal = mobile ? 24.0 : 44.0;
+    final horizontal = mobile ? 28.0 : 48.0;
     final bottom = mobile ? 104 + MediaQuery.paddingOf(context).bottom : 44.0;
     return LayoutBuilder(
       builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth - horizontal * 2;
+        final endInset =
+            horizontal + (availableWidth - 1030).clamp(0.0, double.infinity);
         final wide =
-            constraints.maxWidth >= 650 &&
+            availableWidth >= 625 &&
             MediaQuery.textScalerOf(context).scale(16) < 24;
         final header = Semantics(
           header: true,
-          child: Text(
-            title,
-            style: TextStyle(
-              color: _ink,
-              fontSize: mobile ? 32 : 36,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -1.2,
-              height: 1.15,
-            ),
-          ),
+          child: Text(title, style: workspaceHeadingStyle(mobile)),
         );
         final head = wide || inlineActions
             ? Row(
@@ -626,23 +698,26 @@ class _ListPageLayout extends StatelessWidget {
               )
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [header, const SizedBox(height: 11), actions],
+                children: [header, const SizedBox(height: 18), actions],
               );
         return CustomScrollView(
           key: scrollKey,
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           slivers: [
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(
+              padding: EdgeInsetsDirectional.fromSTEB(
                 horizontal,
-                mobile ? 24 : 42,
-                horizontal,
-                19,
+                mobile ? 25 : 42,
+                endInset,
+                mobile ? 20 : 26,
               ),
               sliver: SliverToBoxAdapter(child: head),
             ),
             SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: horizontal),
+              padding: EdgeInsetsDirectional.only(
+                start: horizontal,
+                end: endInset,
+              ),
               sliver: SliverMainAxisGroup(slivers: slivers(wide)),
             ),
             SliverToBoxAdapter(child: SizedBox(height: bottom)),

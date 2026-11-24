@@ -1,6 +1,7 @@
 import 'package:easy/calendar_page.dart';
 import 'package:easy/list_pages.dart';
 import 'package:easy/main.dart';
+import 'package:easy/orbit_navigation.dart';
 import 'package:easy/record_editor.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,7 +70,8 @@ void main() {
     await tester.tap(find.widgetWithText(InkWell, 'Calendar').first);
     await tester.pumpAndSettle();
     expect(find.byType(CalendarPage), findsOneWidget);
-    expect(find.text('Week'), findsOneWidget);
+    expect(find.byKey(const ValueKey('calendar-date')), findsOneWidget);
+    expect(find.text('Week'), findsNothing);
 
     await tester.tap(find.widgetWithText(InkWell, 'Tasks').first);
     await tester.pumpAndSettle();
@@ -101,7 +103,12 @@ void _setViewport(WidgetTester tester, Size size) {
 Future<void> _openMobileTasks(WidgetTester tester) async {
   await tester.tap(find.byTooltip('Navigate'));
   await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const ValueKey('Tasks')));
+  await tester.tap(
+    find.descendant(
+      of: find.byType(OrbitNavigation),
+      matching: find.text('Tasks'),
+    ),
+  );
   await tester.pumpAndSettle();
   expect(find.byType(TasksPage), findsOneWidget);
 }

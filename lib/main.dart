@@ -23,20 +23,7 @@ class EasyApp extends StatelessWidget {
     return MaterialApp(
       title: appName,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: accent,
-          primary: accent,
-          onPrimary: Colors.white,
-          surface: paper,
-          onSurface: ink,
-          outline: const Color(0xff929a90),
-          outlineVariant: line,
-        ),
-        scaffoldBackgroundColor: paper,
-        dividerColor: line,
-        visualDensity: VisualDensity.standard,
-      ),
+      theme: easyTheme(),
       home: const _Workspace(),
     );
   }
@@ -67,7 +54,8 @@ class _WorkspaceState extends State<_Workspace> {
   final _storage = SharedPreferencesAsync();
   Future<void> _pendingSave = Future.value();
   late WorkspaceData _data;
-  var _date = dateOnly(DateTime.now());
+  var _calendarDate = dateOnly(DateTime.now());
+  DateTime get _today => dateOnly(DateTime.now());
   var _destination = _Destination.today;
   String? _space;
   Object? _inspected;
@@ -85,7 +73,7 @@ class _WorkspaceState extends State<_Workspace> {
     try {
       final raw = await _storage.getString(_storageKey);
       final data = raw == null
-          ? WorkspaceData.samples(_date)
+          ? WorkspaceData.samples(_today)
           : WorkspaceData.decode(raw);
       if (raw == null) await _storage.setString(_storageKey, data.encode());
       if (!mounted) return;
@@ -127,7 +115,10 @@ class _WorkspaceState extends State<_Workspace> {
     });
   }
 
-  void _changeDate(DateTime date) => setState(() => _date = dateOnly(date));
+  void _changeDate(DateTime date) {
+    final day = dateOnly(date);
+    if (day != _calendarDate) setState(() => _calendarDate = day);
+  }
 
   void _changeSpace(String? space) {
     setState(() {
@@ -244,9 +235,9 @@ class _WorkspaceState extends State<_Workspace> {
           }
         : _recordKind(existing);
     final editor = RecordEditor(
-      date: _date,
+      date: _destination == _Destination.calendar ? _calendarDate : _today,
       kind: kind,
-      initialTaskDate: _destination == _Destination.today ? _date : null,
+      initialTaskDate: _destination == _Destination.today ? _today : null,
       initialCategory: _space,
       event: existing is CalendarEvent ? existing : null,
       task: existing is TaskItem ? existing : null,
@@ -355,16 +346,15 @@ class _WorkspaceState extends State<_Workspace> {
         sizing: StackFit.expand,
         children: [
           TodayPage(
-            date: _date,
+            date: _today,
             events: events,
             tasks: tasks,
-            onDateChanged: _changeDate,
             onEventTap: _openRecord,
             onTaskTap: _openRecord,
             onTaskToggle: _toggleTask,
           ),
           CalendarPage(
-            date: _date,
+            date: _calendarDate,
             events: events,
             onDateChanged: _changeDate,
             onEventTap: _openRecord,
@@ -396,11 +386,15 @@ class _WorkspaceState extends State<_Workspace> {
                     children: [
                       Column(
                         children: [
-                          _MobileHeader(
-                            space: space,
-                            onSpaceChanged: _changeSpace,
-                            onSearch: _search,
-                          ),
+                          if (_destination != _Destination.calendar ||
+                              space != null)
+                            _MobileHeader(
+                              space: space,
+                              displayBrand:
+                                  _destination != _Destination.calendar,
+                              onSpaceChanged: _changeSpace,
+                              onSearch: _search,
+                            ),
                           Expanded(child: page),
                         ],
                       ),
@@ -414,7 +408,10 @@ class _WorkspaceState extends State<_Workspace> {
                           backgroundColor: accent,
                           foregroundColor: Colors.white,
                           shape: const CircleBorder(),
-                          child: const Icon(Icons.add_rounded, size: 29),
+                          elevation: 3,
+                          highlightElevation: 1,
+                          hoverElevation: 5,
+                          child: const Icon(Icons.add_rounded, size: 27),
                         ),
                       ),
                       Positioned.fill(
@@ -438,7 +435,7 @@ class _WorkspaceState extends State<_Workspace> {
                       _DesktopHeader(onSearch: _search, onCapture: _editRecord),
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          padding: const EdgeInsets.fromLTRB(12, 0, 14, 14),
                           child: Row(
                             children: [
                               _Sidebar(
@@ -448,10 +445,10 @@ class _WorkspaceState extends State<_Workspace> {
                                 onNavigate: _navigate,
                                 onSpaceChanged: _changeSpace,
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               Expanded(child: _Surface(child: page)),
                               if (_inspected != null && width >= 1000) ...[
-                                const SizedBox(width: 10),
+                                const SizedBox(width: 12),
                                 SizedBox(
                                   width: width >= 1250 ? 294 : 264,
                                   child: _Surface(
@@ -488,7 +485,7 @@ class _Surface extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: paper,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(19),
       clipBehavior: Clip.antiAlias,
       child: child,
     );
@@ -502,12 +499,12 @@ class _Brand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = dark ? const Color(0xffe9eee7) : accent;
+    final color = dark ? const Color(0xffdcead9) : accent;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.wb_twilight_outlined, size: 22, color: color),
-        const SizedBox(width: 9),
+        Icon(Icons.wb_twilight_outlined, size: 23, color: color),
+        const SizedBox(width: 8),
         Flexible(
           child: Text(
             appName,
@@ -515,9 +512,9 @@ class _Brand extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 17,
-              letterSpacing: -.45,
-              color: dark ? Colors.white : ink,
+              fontSize: 19,
+              letterSpacing: -.7,
+              color: dark ? const Color(0xfff5f7f1) : ink,
             ),
           ),
         ),
@@ -538,9 +535,9 @@ class _DesktopHeader extends StatelessWidget {
         ? '⌘ K'
         : 'Ctrl K';
     return SizedBox(
-      height: 68,
+      height: 70,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 23),
+        padding: const EdgeInsets.symmetric(horizontal: 25),
         child: Row(
           children: [
             const Expanded(child: _Brand(dark: true)),
@@ -550,15 +547,18 @@ class _DesktopHeader extends StatelessWidget {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 370),
                   child: Material(
-                    color: const Color(0xff252a26),
-                    borderRadius: BorderRadius.circular(20),
+                    color: shellSurface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: Color(0xff343d34)),
+                    ),
                     child: InkWell(
                       onTap: onSearch,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(12),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 9,
+                          horizontal: 13,
+                          vertical: 8,
                         ),
                         child: Row(
                           children: [
@@ -579,11 +579,25 @@ class _DesktopHeader extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            Text(
-                              shortcut,
-                              style: const TextStyle(
-                                color: sidebarText,
-                                fontSize: 11,
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(
+                                  color: const Color(0xff3d473c),
+                                ),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 2,
+                                ),
+                                child: Text(
+                                  shortcut,
+                                  style: const TextStyle(
+                                    color: sidebarText,
+                                    fontSize: 10,
+                                  ),
+                                ),
                               ),
                             ),
                           ],
@@ -602,8 +616,15 @@ class _DesktopHeader extends StatelessWidget {
                   icon: const Icon(Icons.add_rounded, size: 20),
                   label: const Text('New'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xffdce7dd),
+                    backgroundColor: const Color(0xffe3ebdf),
                     foregroundColor: const Color(0xff283d31),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 17,
+                      vertical: 11,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
@@ -618,21 +639,27 @@ class _DesktopHeader extends StatelessWidget {
 class _MobileHeader extends StatelessWidget {
   const _MobileHeader({
     required this.space,
+    required this.displayBrand,
     required this.onSpaceChanged,
     required this.onSearch,
   });
 
   final String? space;
+  final bool displayBrand;
   final ValueChanged<String?> onSpaceChanged;
   final VoidCallback onSearch;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 6, 13, 0),
+      padding: const EdgeInsets.fromLTRB(28, 8, 16, 0),
       child: Row(
         children: [
-          const Expanded(child: _Brand(dark: false)),
+          Expanded(
+            child: displayBrand
+                ? const _Brand(dark: false)
+                : const SizedBox.shrink(),
+          ),
           MenuAnchor(
             builder: (context, controller, _) => TextButton.icon(
               onPressed: () =>
@@ -649,6 +676,9 @@ class _MobileHeader extends StatelessWidget {
               ),
               style: TextButton.styleFrom(
                 foregroundColor: space == null ? muted : spaceColor(space!),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                textStyle: Theme.of(context).textTheme.labelLarge
+                    ?.copyWith(fontSize: 13, fontWeight: FontWeight.w500),
               ),
             ),
             menuChildren: [
@@ -666,7 +696,7 @@ class _MobileHeader extends StatelessWidget {
           IconButton(
             tooltip: 'Search workspace',
             onPressed: onSearch,
-            icon: const Icon(Icons.search_rounded, size: 22),
+            icon: const Icon(Icons.search_rounded, size: 21),
           ),
         ],
       ),
@@ -692,11 +722,11 @@ class _Sidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: compact ? 54 : 194,
+      width: compact ? 54 : 206,
       child: ListView(
         padding: EdgeInsets.only(
           left: compact ? 0 : 2,
-          top: 8,
+          top: 9,
           right: compact ? 0 : 8,
         ),
         children: [
@@ -709,16 +739,24 @@ class _Sidebar extends StatelessWidget {
               compact: compact,
               onTap: () => onNavigate(item),
             ),
-          const SizedBox(height: 27),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              compact ? 4 : 12,
+              19,
+              compact ? 4 : 10,
+              16,
+            ),
+            child: const Divider(color: Color(0xff323b33)),
+          ),
           if (!compact)
             const Padding(
               padding: EdgeInsets.fromLTRB(13, 4, 0, 8),
               child: Text(
                 'Spaces',
                 style: TextStyle(
-                  color: sidebarText,
+                  color: Color(0xffa7b0a4),
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -734,7 +772,7 @@ class _Sidebar extends StatelessWidget {
             _SidebarButton(
               label: spaceName(category),
               icon: Icons.circle,
-              color: spaceColor(category).withValues(alpha: .95),
+              color: Color.lerp(spaceColor(category), sidebarText, .43)!,
               selected: space == category,
               compact: compact,
               onTap: () => onSpaceChanged(category),
@@ -773,14 +811,14 @@ class _SidebarButton extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.only(bottom: 3),
           child: Material(
-            color: selected ? const Color(0xff2c322d) : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+            color: selected ? const Color(0xff2a342b) : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
             child: InkWell(
               onTap: onTap,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(9),
               child: Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: compact ? 0 : 13,
+                  horizontal: compact ? 0 : 12,
                   vertical: 12,
                 ),
                 child: Row(
@@ -792,7 +830,7 @@ class _SidebarButton extends StatelessWidget {
                       width: 20,
                       child: Icon(
                         icon,
-                        size: icon == Icons.circle ? 10 : 18,
+                        size: icon == Icons.circle ? 8 : 18,
                         color: selected && icon != Icons.circle
                             ? const Color(0xffd0dfd1)
                             : color,
@@ -804,7 +842,9 @@ class _SidebarButton extends StatelessWidget {
                         child: Text(
                           label,
                           style: TextStyle(
-                            color: selected ? Colors.white : sidebarText,
+                            color: selected
+                                ? const Color(0xfff0f5ec)
+                                : sidebarText,
                             fontSize: 14,
                             fontWeight: selected
                                 ? FontWeight.w600
@@ -895,7 +935,7 @@ class _RecordDetails extends StatelessWidget {
       _ => <(IconData, String)>[],
     };
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
+      padding: EdgeInsets.fromLTRB(25, onClose == null ? 11 : 22, 25, 27),
       child: SafeArea(
         top: false,
         child: Column(
@@ -907,9 +947,10 @@ class _RecordDetails extends StatelessWidget {
                   child: Text(
                     _recordTitle(record),
                     style: const TextStyle(
-                      fontSize: 22,
+                      fontSize: 24,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: -.4,
+                      letterSpacing: -.8,
+                      height: 1.15,
                     ),
                   ),
                 ),
@@ -930,22 +971,35 @@ class _RecordDetails extends StatelessWidget {
                     Icon(icon, color: muted, size: 17),
                     const SizedBox(width: 9),
                     Expanded(
-                      child: Text(label, style: const TextStyle(color: muted)),
+                      child: Text(
+                        label,
+                        style: const TextStyle(color: muted, fontSize: 13),
+                      ),
                     ),
                   ],
                 ),
               ),
             if (item is NoteItem && item.body.trim().isNotEmpty) ...[
               const Divider(),
-              const SizedBox(height: 4),
-              SelectableText(item.body, style: const TextStyle(height: 1.55)),
+              const SizedBox(height: 14),
+              SelectableText(
+                item.body,
+                style: const TextStyle(height: 1.6, fontSize: 14),
+              ),
             ],
             const SizedBox(height: 14),
             Wrap(
               spacing: 8,
               children: [
-                FilledButton(onPressed: onEdit, child: const Text('Edit')),
-                TextButton(onPressed: onDelete, child: const Text('Delete')),
+                FilledButton.tonal(
+                  onPressed: onEdit,
+                  child: const Text('Edit'),
+                ),
+                TextButton(
+                  onPressed: onDelete,
+                  style: TextButton.styleFrom(foregroundColor: muted),
+                  child: const Text('Delete'),
+                ),
               ],
             ),
           ],
