@@ -229,6 +229,19 @@ final class SyncJournalCore implements SyncJournal {
       key: pairKey,
     );
     final preview = _replica.previewBatch(verified);
+    final records = {for (final change in preview.records) change.key: change};
+    if (preview.result.duplicates > 0) {
+      for (final signed in verified) {
+        final change = signed.change;
+        if (_replica.watermark.contains(change.dot) &&
+            !records.containsKey(change.record)) {
+          final recorded = _replica.read(change.record);
+          if (recorded != null) {
+            records[change.record] = SyncRecordChange.replay(recorded);
+          }
+        }
+      }
+    }
     final missing = <String, int>{};
     for (final deferred in preview.result.deferred) {
       for (final counter in deferred.missing.counters.entries) {
@@ -247,7 +260,7 @@ final class SyncJournalCore implements SyncJournal {
       hasDestructiveChanges: _destructive(preview),
       hasConflicts: _conflicts(preview),
       missing: SyncVersionVector(missing),
-      records: preview.records,
+      records: List.unmodifiable(records.values),
     );
   }
 

@@ -25,8 +25,9 @@ void main() {
         databasePath: path,
         preferences: SharedPreferencesAsync(),
         readLegacy: () async {
-          if (phase != 'write')
+          if (phase != 'write') {
             throw StateError('The crash fixture lost its migration.');
+          }
           return WorkspaceSnapshot(
             workspaceJson: _workspace('Initial'),
             gymSessionJson: const [],

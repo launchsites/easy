@@ -33,11 +33,20 @@ final class SyncBatchResult {
 }
 
 final class SyncRecordChange {
-  const SyncRecordChange._(this.key, this.before, this.after);
+  const SyncRecordChange._(
+    this.key,
+    this.before,
+    this.after, {
+    this.isReplay = false,
+  });
+
+  factory SyncRecordChange.replay(SyncRecord record) =>
+      SyncRecordChange._(record.key, record, record, isReplay: true);
 
   final SyncRecordKey key;
   final SyncRecord? before;
   final SyncRecord? after;
+  final bool isReplay;
 }
 
 final class SyncBatchPreview {

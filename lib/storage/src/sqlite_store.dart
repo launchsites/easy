@@ -67,7 +67,12 @@ class _SqliteWorkspaceStore implements WorkspaceHistoryStore {
   Future<WorkspaceRevision> restoreBackup(
     WorkspaceBackupPreview preview, {
     required int expectedRevision,
-  }) => _client.request(_Request.restore, (preview.snapshot, expectedRevision));
+    String? operationId,
+  }) => _client.request(_Request.restore, (
+    preview.snapshot,
+    expectedRevision,
+    validateOperationId(operationId),
+  ));
 
   @override
   Future<Uint8List?> readRecoveryBackup() => _client.request(_Request.recovery);
@@ -139,7 +144,7 @@ enum _Request {
 }
 
 typedef _SaveArguments = (WorkspaceMutation, int?, String?);
-typedef _RestoreArguments = (WorkspaceSnapshot, int);
+typedef _RestoreArguments = (WorkspaceSnapshot, int, String?);
 
 class _DatabaseClient {
   final _responses = ReceivePort();
@@ -525,40 +530,29 @@ class _SqliteDatabase {
     final fingerprint = operationId == null
         ? null
         : mutationFingerprint(mutation);
-    if (operationId != null) {
-      final prior = _database.select(
-        'SELECT fingerprint FROM operation_ids WHERE id = ?',
-        [operationId],
-      );
-      if (prior.isNotEmpty) {
-        if (prior.single['fingerprint'] != fingerprint) {
-          throw const WorkspaceStoreException(
-            'That operation ID already belongs to a different change.',
-          );
-        }
-        return current;
-      }
-    }
+    if (_replayed(operationId, fingerprint)) return current;
     verifyRevision(expectedRevision, current.revision);
     final updated = mutation.apply(current.snapshot);
     final changed = !snapshotsEqual(current.snapshot, updated);
     final next = changed
         ? _validateAndAppend(updated, current.revision + 1, 'edit')
         : current;
-    if (operationId != null) {
-      _database.execute(
-        'INSERT INTO operation_ids (id, fingerprint) VALUES (?, ?)',
-        [operationId, fingerprint],
-      );
-    }
+    _recordOperation(operationId, fingerprint);
     return next;
   });
 
   WorkspaceRevision restore(_RestoreArguments arguments) => _transaction(() {
-    final (snapshot, expectedRevision) = arguments;
+    final (snapshot, expectedRevision, operationId) = arguments;
     final current = read();
+    final fingerprint = operationId == null
+        ? null
+        : restoreFingerprint(snapshot);
+    if (_replayed(operationId, fingerprint)) return current;
     verifyRevision(expectedRevision, current.revision);
-    if (snapshotsEqual(current.snapshot, snapshot)) return current;
+    if (snapshotsEqual(current.snapshot, snapshot)) {
+      _recordOperation(operationId, fingerprint);
+      return current;
+    }
     final next = _validateAndAppend(snapshot, current.revision + 1, 'restore');
     _database.execute(
       '''
@@ -567,8 +561,32 @@ class _SqliteDatabase {
     ''',
       [encodeBackup(current)],
     );
+    _recordOperation(operationId, fingerprint);
     return next;
   });
+
+  bool _replayed(String? id, String? fingerprint) {
+    if (id == null) return false;
+    final row = _database.select(
+      'SELECT fingerprint FROM operation_ids WHERE id = ?',
+      [id],
+    ).firstOrNull;
+    if (row == null) return false;
+    if (row['fingerprint'] != fingerprint) {
+      throw const WorkspaceStoreException(
+        'That operation ID already belongs to a different change.',
+      );
+    }
+    return true;
+  }
+
+  void _recordOperation(String? id, String? fingerprint) {
+    if (id == null) return;
+    _database.execute(
+      'INSERT INTO operation_ids (id, fingerprint) VALUES (?, ?)',
+      [id, fingerprint],
+    );
+  }
 
   WorkspaceRevision _validateAndAppend(
     WorkspaceSnapshot snapshot,

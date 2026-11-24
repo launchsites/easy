@@ -16,12 +16,14 @@ The system vault stores the installation identity, journal encryption keys and p
 
 A journal approval binds the peer's public fingerprint to an immutable key ID. A competing approval can leave its own candidate in protected storage while the committed key remains attached to the active grant. Revocation removes journal permission before cleaning up the vault entry. If vault cleanup fails, the caller can retry while the earlier permission stays revoked. Copies already exported remain with their recipients.
 
-The host chooses an approved device for export or import. Files contain authenticated encrypted batches with signed, bounded changes. Import preview checks the workspace, sender, recipient, key, causal dependencies, and conflict states. Commit uses the reviewed revision and requires separate consent for removals or conflicts. The journal keeps accepted changes and the host decides how to project reviewed records into Easy.
+Choose an approved device for export or import. Files contain authenticated encrypted batches with signed, bounded changes. The receiving device can share an encrypted progress code after saving each bundle. The next export uses that device-specific code to continue from its saved watermark.
+
+Import preview checks the workspace, sender, recipient, key, causal dependencies, and conflict states. Commit uses the reviewed revision and requires separate consent for removals or conflicts. Reviewed journal records can then be selected for a separate workspace projection. Projection previews bind the workspace and sync revisions, and an operation ID lets a confirmed workspace restore be retried with its recovery point intact. Reopening an accepted bundle reveals its current journal records for another workspace review.
 
 ## Validation
 
 ```sh
-flutter test test/sync_pairing_test.dart test/manual_sync_workspace_test.dart test/sync_password_vault_test.dart test/sync_journal_test.dart test/workspace_sync_test.dart
+flutter test test/sync_pairing_test.dart test/manual_sync_workspace_test.dart test/manual_sync_page_test.dart test/sync_password_vault_test.dart test/sync_journal_test.dart test/workspace_sync_test.dart
 ```
 
-The tests exercise the code exchange, stale and competing approvals, locked-vault recovery, revoke-before-cleanup, ciphertext transfer between two synthetic native stores, and passphrase file reopening and corruption checks. The system vault adapter is exercised through the plugin's test backend. Access to platform keychains and in-person token scanning needs separate real-device validation.
+The tests exercise the code exchange, stale and competing approvals, locked-vault recovery, revoke-before-cleanup, ciphertext transfer and directional progress between two synthetic native stores, and passphrase file reopening and corruption checks. The pairing widget test uses a 320-pixel viewport with 135% text scaling. A separate test reviews a conflicting bundle and projects only a selected record before confirming revocation. The system vault adapter is exercised through the plugin's test backend. Access to platform keychains and in-person token scanning needs separate real-device validation.

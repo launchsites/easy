@@ -162,6 +162,18 @@ void main() {
     final reopenedFirst = await open(first.workspaceId);
     final reopenedSecond = await open(first.workspaceId, isSecond: true);
     expect(reopenedFirst.device.fingerprint, first.device.fingerprint);
+    final replay = await reopenedSecond.previewIncoming(
+      bytes: exported.bytes,
+      senderId: reopenedFirst.device.fingerprint,
+    );
+    expect(replay.changeCount, 0);
+    expect(replay.duplicateCount, 1);
+    expect(replay.records.single.isReplay, isTrue);
+    final reopenedRevision = (await reopenedSecond.status()).revision;
+    expect(
+      (await reopenedSecond.commitIncoming(replay)).revision,
+      reopenedRevision,
+    );
     expect(
       (await reopenedSecond.readRecord(_note))?.fields['title']?.single.value,
       'Synthetic planning',
@@ -310,6 +322,56 @@ void main() {
     expect(
       (await open(session.workspaceId)).device.fingerprint,
       session.device.fingerprint,
+    );
+  });
+
+  test('authenticated progress continues from the peer and rejects a reflected receipt', () async {
+    final first = await create();
+    final second = await create(isSecond: true, id: first.workspaceId);
+    final (firstReview, secondReview) = await review(first, second);
+    await first.approvePair(firstReview, expectedRevision: 0);
+    await second.approvePair(secondReview, expectedRevision: 0);
+    await first.writeLocalChange(
+      record: _note,
+      kind: SyncChangeKind.patch,
+      fields: {'title': 'First file'},
+    );
+    final bundle = (await first.exportFor(second.device.fingerprint))!;
+    final incoming = await second.previewIncoming(
+      bytes: bundle.bytes,
+      senderId: first.device.fingerprint,
+    );
+    await second.commitIncoming(incoming);
+    final peerProgress = await second.progressFor(first.device.fingerprint);
+    final ownProgress = await first.progressFor(second.device.fingerprint);
+    expect(
+      await first.exportFor(
+        second.device.fingerprint,
+        peerProgress: peerProgress,
+      ),
+      isNull,
+    );
+    await expectLater(
+      first.exportFor(second.device.fingerprint, peerProgress: ownProgress),
+      throwsA(isA<SyncAuthenticationException>()),
+    );
+    await first.writeLocalChange(
+      record: _note,
+      kind: SyncChangeKind.patch,
+      fields: {'body': 'Next file'},
+    );
+    final next = (await first.exportFor(
+      second.device.fingerprint,
+      peerProgress: peerProgress,
+    ))!;
+    expect(next.changeCount, 1);
+    final preview = await second.previewIncoming(
+      bytes: next.bytes,
+      senderId: first.device.fingerprint,
+    );
+    expect(
+      preview.records.single.after?.fields['body']?.single.value,
+      'Next file',
     );
   });
 }

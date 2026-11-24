@@ -43,6 +43,9 @@ String mutationFingerprint(WorkspaceMutation mutation) => digestText(
   }),
 );
 
+String restoreFingerprint(WorkspaceSnapshot snapshot) =>
+    digestText(jsonEncode(['restore', snapshotFields(snapshot)]));
+
 String? validateOperationId(String? id) {
   if (id != null && (id.trim().isEmpty || id.length > 200)) {
     throw ArgumentError('Use an operation ID of 1 to 200 characters.');

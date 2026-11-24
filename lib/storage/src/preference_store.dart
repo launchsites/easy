@@ -130,21 +130,37 @@ class _PreferenceWorkspaceStore implements WorkspaceStore {
   Future<WorkspaceRevision> restoreBackup(
     WorkspaceBackupPreview preview, {
     required int expectedRevision,
+    String? operationId,
   }) => _queue(() async {
     final state = await _read();
     final current = state.current;
+    final id = validateOperationId(operationId);
+    final fingerprint = id == null
+        ? null
+        : restoreFingerprint(preview.snapshot);
+    if (state.ids[id] case final previous?) {
+      if (previous != fingerprint) {
+        throw const WorkspaceStoreException(
+          'That operation ID already belongs to a different change.',
+        );
+      }
+      return current;
+    }
     verifyRevision(expectedRevision, current.revision);
-    if (snapshotsEqual(current.snapshot, preview.snapshot)) return current;
-    validateSnapshot(preview.snapshot);
-    final next = WorkspaceRevision(
-      revision: current.revision + 1,
-      snapshot: preview.snapshot,
-    );
+    final changed = !snapshotsEqual(current.snapshot, preview.snapshot);
+    if (!changed && id == null) return current;
+    if (changed) validateSnapshot(preview.snapshot);
+    final next = changed
+        ? WorkspaceRevision(
+            revision: current.revision + 1,
+            snapshot: preview.snapshot,
+          )
+        : current;
     await _write(
       _PreferenceState(
         current: next,
-        ids: state.ids,
-        recovery: utf8.decode(encodeBackup(current)),
+        ids: {...state.ids, ?id: ?fingerprint},
+        recovery: changed ? utf8.decode(encodeBackup(current)) : state.recovery,
       ),
     );
     return next;

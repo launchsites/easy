@@ -233,6 +233,7 @@ class _HistoryFixture implements WorkspaceHistoryStore {
   Future<WorkspaceRevision> restoreBackup(
     WorkspaceBackupPreview preview, {
     required int expectedRevision,
+    String? operationId,
   }) async {
     _expect(expectedRevision);
     commits++;

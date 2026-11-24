@@ -197,16 +197,44 @@ final class ManualSyncWorkspace {
   Future<SyncJournalExport?> exportFor(
     String recipientId, {
     SyncVersionVector known = const SyncVersionVector.empty(),
+    String? peerProgress,
   }) async {
     final (keyId, key) = await _openPair(recipientId);
     try {
+      final delivered = peerProgress == null
+          ? known
+          : await const SyncProgressCodec().open(
+              token: peerProgress,
+              workspace: workspaceId,
+              senderId: recipientId,
+              recipientId: device.fingerprint,
+              key: key,
+            );
       final encrypted = await _journal.exportChanges(
         recipientId: recipientId,
         pairKey: key,
-        known: known,
+        known: delivered,
       );
       await _verifyPair(recipientId, keyId);
       return encrypted;
+    } finally {
+      key.destroy();
+    }
+  }
+
+  Future<String> progressFor(String recipientId) async {
+    final (keyId, key) = await _openPair(recipientId);
+    try {
+      final state = await _journal.status();
+      final token = await const SyncProgressCodec().seal(
+        workspace: workspaceId,
+        senderId: device.fingerprint,
+        recipientId: recipientId,
+        key: key,
+        watermark: state.watermark,
+      );
+      await _verifyPair(recipientId, keyId);
+      return token;
     } finally {
       key.destroy();
     }

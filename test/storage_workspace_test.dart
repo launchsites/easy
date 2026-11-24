@@ -331,6 +331,48 @@ void main() {
     },
   );
 
+  for (final usePreferences in [false, true]) {
+    test(
+      'restore operation IDs preserve later edits and the recovery point (${usePreferences ? 'preferences' : 'SQLite'})',
+      () async {
+        final store = await open(usePreferences: usePreferences);
+        final backup = await store.previewBackup(await store.createBackup());
+        await store.save(
+          WorkspaceMutation.workspace(_workspace('before restore')),
+        );
+        final applied = await store.restoreBackup(
+          backup,
+          expectedRevision: 2,
+          operationId: 'confirmed-projection',
+        );
+        expect(applied.revision, 3);
+        final recovery = await store.readRecoveryBackup();
+        expect(recovery, isNotNull);
+        await store.save(
+          WorkspaceMutation.workspace(_workspace('after restore')),
+        );
+        final retry = await store.restoreBackup(
+          backup,
+          expectedRevision: 2,
+          operationId: 'confirmed-projection',
+        );
+        expect(retry.revision, 4);
+        expect(retry.snapshot.workspaceJson, _workspace('after restore'));
+        expect(await store.readRecoveryBackup(), recovery);
+        final different = await store.previewBackup(recovery!);
+        await expectLater(
+          store.restoreBackup(
+            different,
+            expectedRevision: 4,
+            operationId: 'confirmed-projection',
+          ),
+          throwsA(isA<WorkspaceStoreException>()),
+        );
+        expect((await store.read()).revision, 4);
+      },
+    );
+  }
+
   test('restore rolls back when writing its recovery point fails', () async {
     final store = await open();
     final backup = await store.previewBackup(await store.createBackup());

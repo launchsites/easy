@@ -164,9 +164,11 @@ abstract interface class WorkspaceStore {
   Future<WorkspaceBackupPreview> previewBackup(Uint8List data);
 
   /// Stores the previous state as a recovery point in the same transaction.
+  /// Repeating an operation ID with the same snapshot returns the current head.
   Future<WorkspaceRevision> restoreBackup(
     WorkspaceBackupPreview preview, {
     required int expectedRevision,
+    String? operationId,
   });
 
   Future<Uint8List?> readRecoveryBackup();

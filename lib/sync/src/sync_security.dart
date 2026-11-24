@@ -275,6 +275,108 @@ final class SyncPairKey {
   void destroy() => _secret.destroy();
 }
 
+/// An authenticated progress receipt lets the next manual export continue
+/// from the recipient's last saved causal watermark.
+final class SyncProgressCodec {
+  const SyncProgressCodec();
+
+  static const _prefix = 'easy-progress1:';
+  static const _maximumTokenLength = 8192;
+  static final _kdf = Hkdf(hmac: Hmac.sha256(), outputLength: _pairKeyBytes);
+
+  Future<String> seal({
+    required SyncWorkspaceId workspace,
+    required String senderId,
+    required String recipientId,
+    required SyncPairKey key,
+    required SyncVersionVector watermark,
+  }) async {
+    final context = _progressContext(workspace, senderId, recipientId);
+    final derived = await _kdf.deriveKey(secretKey: key._secret, info: context);
+    try {
+      final sealed = await _encryptionAlgorithm.encrypt(
+        utf8.encode(jsonEncode(watermark.counters)),
+        secretKey: derived,
+        aad: context,
+      );
+      final token = '$_prefix${base64Url.encode(sealed.concatenation())}';
+      if (token.length > _maximumTokenLength) {
+        throw const FormatException('Sync progress is too large.');
+      }
+      return token;
+    } finally {
+      derived.destroy();
+    }
+  }
+
+  Future<SyncVersionVector> open({
+    required String token,
+    required SyncWorkspaceId workspace,
+    required String senderId,
+    required String recipientId,
+    required SyncPairKey key,
+  }) async {
+    if (token.length > _maximumTokenLength || !token.startsWith(_prefix)) {
+      throw const FormatException('Invalid sync progress receipt.');
+    }
+    final Uint8List bytes;
+    try {
+      final payload = token.substring(_prefix.length);
+      bytes = base64Url.decode(payload);
+      if (bytes.length <= _nonceLength + _tagLength ||
+          base64Url.encode(bytes) != payload) {
+        throw const FormatException('Invalid sync progress receipt.');
+      }
+    } on FormatException {
+      throw const FormatException('Invalid sync progress receipt.');
+    }
+    final context = _progressContext(workspace, senderId, recipientId);
+    final derived = await _kdf.deriveKey(secretKey: key._secret, info: context);
+    try {
+      final opened = await _encryptionAlgorithm.decrypt(
+        SecretBox.fromConcatenation(
+          bytes,
+          nonceLength: _nonceLength,
+          macLength: _tagLength,
+        ),
+        secretKey: derived,
+        aad: context,
+      );
+      final decoded = syncDecodeJson(
+        utf8.decode(opened),
+        maxChars: _maximumTokenLength,
+        maxDepth: 2,
+      );
+      if (decoded is! Map<String, dynamic> ||
+          decoded.values.any((value) => value is! int)) {
+        throw const FormatException('Invalid sync progress watermark.');
+      }
+      return SyncVersionVector(decoded.cast<String, int>());
+    } on SecretBoxAuthenticationError {
+      throw const SyncAuthenticationException();
+    } finally {
+      derived.destroy();
+    }
+  }
+
+  List<int> _progressContext(
+    SyncWorkspaceId workspace,
+    String sender,
+    String recipient,
+  ) {
+    if (sender == recipient ||
+        !syncMatches(syncDeviceIdPattern, sender) ||
+        !syncMatches(syncDeviceIdPattern, recipient)) {
+      throw const SyncTrustException(
+        'Sync progress requires two approved devices.',
+      );
+    }
+    return utf8.encode(
+      'Easy Manual Sync Progress v1\u0000${workspace.value}\t$sender\t$recipient',
+    );
+  }
+}
+
 const _envelopeMagic = 'EASYSYN\u0000';
 const _envelopeVersion = 1;
 const _tagLength = 16;
