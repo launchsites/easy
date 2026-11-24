@@ -2,7 +2,7 @@
 
 | Requirement | Development evidence | Remaining release gate |
 |---|---|---|
-| P01 Device-first start and preferences | Native Linux first-run choices, empty and sample workspaces, presets, display-name tool and restart. Hosted Android 36 and iPhone 17 launches verified the private empty workspace awaiting setup. | First-run checks on physical devices and desktop Apple. |
+| P01 Device-first start and preferences | Native Linux first-run choices, empty and sample workspaces, presets, display-name tool and restart. Hosted Android 36, iPhone 17, and ARM64 macOS launches verified the private empty workspace awaiting setup. | First-run checks on physical devices. |
 | P02 Today and navigation | Linux at twelve sizes, thumb orbit, Calendar swipe, keyboard search, focus surfaces and compact lists with large text. | Physical touch, assistive technology and device sign-off. |
 | P03 Tasks and notes | Due times, nesting, repeats, reminders, prerequisites, Markdown and workspace links. Fault tests verify completion and revision-bound Undo. | Physical reminder delivery and broader platform accessibility. |
 | P04 Calendar and deterministic planning | Mobile day and desktop week, DST, iCalendar, local repeats, saved travel, verified timing suggestions, reviewed day and week blocks and mocked Apple access. | EventKit permissions and account interoperability on Apple devices. |
@@ -14,6 +14,6 @@
 | P10 Capture and integrations | Reviewable text and speech, optional local or paid models, recent timing history, adaptive spending and local follow-up rules. | Real microphone use, paid billing, and broader model and device coverage. |
 | Data integrity and recovery | SQLite migration, bounded history, authenticated original media, selected restores and real process interruption and write error recovery. | Wider file system and device interruption checks before release. |
 | Device sharing | Encrypted selected change files, independent approvals, a native two-profile file transfer, paired journal reopen, conflicts, revocation and five-device ordering tests. | Physical peer interoperability. |
-| Platform distribution | Linux native review builds, Android review APKs and lint for ARMv7, ARM64 and x86-64, hosted Android 36 and iPhone 17 first launches, and macOS SDK build. | Android and Apple devices and distribution signing. |
+| Platform distribution | Linux native review builds, Android review APKs and lint for ARMv7, ARM64 and x86-64, hosted Android 36 and iPhone 17 first launches, and sandboxed ARM64 macOS startup. | Android and Apple devices and distribution signing. |
 
 [Reproducible checks and measured results](TEST_EVIDENCE.md)

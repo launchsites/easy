@@ -2,7 +2,7 @@
 
 ## Native and platform evidence
 
-On the frozen `5c4bd85` source, the full Flutter suite passed 881 tests in Europe/London and 886 in America/New_York, with seven and two timezone-specific skips respectively. Fifty-five focused calendar, capture, and scheduling tests passed in Australia/Lord_Howe, with five expected skips. Strict Dart analysis and four native project declaration checks passed. [Earlier hosted Linux verification](https://github.com/launchsites/easy/actions/runs/45334600558)
+On the frozen `5c4bd85` source, the full Flutter suite passed 881 tests in Europe/London and 886 in America/New_York, with seven and two timezone-specific skips respectively. Fifty-five focused calendar, capture, and scheduling tests passed in Australia/Lord_Howe, with five expected skips. Strict Dart analysis and four native project declaration checks passed. [Hosted strict analysis, 881 London tests, and Linux release build](https://github.com/launchsites/easy/actions/runs/45343263354)
 
 | Check | Result |
 |---|---|
@@ -11,7 +11,7 @@ On the frozen `5c4bd85` source, the full Flutter suite passed 881 tests in Europ
 | Native release soak | The pinned route test ran for 1,801 seconds. All 156 desktop route probes and 24 hold-and-drag navigation probes passed. The recorded workspace digest was unchanged. |
 | Native viewport review | Home, Tasks and Settings exercised at twelve sizes. The compact 320 × 568 Home layout lifted the first visible checkbox above the navigation dock. A Tasks regression covers 568 × 320 landscape. |
 | Android API 36 | Offline review APKs built for ARMv7, ARM64 and x86-64. Checks inspect development signatures, compiled backup and network rules, and 16 KiB ZIP and ELF load alignment. A hosted AOSP emulator launched the non-debuggable x86-64 release and verified its private empty workspace. [Emulator run](https://github.com/launchsites/easy/actions/runs/45344251920) |
-| macOS and iOS | Hosted Xcode 26.4.1 built the iOS simulator target and unsigned macOS release. The iPhone 17 simulator launched Easy and verified its first private SQLite revision. Provisioning, physical device permissions and real EventKit account verification remain open. [Apple runtime run](https://github.com/launchsites/easy/actions/runs/45341653863) |
+| macOS and iOS | Hosted Xcode 26.4.1 built the iOS simulator target and unsigned macOS release. The iPhone 17 simulator launched Easy and verified its first private SQLite revision. The macOS ARM64 release also launched on macOS 15.8.2 with Xcode 26.3, retaining its release sandbox entitlements and verifying private SQLite integrity. Provisioning, physical device permissions and real EventKit account checks remain open. [iPhone runtime](https://github.com/launchsites/easy/actions/runs/45341653863) · [macOS runtime](https://github.com/launchsites/easy/actions/runs/45345576521) |
 | Browser setup smoke | A local Flutter web release at `7c18361` displayed and saved initial setup in Chromium 156 at 1440 × 900, 390 × 844 and 320 × 568. The choice survived reload, with zero nonlocal page requests or unhandled page errors during the probe. |
 
 [Native performance report](native-performance-benchmark.md) · [Release smoke](native-release-smoke.md) · [Android checks](android-validation.md) · [Appearance previews](DESIGN_PREVIEWS.md)

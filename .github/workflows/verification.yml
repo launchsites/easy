@@ -70,3 +70,37 @@ jobs:
 
       - name: Compile the Linux release
         run: flutter build linux --release --no-pub
+
+      - name: Archive the Linux review package
+        if: github.event_name != 'pull_request'
+        run: |
+          stage="$RUNNER_TEMP/easy-linux-review"
+          bundle=build/linux/x64/release/bundle
+          test -x "$bundle/easy"
+          mkdir -p "$stage"
+          cp -a "$bundle" "$stage/easy"
+          {
+            printf 'Easy Linux x86-64 review package\n'
+            printf 'Source: https://github.com/%s/tree/%s\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA"
+            printf 'From the extracted easy directory, run ./easy.\n'
+            printf 'GTK 3, libsecret, and GStreamer 1.x are required at runtime.\n'
+          } > "$stage/easy/BUILD.txt"
+          tar -czf "$stage/easy-linux-x64.tar.gz" -C "$stage" easy
+          mkdir "$stage/extracted"
+          tar -xzf "$stage/easy-linux-x64.tar.gz" -C "$stage/extracted"
+          test -x "$stage/extracted/easy/easy"
+          (
+            cd "$stage"
+            sha256sum easy-linux-x64.tar.gz > SHA256SUMS
+          )
+
+      - name: Retain the Linux review package
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: easy-linux-x64
+          path: |
+            ${{ runner.temp }}/easy-linux-review/easy-linux-x64.tar.gz
+            ${{ runner.temp }}/easy-linux-review/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
