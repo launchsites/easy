@@ -1,0 +1,255 @@
+{
+  "recorded_at_utc": "2026-11-24T06:03:58.653948+00:00",
+  "app_revision": "6f18fe901e9c3b2622240ff8b17e26d626b0df3e",
+  "executable_sha256": "0925c8b655a4cb8fb21b1a3606afa94887588f4e4e94b08534b45f0d67557523",
+  "aot_library_sha256": "298cc09f17cc35d09a12f6cb7e6ae2e327623954d35e139adc5a2fc96fedbd31",
+  "status": "passed",
+  "checks": {
+    "desktop-today": {
+      "screenshot_sha256": "909bd153f7d7b4dc6165462a4c51aa4c0f047f36e1c93716766d621da5b36cbc"
+    },
+    "desktop-calendar": {
+      "screenshot_sha256": "855e22e02efc410be6c67cdb15567168fa5213fd85ff7ee8c3218c4d8ea73ab1"
+    },
+    "desktop-tasks": {
+      "screenshot_sha256": "faa1228d3601e2bc0807905d98068c1f781fad492feec4dcdb9a974c063c6d92"
+    },
+    "desktop-notes": {
+      "screenshot_sha256": "805e6afb3c8e54dea210c553a92a9c51670dc4a0a4853bf657350fc32cc94c68"
+    },
+    "desktop-task-capture": {
+      "screenshot_sha256": "7d5bcf9161e0e31cfdb47e3eb9131c72e1d14efe7a4732046bb3c44d994f4957"
+    },
+    "desktop-task-saved": {
+      "screenshot_sha256": "a968a1019af4d8324876975c13a74d0429cebb79abcbb9e5c40c609d02e114c9"
+    },
+    "desktop-search": {
+      "screenshot_sha256": "cfc6ddebb88b0106af7d8be11713b26f05852e922ef176265b48bd0359db4d32"
+    },
+    "desktop-search-result": {
+      "screenshot_sha256": "b4bf575645b2e82fc5d7e35cdabc05a8503f5cda259055b92f8f737951467260"
+    },
+    "mobile-orbit-calendar": {
+      "screenshot_sha256": "733d70e6dc4177b92dad6475d0967bf680d0aed8f114535b00e81c3d76555c20"
+    },
+    "mobile-calendar-next-day": {
+      "screenshot_sha256": "e344917cabb6e949b94ce8763a0d27b4860a17cfed4205916217e8b6ac95ba54"
+    },
+    "mobile-gym": {
+      "screenshot_sha256": "543e2aac422fd90b390417a224e608afef80b09e5cd97dfaea016f12a4f1e452"
+    },
+    "mobile-gym-history": {
+      "screenshot_sha256": "9fd8761a1286a6144c20fc9e2187048e8c761c28bd21c38529af60a94568059f"
+    },
+    "mobile-gym-progress": {
+      "screenshot_sha256": "1f6edc42a70ffd456a985e114806769688a775a72b462e3eea253b4886d5f84e"
+    },
+    "compact-gym-progress": {
+      "screenshot_sha256": "4eff6fbe176c17df6f6e92644c9562115520c90b251dcf08c9c51342f66808ef"
+    },
+    "mobile-gym-record-picker": {
+      "screenshot_sha256": "425464fdb91e341a4f4809eb65d14bfd7a36068e398998db8b6493fc937ee126"
+    },
+    "mobile-gym-measured-weight": {
+      "screenshot_sha256": "4ea1e9f7016570c877dc2019e2951cbd0ba9faea85815348d0ab67e4fcfa01cd"
+    },
+    "mobile-gym-return": {
+      "screenshot_sha256": "f321f5847f84ddf86f596025363b7e1c5c02117fe6fa48a31025c6ea4b82898f"
+    },
+    "mobile-settings": {
+      "screenshot_sha256": "f7abe8984ab8eabc9d66a50a835bf5263bee687ffe1c6053f5bc1188a9adf630"
+    },
+    "mobile-feature-privacy": {
+      "screenshot_sha256": "7279563ae4fb5268e58fa044e7cc9c57276e4084ec2aa7f8e65b3136615bc98f"
+    },
+    "reopened-workspace": {
+      "screenshot_sha256": "2a9818c11ebf498712f684a6722c610b994cf74008edad9b0cc957c49d0f2491"
+    },
+    "reopened-task": {
+      "screenshot_sha256": "d18b1433d5d37abaa08e105525d788302ab995cb6bdbfd55d16a9378f8893b03"
+    },
+    "reopened-gym-history": {
+      "screenshot_sha256": "9fd8761a1286a6144c20fc9e2187048e8c761c28bd21c38529af60a94568059f"
+    },
+    "reopened-gym-progress": {
+      "screenshot_sha256": "243bf969dc1811a7928d08b49be123becc80041bbbdc44f38b3c29727269983c"
+    },
+    "onboarding-skip-blank": {
+      "screenshot_sha256": "0ac9d700f397cb492dac86b4d1794cba4d60ae3d745e4893396e821d8e8da8d1"
+    },
+    "onboarding-skip-today": {
+      "screenshot_sha256": "898cead3e0c7107ecd92096db760a802251fa82a8aea9070c9d006a5f60fc132"
+    },
+    "onboarding-skip-reopened": {
+      "screenshot_sha256": "898cead3e0c7107ecd92096db760a802251fa82a8aea9070c9d006a5f60fc132"
+    },
+    "onboarding-samples-blank": {
+      "screenshot_sha256": "ee76a902b2eab5a72324c98a40c1dce0de632a5903efd93279ee939ebd673f2b"
+    },
+    "onboarding-samples-today": {
+      "screenshot_sha256": "83be0cbe2fbd5b5770b718899f8c2e70d1188f42ccc0efc0ceecfab1ba1914d4"
+    },
+    "onboarding-samples-reopened": {
+      "screenshot_sha256": "83be0cbe2fbd5b5770b718899f8c2e70d1188f42ccc0efc0ceecfab1ba1914d4"
+    },
+    "live-gym-resumable": {
+      "screenshot_sha256": "3c878578930e53e4ac2a2a65f315e9eccf36ac7b3fcf898f95898dfc3f5c83c2"
+    },
+    "live-gym-session": {
+      "screenshot_sha256": "6535a781895bdc800ffb89e299ddfdbde7778d76af8701012357ff82c6969c24"
+    },
+    "live-gym-capture": {
+      "screenshot_sha256": "3a21bfe696a0c5e3d8fbc68d0e1fbf22f5f65effd4b68ff9ed4e35d7a6285ed5"
+    },
+    "live-gym-completion-choice": {
+      "screenshot_sha256": "2e871fa474931312c4867e8d1c68bf62cb46970cf965127fddcec07641e02444"
+    },
+    "live-gym-capture-returns": {
+      "screenshot_sha256": "b67c538a083dfcd0e6eb340b29750bbb44cb8239d382cf6022d5905e91bda705"
+    },
+    "live-gym-refreshed": {
+      "screenshot_sha256": "b67c538a083dfcd0e6eb340b29750bbb44cb8239d382cf6022d5905e91bda705"
+    },
+    "live-gym-reopened-resumable": {
+      "screenshot_sha256": "ec163d12b28e1663f724476d3d140261c151e6469840cd86e4174be5ab1dfc26"
+    },
+    "live-gym-reopened-session": {
+      "screenshot_sha256": "cd997de6be2b5bf3f90507ddb6b8d889079ab181fb26cf14bcfdd515d4abbeaa"
+    },
+    "live-gym-reopened-result": {
+      "screenshot_sha256": "cd997de6be2b5bf3f90507ddb6b8d889079ab181fb26cf14bcfdd515d4abbeaa"
+    }
+  },
+  "before": {
+    "revision": 1,
+    "digest": "3b87f6f085f287cb71bd2d570a2066fe47fc5f64346a630019f0c517d887232a",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 2,
+      "tasks": 1,
+      "notes": 2
+    },
+    "quick_check": "ok"
+  },
+  "after": {
+    "revision": 3,
+    "digest": "d6618b284a51c0e551cd058c05d91388fa5a86ee4634f2686fbf67cf0820e85d",
+    "storage_format": "chunked",
+    "counts": {
+      "events": 2,
+      "tasks": 2,
+      "notes": 2
+    },
+    "quick_check": "ok"
+  },
+  "health_measurements_hidden_and_retained": true,
+  "onboarding": {
+    "skip": {
+      "before": {
+        "revision": 2,
+        "digest": "6d95c327b46956b91ef8088d870041ae3d584eedcbcda31bc1b67dd23b5f2740",
+        "storage_format": "chunked",
+        "counts": {
+          "events": 0,
+          "tasks": 0,
+          "notes": 0
+        },
+        "quick_check": "ok",
+        "enabled_features": [],
+        "workout_plan_ids": []
+      },
+      "after": {
+        "revision": 2,
+        "digest": "6d95c327b46956b91ef8088d870041ae3d584eedcbcda31bc1b67dd23b5f2740",
+        "storage_format": "chunked",
+        "counts": {
+          "events": 0,
+          "tasks": 0,
+          "notes": 0
+        },
+        "quick_check": "ok",
+        "enabled_features": [],
+        "workout_plan_ids": []
+      }
+    },
+    "samples": {
+      "before": {
+        "revision": 2,
+        "digest": "69d935c1bb3fe6a513dce953d8abdb27690ec07886251589d09c6ac8a0549c48",
+        "storage_format": "chunked",
+        "counts": {
+          "events": 6,
+          "tasks": 8,
+          "notes": 5
+        },
+        "quick_check": "ok",
+        "enabled_features": [
+          "activity",
+          "ai",
+          "captureMedia",
+          "externalCalendars",
+          "health",
+          "insights",
+          "nutrition",
+          "planning",
+          "reviews",
+          "workouts"
+        ],
+        "workout_plan_ids": [
+          "sample-upper-body"
+        ]
+      },
+      "after": {
+        "revision": 2,
+        "digest": "69d935c1bb3fe6a513dce953d8abdb27690ec07886251589d09c6ac8a0549c48",
+        "storage_format": "chunked",
+        "counts": {
+          "events": 6,
+          "tasks": 8,
+          "notes": 5
+        },
+        "quick_check": "ok",
+        "enabled_features": [
+          "activity",
+          "ai",
+          "captureMedia",
+          "externalCalendars",
+          "health",
+          "insights",
+          "nutrition",
+          "planning",
+          "reviews",
+          "workouts"
+        ],
+        "workout_plan_ids": [
+          "sample-upper-body"
+        ]
+      }
+    }
+  },
+  "live_workout_capture": {
+    "after": {
+      "revision": 3,
+      "digest": "0653ee0b537c98fc9d5b300ec2110863cf1d3ea0350aa0d64a738049542194fa",
+      "storage_format": "chunked",
+      "counts": {
+        "events": 2,
+        "tasks": 2,
+        "notes": 2
+      },
+      "quick_check": "ok"
+    },
+    "reopened": {
+      "revision": 3,
+      "digest": "0653ee0b537c98fc9d5b300ec2110863cf1d3ea0350aa0d64a738049542194fa",
+      "storage_format": "chunked",
+      "counts": {
+        "events": 2,
+        "tasks": 2,
+        "notes": 2
+      },
+      "quick_check": "ok"
+    }
+  },
+  "elapsed_seconds": 222.81
+}

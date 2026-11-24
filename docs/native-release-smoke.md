@@ -11,6 +11,8 @@ The live workout check passed nine visual checkpoints in 76.81 seconds on `68fec
 
 An extracted 64-bit review archive from `12730c86ac311e5c473a6810a69cc31ec257f1ff` passed all 38 baseline checkpoints in 223.43 seconds. [Release archive verification](benchmark-results/native-release-smoke-12730c8-epyc-20261124.json)
 
+The extracted review archive from `6f18fe901e9c3b2622240ff8b17e26d626b0df3e` passed the same 38 checkpoints in 222.81 seconds. [Updated archive verification](benchmark-results/native-release-smoke-6f18fe9-epyc-20261124.json)
+
 The runner uses Flutter's Linux x64 release bundle, Python 3, Xvfb, xdotool, ImageMagick, and Tesseract. It checks simulated pointer and keyboard input at desktop and phone dimensions. Android, iOS, and physical touch use require separate checks.
 
 ```sh
@@ -75,4 +77,17 @@ for scenario in persona_journey today_fit; do
     --app-revision "$(git rev-parse HEAD)" \
     --deny-ip /tmp/easy-deny-ip-sockets --output "$(mktemp -d)"
 done
+```
+
+## Workout completion after a write failure
+
+The native workout test used an isolated workspace with a planned workout and one follow-up draft rule. With a 65,952-byte process limit on the SQLite write-ahead log, the earlier `12730c8` build showed a completed-session summary while SQLite still held revision 2. The `6f18fe9` build showed the save failure, retained the unsaved text, and kept the same revision and set results. [Earlier result](benchmark-results/native-gym-finish-before-12730c8-20261124.json) · [Updated result](benchmark-results/native-gym-finish-6f18fe9-20261124.json)
+
+After releasing the limit, a confirmed retry finished the workout and created one pending follow-up draft in a single revision. The original set results and other records were intact. The finished workout was visible in History after a forced process exit, and the reopened workspace still held the same revision and pending draft. The 15-screen check ran with IPv4 and IPv6 sockets blocked.
+
+```sh
+python3 tool/benchmark/native_gym_finish_fault.py \
+  --binary build/linux/x64/release/bundle/easy \
+  --app-revision "$(git rev-parse HEAD)" \
+  --deny-ip /tmp/easy-deny-ip-sockets --output "$(mktemp -d)"
 ```

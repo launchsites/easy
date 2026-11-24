@@ -1,0 +1,20 @@
+{
+  "status": "failed",
+  "app_revision": "12730c86ac311e5c473a6810a69cc31ec257f1ff",
+  "ip_sockets_blocked": true,
+  "aot_sha256": "c098f231038db74a5891ee5429059a510a9660c5d16b792f079e030a28eb7f5b",
+  "executable_sha256": "24c0608a8ec894cc2c7a04473cd5d420304e0f15c6e6e9d2b7ba58cce9057a6b",
+  "checks": {
+    "home": "202cdf56f676355c5d9c0670406a5edeb328a0cf68b004634c9e5eeec081500a",
+    "gym-resumable": "bb273247f1f0f230e20469affc127ad88c849fdec27ca10c61631b4236616a7c",
+    "gym-live": "b3b04360710d0d4b0d572d3124a4ad27c875a199316fdc5876065f0ed97178b2",
+    "typed-draft": "34b86c54728b2618808865756530439ef551181f736091077ad6fae1398f86f3",
+    "cancel-prompt": "7ca797aeb58165be25f5963f48d060342f32650b93019ab64de86b3efabdc960",
+    "cancel-retained-draft": "b897718e9ca6a54c611772d139505c9b2411eb9960e97a1c3a009abbe2503be4",
+    "fault-prompt": "6c626486794c9a51e653bcfe2fe4e042d3d7b5b4cc76d7e1da802530b912b0e2"
+  },
+  "premature_summary_with_failed_write": true,
+  "failed_write_kept_revision": 2,
+  "file_size_ceiling_bytes": 65952,
+  "error": "The app showed a completion summary for a failed write."
+}
