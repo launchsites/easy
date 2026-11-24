@@ -25,3 +25,23 @@ taskset -c 0 /tmp/easy-scheduling-benchmark packed
 ```
 
 The runner also accepts `ordinary`, `wide`, and `blocked`. Use a CPU number available to the process. [Fixture runner](../tool/benchmark/scheduling_scale.dart)
+
+## Automatic estimate candidate ordering
+
+The automatic estimate pass filters completed tasks, existing estimates, scheduling holds, recurring base tasks, and titles over the request limit before sorting. Large workspace snapshots are scanned and sorted in slices of up to 1,024 tasks, then merged in slices of up to 4,096 results. The pass gives the event loop a turn and checks cancellation between slices. All measured profiles matched the previous candidate order using due or scheduled instant, priority, and ID.
+
+These medians cover 12 Dart AOT trials for each 120,000-task fixture on one logical AMD EPYC 9V74 CPU. The worker measurements use `Isolate.run` and the same complete task snapshot. The synchronous and cooperative columns include the full ranked result.
+
+| Input | Eligible | Previous sort and first candidate | Synchronous rank | Cooperative rank | Worker submission | Cooperative event gap p95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| All eligible | 120,000 | 156.0 ms | 174.2 ms | 243.3 ms | 126.3 ms | 1.138 ms |
+| Mixed history | 6,000 | 8.2 ms | 4.4 ms | 10.0 ms | 96.5 ms | 0.100 ms |
+| Mostly held, recurring, or oversize | 4,800 | 122.7 ms | 5.2 ms | 9.7 ms | 107.5 ms | 0.079 ms |
+
+At 2,048 fully eligible tasks, synchronous ranking took 0.702 ms at the median and 0.868 ms at p95. The timer probe measures wall time between observed event-loop turns, including shared-host scheduling and garbage collection. It recorded a 292 ms maximum gap in the large all-eligible profile during concurrent builds and UI tests. The measurements cover ranking in a standalone process. [Raw measurements](benchmark-results/automatic-estimate-order-epyc-20261124.json)
+
+```sh
+dart compile exe tool/benchmark/automatic_estimate_order_bench.dart -o /tmp/easy-estimate-order-benchmark
+taskset -c 4 /tmp/easy-estimate-order-benchmark 120000
+taskset -c 4 /tmp/easy-estimate-order-benchmark 2048
+```
