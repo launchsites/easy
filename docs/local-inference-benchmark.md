@@ -72,6 +72,17 @@ The application accepted 10,000 exact two-item model responses and withheld all 
 TZ=Europe/London dart run tool/benchmark/capture_validation_fuzz.dart /tmp/easy-capture-validation.json
 ```
 
+## AI budget accounting replay
+
+A Dart AOT simulator compared the GBP ledger with independent integer accounting through 64 seeded request histories. Across 131,072 operations and 163,328 monthly report checks, every balance, charge and decision agreed. The cases included 5,235 serialization and restart cycles, 2,116 month changes and 14,481 settlements after the clock moved to a different month. The replay also covered changed caps, paid and unpaid local requests, missing usage, known non-dispatch, provider usage above the reserved limit and duplicate request IDs.
+
+The one-CPU replay completed in 25.95 seconds. It exercised the local ledger without API calls. [Budget replay counts](benchmark-results/ai-budget-ledger-replay-20261124.json)
+
+```sh
+dart compile exe tool/benchmark/ai_budget_replay.dart -o /tmp/easy-ai-budget-replay
+taskset -c 2 /tmp/easy-ai-budget-replay /tmp/easy-ai-budget-replay.json
+```
+
 ## Qwen3-4B text sweep
 
 The tested file was Qwen's Apache 2.0 Qwen3-4B Q4_K_M GGUF at revision `bc640142c66e1fdd12af0bd68f40445458f3869b`. The 2,497,280,256-byte file has SHA-256 `7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5`. This sweep reused the same 12 cases and schema with the model's thinking template disabled. [Qwen3-4B GGUF model card](https://huggingface.co/Qwen/Qwen3-4B-GGUF/tree/bc640142c66e1fdd12af0bd68f40445458f3869b)

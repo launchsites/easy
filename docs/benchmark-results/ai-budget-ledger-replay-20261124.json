@@ -1,0 +1,33 @@
+{
+  "run_at_utc": "2026-11-24T03:12:36.679007Z",
+  "ledger_source_revision": "b942321011984eebffd95af049ea0d3629201e71",
+  "dart": "3.14.0 (stable) (Wed Nov 4 16:28:39 2026 -0800) on \"linux_x64\"",
+  "seed": 261124,
+  "trajectories": 64,
+  "steps_per_trajectory": 2048,
+  "operations": {
+    "denial_invalidPrice": 1398,
+    "monthly_report": 163328,
+    "denial_monthlyCap": 20256,
+    "reserve_local": 13881,
+    "clock_day": 10848,
+    "actual_within_envelope": 3490,
+    "actual_above_envelope": 3592,
+    "idempotent_resolution": 23114,
+    "restart": 5235,
+    "denial_duplicateId": 8414,
+    "abandon_dispatched": 3490,
+    "cap_change": 6408,
+    "reserve_paid": 16426,
+    "denial_currencyMismatch": 1475,
+    "clock_month": 2116,
+    "denial_pacingLimit": 957,
+    "resolve_after_clock_month_change": 14481,
+    "denial_invalidRequest": 1861,
+    "abandon_before_dispatch": 3380,
+    "settle_missing_usage": 3384,
+    "denial_missingPrice": 1347
+  },
+  "elapsed_ms": 25953.957,
+  "status": "all assertions passed"
+}
