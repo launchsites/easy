@@ -1,0 +1,45 @@
+name: Publish verified Linux review archive
+on:
+  push:
+    branches: [ops/publish-linux-review-dd7d40d]
+    paths: [.github/workflows/publish-linux-review-dd7d40d.yml]
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_ID: '456608135'
+      RELEASE_TAG: linux-review-dd7d40d
+      SOURCE_REVISION: dd7d40d52235690b504964605e8a3ba9ec15727e
+      ARCHIVE_SHA: d9db971c33583782abf9a236a12152d2dc89b94a4f38d6ae4649054d22c66e86
+    steps:
+      - name: Verify the source artifact and the draft release
+        run: |
+          test "$GITHUB_REPOSITORY" = launchsites/easy
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" |
+            jq -e --arg tag "$RELEASE_TAG" --arg sha "$SOURCE_REVISION" \
+              '.draft and .prerelease and .tag_name == $tag and .target_commitish == $sha and (.assets | length) == 0'
+          gh run download 45374941201 --repo "$GITHUB_REPOSITORY" --name easy-linux-x64 --dir "$RUNNER_TEMP/easy-linux"
+          cd "$RUNNER_TEMP/easy-linux"
+          printf '%s  %s\n' "$ARCHIVE_SHA" easy-linux-x64.tar.gz | sha256sum -c -
+          sha256sum -c SHA256SUMS
+          tar -xOzf easy-linux-x64.tar.gz easy/BUILD.txt | grep -Fx "Source: https://github.com/$GITHUB_REPOSITORY/tree/$SOURCE_REVISION"
+      - name: Upload and publish the public Linux review build
+        run: |
+          cd "$RUNNER_TEMP/easy-linux"
+          gh release upload "$RELEASE_TAG" easy-linux-x64.tar.gz SHA256SUMS --repo "$GITHUB_REPOSITORY"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" |
+            jq -e --arg digest "sha256:$ARCHIVE_SHA" \
+              'any(.assets[]; .name == "easy-linux-x64.tar.gz" and .state == "uploaded" and .digest == $digest) and any(.assets[]; .name == "SHA256SUMS" and .state == "uploaded")'
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease
+      - name: Download the public archive without credentials
+        run: |
+          cd "$RUNNER_TEMP"
+          curl --fail --silent --show-error --location --retry 2 --max-time 90 \
+            --output public-easy-linux.tar.gz \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/easy-linux-x64.tar.gz"
+          printf '%s  %s\n' "$ARCHIVE_SHA" public-easy-linux.tar.gz | sha256sum -c -
