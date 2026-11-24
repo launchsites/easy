@@ -15,6 +15,7 @@ class TodayPage extends StatelessWidget {
     required this.onTaskTap,
     required this.onTaskToggle,
     this.onPlanDay,
+    this.onWhatFitsNow,
     this.title = 'Today',
     this.showSchedule = true,
     this.showTasks = true,
@@ -29,6 +30,7 @@ class TodayPage extends StatelessWidget {
   final ValueChanged<TaskItem> onTaskTap;
   final ValueChanged<TaskItem> onTaskToggle;
   final VoidCallback? onPlanDay;
+  final VoidCallback? onWhatFitsNow;
   final String title;
   final bool showSchedule;
   final bool showTasks;
@@ -144,10 +146,14 @@ class TodayPage extends StatelessWidget {
                       Row(
                         children: [
                           const Expanded(child: _SectionHeading('Tasks')),
-                          if (onPlanDay != null)
+                          if ((onWhatFitsNow ?? onPlanDay) case final plan?)
                             TextButton(
-                              onPressed: onPlanDay,
-                              child: const Text('Plan day'),
+                              onPressed: plan,
+                              child: Text(
+                                onWhatFitsNow == null
+                                    ? 'Plan day'
+                                    : 'What fits now',
+                              ),
                             ),
                         ],
                       ),

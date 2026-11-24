@@ -8,6 +8,7 @@ import 'task_objective_review.dart';
 Future<String?> showTaskObjectives(
   BuildContext context, {
   required TaskObjectiveReview review,
+  VoidCallback? onPlanDay,
 }) => _showObjectiveDialog(
   context,
   title: 'What can I work on?',
@@ -15,8 +16,23 @@ Future<String?> showTaskObjectives(
     Duration(:final inMicroseconds) when inMicroseconds == 0 =>
       'No unbooked time now',
     final gap? => '${_minutes(gap)} available',
-    null => '',
+    null => 'Available time is unverified',
   },
+  footer: onPlanDay == null
+      ? null
+      : (context) => Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(14, 2, 14, 10),
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                onPlanDay();
+              },
+              child: const Text('Plan day'),
+            ),
+          ),
+        ),
   slivers: (context) => [
     if (review.ready.isEmpty)
       SliverToBoxAdapter(
@@ -46,6 +62,7 @@ Future<String?> _showObjectiveDialog(
   required String title,
   required List<Widget> Function(BuildContext) slivers,
   String subtitle = '',
+  Widget Function(BuildContext)? footer,
 }) => showDialog<String>(
   context: context,
   builder: (context) {
@@ -60,6 +77,7 @@ Future<String?> _showObjectiveDialog(
         subtitle: subtitle,
         closeTooltip: 'Close suggestions',
         slivers: slivers(context),
+        footer: footer?.call(context),
       ),
     );
   },

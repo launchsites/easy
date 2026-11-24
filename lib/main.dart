@@ -84,6 +84,9 @@ import 'scheduling/manual_time_block.dart';
 import 'scheduling/manual_time_block_sheet.dart';
 import 'scheduling/plan_day_sheet.dart';
 import 'scheduling/planner.dart';
+import 'scheduling/task_objective_availability.dart';
+import 'scheduling/task_objective_review.dart';
+import 'scheduling/task_objective_review_sheet.dart';
 import 'scheduling/weekly_plan_sheet.dart';
 import 'scheduling/weekly_planner.dart';
 import 'search/search.dart';
@@ -125,6 +128,7 @@ part 'workspace_onboarding.dart';
 part 'workspace_focus_suggestions.dart';
 part 'workspace_manual_sync_actions.dart';
 part 'workspace_workout_capture.dart';
+part 'workspace_task_objectives.dart';
 
 const appName = String.fromEnvironment('APP_NAME', defaultValue: 'Easy');
 
@@ -273,6 +277,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   var _activityActionOpen = false;
   var _futureRemovalOpen = false;
   var _manualSyncOpen = false;
+  var _taskObjectivesOpen = false;
   var _planningDay = false;
   var _recordingVoice = false;
   final _heldVoiceOverlay = HeldVoiceCaptureOverlay();
@@ -3128,7 +3133,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         result.tasks.any((entry) {
           final checked = available[entry.task.id];
           return checked == null ||
-              !_samePlanBlocks(entry.blocks, checked.blocks) ||
+              !sameReviewedSchedule(entry, checked) ||
               entry.blocks.any((block) => block.start.isBefore(now)) ||
               checked.task.prerequisites.any(
                 (id) =>
@@ -3153,6 +3158,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     DateTime day, {
     DateTime? firstDay,
     DateTime? lastDay,
+    bool reportProblem = true,
   }) async {
     final apple = _selectedAppleCalendars;
     final imports = _selectedIcsCalendars;
@@ -3168,19 +3174,29 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         covers(firstDay ?? day) && covers(lastDay ?? day);
     if (apple.isNotEmpty &&
         (_appleFeed.problem != null || !covered(_appleFeed.covers))) {
-      _inform(_appleFeed.problem ?? 'Apple calendars could not be refreshed.');
+      if (reportProblem) {
+        _inform(
+          _appleFeed.problem ?? 'Apple calendars could not be refreshed.',
+        );
+      }
       return null;
     }
     if (imports.isNotEmpty &&
         (_icsFeed.problem != null || !covered(_icsFeed.covers))) {
-      _inform(_icsFeed.problem ?? 'Imported calendars could not be refreshed.');
+      if (reportProblem) {
+        _inform(
+          _icsFeed.problem ?? 'Imported calendars could not be refreshed.',
+        );
+      }
       return null;
     }
     if (series.isNotEmpty &&
         (_internalFeed.problem != null || !covered(_internalFeed.covers))) {
-      _inform(
-        _internalFeed.problem ?? 'Repeating events could not be refreshed.',
-      );
+      if (reportProblem) {
+        _inform(
+          _internalFeed.problem ?? 'Repeating events could not be refreshed.',
+        );
+      }
       return null;
     }
     return [
@@ -4324,10 +4340,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
             : null) ??
         _internalFeed.problem;
     final todayNote = mobile ? _homeNote() : null;
-    final canPlan =
+    final canReviewObjectives =
         _allows(EasyFeature.planning) &&
         showTasks &&
-        tasks.any((task) => !task.done && (task.estimatedMinutes ?? 0) > 0);
+        tasks.any((task) => !task.done);
     final page = PageStorage(
       bucket: _pageStorage,
       child: IndexedStack(
@@ -4351,7 +4367,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
               focusedContent: focusedContent,
               showTasks: showTasks,
               showSchedule: showSchedule,
-              onPlanDay: canPlan ? _planDay : null,
+              onWhatFitsNow: canReviewObjectives ? _openTaskObjectives : null,
               events: events,
               tasks: tasks,
               onNoteTap: () => _openHomeNote(todayNote),
@@ -4370,7 +4386,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
               showSchedule: showSchedule,
               showTasks: showTasks,
               focusedContent: focusedContent,
-              onPlanDay: canPlan ? _planDay : null,
+              onWhatFitsNow: canReviewObjectives ? _openTaskObjectives : null,
               events: events,
               tasks: tasks,
               onEventTap: _openRecord,
@@ -4673,17 +4689,6 @@ int _stableRevision(Object value) => sha256
     .bytes
     .take(6)
     .fold(0, (number, byte) => number * 256 + byte);
-
-bool _samePlanBlocks(List<TimeSpan> first, List<TimeSpan> second) {
-  if (first.length != second.length) return false;
-  for (var index = 0; index < first.length; index++) {
-    if (!first[index].start.isAtSameMomentAs(second[index].start) ||
-        !first[index].end.isAtSameMomentAs(second[index].end)) {
-      return false;
-    }
-  }
-  return true;
-}
 
 WorkoutPlan _sampleWorkoutPlan(DateTime today) => WorkoutPlan(
   id: 'sample-upper-body',
