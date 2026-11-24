@@ -60,6 +60,8 @@ void main() {
     await tester.tap(find.text('Add selected'));
     await tester.pumpAndSettle();
     expect(find.text('Subtask added'), findsOneWidget);
+    await tester.tap(find.byTooltip('Close details'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('New'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField), 'Review studio assets');

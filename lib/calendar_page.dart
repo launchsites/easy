@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart'
+    show DragStartBehavior, PointerDeviceKind;
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -73,6 +75,7 @@ class CalendarPage extends StatefulWidget {
     required this.onDateChanged,
     required this.events,
     required this.onEventTap,
+    this.onCreateTimedEvent,
     this.eventsRevision,
     super.key,
   });
@@ -81,6 +84,9 @@ class CalendarPage extends StatefulWidget {
   final ValueChanged<DateTime> onDateChanged;
   final List<CalendarEvent> events;
   final ValueChanged<CalendarEvent> onEventTap;
+
+  /// Opens an event draft for a range selected in the desktop timeline.
+  final ValueChanged<DateTimeRange>? onCreateTimedEvent;
 
   /// Change this when the event snapshot changes. When omitted, a new list
   /// instance is treated as a new snapshot.
@@ -191,6 +197,7 @@ class _CalendarPageState extends State<CalendarPage> {
                           context,
                           colors,
                           _weekContaining(_date),
+                          onCreateTimedEvent: widget.onCreateTimedEvent,
                         ),
                       )
                     : _ContinuousDayTimeline(
@@ -198,8 +205,15 @@ class _CalendarPageState extends State<CalendarPage> {
                         inset: inset,
                         onDateChanged: widget.onDateChanged,
                         eventsOn: _eventsOn,
-                        section: (context, date, timelineKey) =>
-                            _daySection(context, colors, date, timelineKey),
+                        section: (context, date, timelineKey) => _daySection(
+                          context,
+                          colors,
+                          date,
+                          timelineKey,
+                          onCreateTimedEvent: mobile
+                              ? null
+                              : widget.onCreateTimedEvent,
+                        ),
                       ),
               ),
             ],
@@ -265,8 +279,9 @@ class _CalendarPageState extends State<CalendarPage> {
     BuildContext context,
     _CalendarColors colors,
     DateTime date,
-    GlobalKey timelineKey,
-  ) {
+    GlobalKey timelineKey, {
+    ValueChanged<DateTimeRange>? onCreateTimedEvent,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 17),
       child: Column(
@@ -286,7 +301,13 @@ class _CalendarPageState extends State<CalendarPage> {
               ),
             ),
           ),
-          _timeline(context, colors, [date], timelineKey: timelineKey),
+          _timeline(
+            context,
+            colors,
+            [date],
+            timelineKey: timelineKey,
+            onCreateTimedEvent: onCreateTimedEvent,
+          ),
         ],
       ),
     );
@@ -328,6 +349,7 @@ class _CalendarPageState extends State<CalendarPage> {
     _CalendarColors colors,
     List<DateTime> days, {
     GlobalKey? timelineKey,
+    ValueChanged<DateTimeRange>? onCreateTimedEvent,
   }) {
     final multiDay = days.length > 1;
     final daysEvents = days.map(_eventsOn).toList();
@@ -432,6 +454,7 @@ class _CalendarPageState extends State<CalendarPage> {
                       ruler: ruler,
                       now: now,
                       compact: multiDay,
+                      onCreateTimedEvent: onCreateTimedEvent,
                     ),
                   ),
               ],
@@ -485,6 +508,7 @@ class _CalendarPageState extends State<CalendarPage> {
     required _TimelineRuler ruler,
     required DateTime now,
     required bool compact,
+    required ValueChanged<DateTimeRange>? onCreateTimedEvent,
   }) {
     const topInset = 2.0;
     final nowOffset = ruler.offset(axis.position(now));
@@ -509,6 +533,16 @@ class _CalendarPageState extends State<CalendarPage> {
                   right: 0,
                   top: ruler.offset(mark.minute),
                   child: Divider(height: 1, thickness: 1, color: colors.line),
+                ),
+              if (onCreateTimedEvent != null)
+                Positioned.fill(
+                  child: _DesktopTimeSelection(
+                    key: ValueKey(('calendar-selection', axis.date)),
+                    axis: axis,
+                    ruler: ruler,
+                    colors: colors,
+                    onSelected: onCreateTimedEvent,
+                  ),
                 ),
               for (final placement in placements)
                 Positioned(
@@ -649,6 +683,140 @@ class _CalendarPageState extends State<CalendarPage> {
 List<DateTime> _weekContaining(DateTime date) {
   final monday = DateUtils.addDaysToDate(date, 1 - date.weekday);
   return List.generate(7, (index) => DateUtils.addDaysToDate(monday, index));
+}
+
+class _DesktopTimeSelection extends StatefulWidget {
+  const _DesktopTimeSelection({
+    required this.axis,
+    required this.ruler,
+    required this.colors,
+    required this.onSelected,
+    super.key,
+  });
+
+  final _DayAxis axis;
+  final _TimelineRuler ruler;
+  final _CalendarColors colors;
+  final ValueChanged<DateTimeRange> onSelected;
+
+  @override
+  State<_DesktopTimeSelection> createState() => _DesktopTimeSelectionState();
+}
+
+class _DesktopTimeSelectionState extends State<_DesktopTimeSelection> {
+  int? _anchor;
+  int? _edge;
+
+  @override
+  void didUpdateWidget(_DesktopTimeSelection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.ruler != widget.ruler) _anchor = _edge = null;
+  }
+
+  int _minuteAt(double y) {
+    const step = 15;
+    final ruler = widget.ruler;
+    final minute = (ruler.minuteAtOffset(y) / step).round() * step;
+    return minute
+        .clamp(ruler.minuteAtOffset(0), ruler.minuteAtOffset(ruler.height))
+        .toInt();
+  }
+
+  ({int start, int end})? _span(int? edge) {
+    final anchor = _anchor;
+    if (anchor == null || edge == null || anchor == edge) return null;
+    return (start: math.min(anchor, edge), end: math.max(anchor, edge));
+  }
+
+  DateTimeRange? _range(({int start, int end}) span) {
+    final start = widget.axis.instantAt(span.start);
+    final end = widget.axis.instantAt(span.end);
+    return start == null || end == null || !end.isAfter(start)
+        ? null
+        : DateTimeRange(start: start, end: end);
+  }
+
+  void _cancel() {
+    if (_anchor == null) return;
+    setState(() => _anchor = _edge = null);
+  }
+
+  void _finish(DragEndDetails details) {
+    final span = _span(_minuteAt(details.localPosition.dy));
+    _cancel();
+    if (span == null) return;
+    final range = _range(span);
+    if (range != null) widget.onSelected(range);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final span = _span(_edge);
+    return Listener(
+      // An accepted Flutter drag also reports an end after a pointer cancel.
+      onPointerCancel: (event) {
+        if (event.kind == PointerDeviceKind.mouse) _cancel();
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.precise,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          excludeFromSemantics: true,
+          supportedDevices: const {PointerDeviceKind.mouse},
+          dragStartBehavior: DragStartBehavior.down,
+          onVerticalDragStart: (details) =>
+              _anchor = _edge = _minuteAt(details.localPosition.dy),
+          onVerticalDragUpdate: (details) {
+            if (_anchor == null) return;
+            final minute = _minuteAt(details.localPosition.dy);
+            if (minute != _edge) setState(() => _edge = minute);
+          },
+          onVerticalDragEnd: _finish,
+          onVerticalDragCancel: _cancel,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [if (span != null) _preview(context, span)],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _preview(BuildContext context, ({int start, int end}) span) {
+    final start = widget.ruler.offset(span.start);
+    final end = widget.ruler.offset(span.end);
+    final height = math.max(0.0, end - start - 4);
+    final range = _range(span);
+    final color = range == null ? widget.colors.muted : widget.colors.accent;
+    return Positioned(
+      left: 3,
+      right: 3,
+      top: start + 2,
+      height: height,
+      child: DecoratedBox(
+        key: const ValueKey('calendar-selection-preview'),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .14),
+          border: Border.all(color: color),
+          borderRadius: BorderRadius.circular(7),
+        ),
+        child: height >= 34
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                child: Text(
+                  range == null
+                      ? 'Choose another time'
+                      : '${_time(context, TimeOfDay.fromDateTime(range.start))}'
+                            '–${_time(context, TimeOfDay.fromDateTime(range.end))}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: color, fontSize: 11),
+                ),
+              )
+            : null,
+      ),
+    );
+  }
 }
 
 const _dayHourHeight = 53.0;
@@ -959,6 +1127,16 @@ class _DayAxis {
   late final int minutes = elapsed ? actualMinutes : _civilMinutes;
 
   DateTime _instant(int minute) => date.add(Duration(minutes: minute));
+
+  DateTime? instantAt(int minute) {
+    if (minute == minutes) return end;
+    if (elapsed) return _instant(minute);
+    final local = DateTime(date.year, date.month, date.day, 0, minute);
+    // A shared week ruler cannot tell the two occurrences of a wall time apart.
+    return position(local) == minute && !_repeatedClockTime(local)
+        ? local
+        : null;
+  }
 
   int position(DateTime time) {
     if (time.isBefore(date)) return 0;

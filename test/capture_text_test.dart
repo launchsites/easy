@@ -117,6 +117,65 @@ void main() {
       expect(event.error, isNull);
     });
 
+    test('consumes a spoken clock with its date and duration', () {
+      for (final input in [
+        "Coffee tomorrow at 10 o'clock for 30 minutes",
+        'Coffee tomorrow, 10 o’clock for 30 minutes.',
+        'Coffee Tomorrow at 10 o clock for 30 minutes!',
+      ]) {
+        final event = parseEventCapture(input, date: monday);
+        expect(event.title, 'Coffee', reason: input);
+        expect(event.date, DateTime(2026, 11, 24), reason: input);
+        expect(event.start, DateTime(2026, 11, 24, 10), reason: input);
+        expect(event.end, DateTime(2026, 11, 24, 10, 30), reason: input);
+        expect(event.duration, const Duration(minutes: 30), reason: input);
+        expect(event.error, isNull, reason: input);
+      }
+
+      final noEnd = parseEventCapture(
+        'Coffee tomorrow at 10 o’clock',
+        date: monday,
+      );
+      expect(noEnd.start, DateTime(2026, 11, 24, 10));
+      expect(noEnd.end, isNull);
+      expect(noEnd.error, isNull);
+    });
+
+    test(
+      'uses explicit range periods and preserves ambiguous spoken times',
+      () {
+        final event = parseEventCapture(
+          'Coffee tomorrow from 10 o’clock to 11 o’clock a.m.',
+          date: monday,
+        );
+        expect(event.title, 'Coffee');
+        expect(event.start, DateTime(2026, 11, 24, 10));
+        expect(event.end, DateTime(2026, 11, 24, 11));
+        expect(event.error, isNull);
+
+        for (final input in [
+          'Coffee tomorrow from 10 o’clock to 11 o’clock',
+          'Coffee tomorrow around 10 o’clock for 30 minutes',
+          'Coffee tomorrow at 10 o’clock UTC for 30 minutes',
+          'Coffee tomorrow at 24 o’clock for 30 minutes',
+        ]) {
+          final unsafe = parseEventCapture(input, date: monday);
+          expect(unsafe.start, isNull, reason: input);
+          expect(unsafe.end, isNull, reason: input);
+          expect(unsafe.error, isNotNull, reason: input);
+        }
+
+        final quoted = parseEventCapture(
+          'Review “10 o’clock” tomorrow',
+          date: monday,
+        );
+        expect(quoted.title, 'Review “10 o’clock”');
+        expect(quoted.date, DateTime(2026, 11, 24));
+        expect(quoted.start, isNull);
+        expect(quoted.error, isNull);
+      },
+    );
+
     test('retains an explicit duration while the start is missing', () {
       final event = parseEventCapture(
         'Focus on Friday for 1h 30m',
@@ -319,12 +378,96 @@ void main() {
         final task = parseTaskCapture(title, date: monday);
         expect(task.title, title);
         expect(task.dueDate, isNull);
+        expect(task.dueAt, isNull);
+      }
+    });
+
+    test('reads a punctuated spoken deadline and keeps a clean task title', () {
+      for (final input in [
+        "Web Design Tomorrow, 10 o'clock",
+        'Web Design Tomorrow: 10 o’clock.',
+        'Web Design — Tomorrow; 10 oʼclock',
+        'Web Design Tomorrow — 10 o clock!',
+        'Web Design Tomorrow. 10 o’clock',
+        'Web Design tomorrow at 10',
+      ]) {
+        final task = parseTaskCapture(input, date: monday);
+        expect(task.title, 'Web Design', reason: input);
+        expect(task.dueDate, DateTime(2026, 11, 24), reason: input);
+        expect(task.dueAt, DateTime(2026, 11, 24, 10), reason: input);
+        expect(task.error, isNull, reason: input);
+      }
+    });
+
+    test(
+      'uses the explicit clock period and the current relative date anchor',
+      () {
+        final task = parseTaskCapture(
+          "Web Design due tomorrow, 10 o'clock p.m.",
+          date: monday,
+          now: DateTime(2026, 12, 31, 23),
+        );
+        expect(task.title, 'Web Design');
+        expect(task.dueDate, DateTime(2027));
+        expect(task.dueAt, DateTime(2027, 1, 1, 22));
+
+        final weekday = parseTaskCapture(
+          'Web Design by Fri at 18:40',
+          date: monday,
+        );
+        expect(weekday.title, 'Web Design');
+        expect(weekday.dueAt, DateTime(2026, 11, 27, 18, 40));
+      },
+    );
+
+    test(
+      'leaves in-title clocks and undated clocks free of an exact deadline',
+      () {
+        final titled = parseTaskCapture(
+          'Review the 10am report tomorrow',
+          date: monday,
+        );
+        expect(titled.title, 'Review the 10am report');
+        expect(titled.dueDate, DateTime(2026, 11, 24));
+        expect(titled.dueAt, isNull);
+
+        for (final input in [
+          "Web Design at 10 o'clock",
+          'Review “tomorrow, 10 o’clock”',
+          'Compare tomorrow 10am and 11am',
+        ]) {
+          final task = parseTaskCapture(input, date: monday);
+          expect(task.title, input);
+          expect(task.dueAt, isNull);
+        }
+      },
+    );
+
+    test('rejects unsafe compound deadlines without discarding the text', () {
+      for (final input in [
+        "Web Design tomorrow, 24 o'clock",
+        'Web Design tomorrow at 10:61',
+        'Web Design tomorrow at 10:2',
+        'Web Design tomorrow around 10 o’clock',
+        'Web Design tomorrow, 10 o’clock UTC',
+        'Web Design today tomorrow at 10am',
+        'Web Design 11/12/2026 at 10am',
+      ]) {
+        final task = parseTaskCapture(input, date: monday);
+        expect(task.title, input);
+        expect(task.dueDate, isNull, reason: input);
+        expect(task.dueAt, isNull, reason: input);
+        expect(task.error, isNotNull, reason: input);
       }
     });
   });
 
   test('standalone time fields accept concise answers', () {
     expect(parseCaptureTime('7', date: monday), DateTime(2026, 11, 23, 7));
+    expect(
+      parseCaptureTime('10 o’clock', date: monday),
+      DateTime(2026, 11, 23, 10),
+    );
     expect(
       parseCaptureTime('at 7:30 p.m.', date: monday),
       DateTime(2026, 11, 23, 19, 30),
@@ -364,7 +507,30 @@ void main() {
       date: monday,
     );
     expect(elapsed.end, DateTime(2026, 3, 8, 3, 20));
+
+    final taskGap = parseTaskCapture(
+      'Finish 2026-03-08 at 02:30',
+      date: monday,
+    );
+    expect(taskGap.dueAt, isNull);
+    expect(taskGap.error, contains('skipped'));
+    final taskFold = parseTaskCapture(
+      'Finish 2026-11-01 at 01:30',
+      date: monday,
+    );
+    expect(taskFold.dueAt, isNull);
+    expect(taskFold.error, contains('twice'));
   }, skip: !newYork);
+
+  final apiaSkippedDay = DateTime(2011, 12, 30).day != 30;
+  test('a skipped civil day cannot silently move a task deadline', () {
+    const input = "Web Design tomorrow, 10 o'clock";
+    final task = parseTaskCapture(input, date: DateTime(2011, 12, 29));
+    expect(task.title, input);
+    expect(task.dueDate, isNull);
+    expect(task.dueAt, isNull);
+    expect(task.error, isNotNull);
+  }, skip: !apiaSkippedDay);
 
   final lordHowe =
       DateTime(2026, 4, 5, 0).timeZoneOffset == const Duration(hours: 11) &&

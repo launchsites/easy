@@ -21,10 +21,17 @@ class EventCaptureText {
 }
 
 class TaskCaptureText {
-  const TaskCaptureText({required this.title, this.dueDate});
+  const TaskCaptureText({
+    required this.title,
+    this.dueDate,
+    this.dueAt,
+    this.error,
+  });
 
   final String title;
   final DateTime? dueDate;
+  final DateTime? dueAt;
+  final String? error;
 }
 
 /// Reads explicitly supplied scheduling details and preserves missing times.
@@ -126,7 +133,53 @@ TaskCaptureText parseTaskCapture(
   DateTime? now,
 }) {
   final text = input.trim();
-  final phrase = _takeDate(text, _day(now?.toLocal() ?? date));
+  final reference = _day(now?.toLocal() ?? date);
+  // A task clock belongs to a deadline only when it directly follows a date.
+  // A single bare hour in that position uses the device's 24-hour clock.
+  final suffix = _taskDeadlineClock.firstMatch(text);
+  if (suffix != null && !_quoted(text, suffix)) {
+    final beforeClock = text.substring(0, suffix.start);
+    final qualifier = _taskDeadlineQualifier.firstMatch(beforeClock);
+    final dateText = beforeClock
+        .substring(0, qualifier?.start ?? beforeClock.length)
+        .replaceFirst(_taskDeadlineSeparator, '');
+    final dateAtEnd = _taskDeadlineDate.firstMatch(dateText);
+    if (dateAtEnd != null && !_quoted(dateText, dateAtEnd)) {
+      final phrase = _takeDate(dateText, reference);
+      if (phrase.error case final error?) {
+        return TaskCaptureText(title: text, error: error);
+      }
+      final dueDate = phrase.value;
+      final title = phrase.text.replaceFirst(_taskDeadlineSeparator, '');
+      if (dueDate == null || title.isEmpty) return TaskCaptureText(title: text);
+      if (suffix[2] != null) {
+        return TaskCaptureText(
+          title: text,
+          error: 'Enter the deadline in your device’s time zone.',
+        );
+      }
+      final connector = qualifier?[0]?.trim().toLowerCase();
+      if (connector != null && connector != 'at' && connector != 'by') {
+        return TaskCaptureText(
+          title: text,
+          error: 'Enter an exact deadline time.',
+        );
+      }
+      final clock = _parseClock(suffix[1]!);
+      if (clock == null) {
+        return TaskCaptureText(title: text, error: _invalidTime);
+      }
+      final resolved = _atMinute(dueDate, clock.minutes);
+      return resolved.time == null
+          ? TaskCaptureText(title: text, error: resolved.error)
+          : TaskCaptureText(
+              title: title,
+              dueDate: dueDate,
+              dueAt: resolved.time,
+            );
+    }
+  }
+  final phrase = _takeDate(text, reference);
   if (phrase.value == null || phrase.text.isEmpty) {
     return TaskCaptureText(title: text);
   }
@@ -197,7 +250,16 @@ final _dateQualifier = RegExp(
   r'(?:^|\s)(?:on|by|for|due(?:\s+(?:by|on))?:?)[ \t]+$',
   caseSensitive: false,
 );
-final _schedulePunctuation = RegExp(r'^\s*[,;.]?\s*$');
+final _schedulePunctuation = RegExp(r'^[\s,;.!?]*$');
+final _taskDeadlineDate = RegExp(
+  '(?<![\\w/:-])$_datePattern\\.?\$',
+  caseSensitive: false,
+);
+final _taskDeadlineSeparator = RegExp(r'[ \t,;:–—-]+$');
+final _taskDeadlineQualifier = RegExp(
+  r'(?<![\w/])(?:at|by|about|around|roughly|approximately|before|after)[ \t]*$',
+  caseSensitive: false,
+);
 final _doubleQuotes = RegExp(r'"[^"]*"|“[^”]*”');
 final _vagueDayPartSuffix = RegExp(
   '(?<![\\w/:-])$_datePattern([ \\t]+(?:(?:in|during)[ \\t]+(?:the[ \\t]+)?)?'
@@ -275,9 +337,9 @@ DateTime? _parseDate(String text, DateTime reference) {
     case 'today':
       return reference;
     case 'tomorrow':
-      return _plusDays(reference, 1);
+      return _validatedShift(reference, 1);
     case 'yesterday':
-      return _plusDays(reference, -1);
+      return _validatedShift(reference, -1);
   }
 
   if (_yearFirstDate.hasMatch(lower) || _trailingYearDate.hasMatch(lower)) {
@@ -315,7 +377,7 @@ DateTime? _parseDate(String text, DateTime reference) {
       const ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].indexOf(dayName) +
       1;
   final distance = (weekday - reference.weekday) % 7;
-  return _plusDays(
+  return _validatedShift(
     reference,
     words.first == 'next' && distance == 0 ? 7 : distance,
   );
@@ -325,6 +387,11 @@ DateTime _day(DateTime value) => DateTime(value.year, value.month, value.day);
 
 DateTime _plusDays(DateTime value, int amount) =>
     DateTime(value.year, value.month, value.day + amount);
+
+DateTime? _validatedShift(DateTime value, int amount) {
+  final civil = DateTime.utc(value.year, value.month, value.day + amount);
+  return _validatedDay(civil.year, civil.month, civil.day);
+}
 
 DateTime? _validatedDay(int year, int month, int day) {
   if (year < 1 ||
@@ -446,11 +513,18 @@ final _allDay = RegExp(r'\ball[ -]+day\b', caseSensitive: false);
   return (text: text, value: false);
 }
 
+const _spokenClockSuffix = r"[ \t]+o(?:['’‘ʼ]|[ \t]*)clock";
 const _clockAtom =
-    r'(?:\d{1,3}(?::\d{0,3})?(?:[ \t]*[ap]\.?m\.?)?|noon|midnight)';
+    '(?:\\d{1,3}(?::\\d{0,3})?(?:$_spokenClockSuffix)?'
+    '(?:[ \\t]*[ap]\\.?m\\.?)?|noon|midnight)';
 const _zoneSuffix =
     '(?:[ \\t]*(?:Z|[+−]\\d{2}:?\\d{2}|-\\d{4})(?![\\w:])'
     '|[ \\t]+(?:(?:in|@)[ \\t]*)?(?:$_zoneId|$_commonZones)\\b)';
+final _spokenClock = RegExp(_spokenClockSuffix, caseSensitive: false);
+final _taskDeadlineClock = RegExp(
+  '(?<![\\w:/])($_clockAtom)($_zoneSuffix)?[ \\t]*[,.!?;]?[ \\t]*\$',
+  caseSensitive: false,
+);
 final _zoneAfterClock = RegExp(
   '(?<![\\w:])$_clockAtom$_zoneSuffix',
   caseSensitive: false,
@@ -512,7 +586,7 @@ class _Clock {
 }
 
 _Clock? _parseClock(String text) {
-  final raw = text.toLowerCase();
+  final raw = text.replaceFirst(_spokenClock, '').toLowerCase();
   if (raw == 'noon') return const _Clock(12 * 60, fixedPeriod: true);
   if (raw == 'midnight') return const _Clock(0, fixedPeriod: true);
   final match = _clock.firstMatch(raw);
@@ -538,8 +612,10 @@ _Clock? _parseClock(String text) {
 bool _strongClock(String token) =>
     token.contains(':') || _period.hasMatch(token);
 
-bool _wordClock(String token) =>
-    token.toLowerCase() == 'noon' || token.toLowerCase() == 'midnight';
+bool _namedClock(String token) =>
+    token.toLowerCase() == 'noon' ||
+    token.toLowerCase() == 'midnight' ||
+    _spokenClock.hasMatch(token);
 
 bool _qualifiedRange(Match match) {
   final first = match[2]!;
@@ -547,8 +623,8 @@ bool _qualifiedRange(Match match) {
   return match[1] != null ||
       _strongClock(first) ||
       _strongClock(second) ||
-      _wordClock(first) ||
-      _wordClock(second);
+      _namedClock(first) ||
+      _namedClock(second);
 }
 
 ({String text, _Clock? start, _Clock? end, String? error}) _takeClocks(
@@ -558,7 +634,7 @@ bool _qualifiedRange(Match match) {
   final approximate = _approximateClock.allMatches(text).any((match) {
     if (_quoted(text, match)) return false;
     final token = match[1]!;
-    if (_strongClock(token) || _wordClock(token)) return true;
+    if (_strongClock(token) || _namedClock(token)) return true;
     final range = _range.matchAsPrefix(text, match.end - token.length);
     return range != null && _qualifiedRange(range);
   });
@@ -594,7 +670,7 @@ bool _qualifiedRange(Match match) {
     return !_quoted(remaining, match) &&
         (match[1] != null ||
             _strongClock(raw) ||
-            (_wordClock(raw) && trailing));
+            (_namedClock(raw) && trailing));
   }).toList();
 
   if (range != null) {
@@ -703,7 +779,8 @@ const _clarifyRangePeriod =
 final _bareTwelveHourClock = RegExp(r'^(?:[1-9]|1[0-2])$');
 
 bool _needsRangePeriod(String start, String end) =>
-    _bareTwelveHourClock.hasMatch(start) && _bareTwelveHourClock.hasMatch(end);
+    _bareTwelveHourClock.hasMatch(start.replaceFirst(_spokenClock, '')) &&
+    _bareTwelveHourClock.hasMatch(end.replaceFirst(_spokenClock, ''));
 
 (int, int?) _resolveRange(_Clock start, _Clock? end) {
   if (end == null) return (start.minutes, null);

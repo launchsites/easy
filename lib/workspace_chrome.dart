@@ -1,7 +1,7 @@
 part of 'main.dart';
 
 class _Surface extends StatelessWidget {
-  const _Surface({required this.child});
+  const _Surface({required this.child, super.key});
 
   final Widget child;
 
@@ -494,6 +494,7 @@ class _RecordDetails extends StatelessWidget {
     this.onTimingHistory,
     this.onTrackActivity,
     this.onRemoveFutureBlocks,
+    this.centered = false,
   });
 
   final Object record;
@@ -517,6 +518,7 @@ class _RecordDetails extends StatelessWidget {
   final VoidCallback? onTimingHistory;
   final VoidCallback? onTrackActivity;
   final VoidCallback? onRemoveFutureBlocks;
+  final bool centered;
 
   @override
   Widget build(BuildContext context) {
@@ -578,179 +580,202 @@ class _RecordDetails extends StatelessWidget {
       ],
       _ => <(IconData, String)>[],
     };
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(25, onClose == null ? 11 : 22, 25, 27),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Align(
+      alignment: AlignmentDirectional.topStart,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: centered ? 840 : double.infinity),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            centered ? 36 : 25,
+            onClose == null ? 11 : 22,
+            centered ? 36 : 25,
+            27,
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    _recordTitle(record),
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -.8,
-                      height: 1.15,
-                    ),
-                  ),
-                ),
-                if (onClose != null)
+                if (centered && onClose != null) ...[
                   IconButton(
                     tooltip: 'Close details',
                     onPressed: onClose,
-                    icon: const Icon(Icons.close_rounded, size: 19),
+                    icon: const BackButtonIcon(),
                   ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            for (final (icon, label) in rows)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
+                  const SizedBox(height: 18),
+                ],
+                Row(
                   children: [
-                    Icon(icon, color: muted, size: 17),
-                    const SizedBox(width: 9),
                     Expanded(
                       child: Text(
-                        label,
-                        style: const TextStyle(color: muted, fontSize: 13),
+                        _recordTitle(record),
+                        style: TextStyle(
+                          fontSize: centered ? 36 : 24,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -.8,
+                          height: 1.15,
+                        ),
                       ),
                     ),
+                    if (onClose != null && !centered)
+                      IconButton(
+                        tooltip: 'Close details',
+                        onPressed: onClose,
+                        icon: const Icon(Icons.close_rounded, size: 19),
+                      ),
                   ],
                 ),
-              ),
-            if (item is NoteItem &&
-                (item.body.trim().isNotEmpty || item.links.isNotEmpty)) ...[
-              const Divider(),
-              const SizedBox(height: 14),
-              NotePreview(
-                note: item,
-                targets: noteTargets,
-                onOpenLink: onOpenNoteLink,
-              ),
-            ],
-            if (item case CalendarEvent(description: final description?)) ...[
-              const Divider(),
-              const SizedBox(height: 14),
-              SelectableText(
-                description,
-                style: const TextStyle(height: 1.6, fontSize: 14),
-              ),
-            ],
-            if (item is! CalendarEvent ||
-                !item.isReadOnly ||
-                onTrackActivity != null) ...[
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                children: [
-                  if (canEdit)
-                    FilledButton.tonal(
-                      onPressed: onEdit,
-                      child: Text(
-                        item is CalendarEvent && item.plannedTaskId != null
-                            ? 'Move block'
-                            : 'Edit',
-                      ),
+                const SizedBox(height: 14),
+                for (final (icon, label) in rows)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        Icon(icon, color: muted, size: 17),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: const TextStyle(color: muted, fontSize: 13),
+                          ),
+                        ),
+                      ],
                     ),
-                  if (item is TaskItem && onToggleDone != null)
-                    TextButton(
-                      onPressed: onToggleDone,
-                      child: Text(item.done ? 'Reopen' : 'Mark done'),
-                    ),
-                  if (onTrackActivity != null)
-                    TextButton(
-                      onPressed: onTrackActivity,
-                      child: const Text('Track time'),
-                    ),
-                  if (onEstimate != null)
-                    TextButton(
-                      onPressed: onEstimate,
-                      child: const Text('Suggest duration'),
-                    ),
-                  if (onAppleCopy != null)
-                    TextButton(
-                      onPressed: onAppleCopy,
-                      child: Text(appleActionLabel ?? 'Copy to Apple Calendar'),
-                    ),
-                  if (onRepeat != null)
-                    TextButton(
-                      onPressed: onRepeat,
-                      child: Text(
-                        repeatingTask ||
-                                item is CalendarEvent &&
-                                    item.recurringSeriesId != null
-                            ? 'Repeat rule'
-                            : 'Repeat',
-                      ),
-                    ),
-                  if (onAssignPlace != null)
-                    TextButton(
-                      onPressed: onAssignPlace,
-                      child: const Text('Travel place'),
-                    ),
-                  if (onAddSubtask != null)
-                    TextButton(
-                      onPressed: onAddSubtask,
-                      child: const Text('Add subtask'),
-                    ),
-                  if (onBreakdown != null)
-                    TextButton(
-                      onPressed: onBreakdown,
-                      child: const Text('Break down'),
-                    ),
-                  if (onReminder != null)
-                    TextButton(
-                      onPressed: onReminder,
-                      child: Text(
-                        reminderSet ? 'Edit reminder' : 'Set reminder',
-                      ),
-                    ),
-                  if (onSchedule != null)
-                    TextButton(
-                      onPressed: onSchedule,
-                      child: const Text('Schedule'),
-                    ),
-                  if (onTimingHistory != null)
-                    TextButton(
-                      onPressed: onTimingHistory,
-                      child: const Text('Timing history'),
-                    ),
-                  if (onRemoveFutureBlocks != null)
-                    TextButton(
-                      onPressed: onRemoveFutureBlocks,
-                      child: const Text('Review future blocks'),
-                    ),
-                  if (canEdit)
-                    TextButton(
-                      onPressed: onDelete,
-                      style: TextButton.styleFrom(foregroundColor: muted),
-                      child: Text(
-                        repeatingTask ||
-                                item is CalendarEvent &&
-                                    item.recurringSeriesId != null
-                            ? 'Skip'
-                            : 'Delete',
-                      ),
-                    ),
+                  ),
+                if (item is NoteItem &&
+                    (item.body.trim().isNotEmpty || item.links.isNotEmpty)) ...[
+                  const Divider(),
+                  const SizedBox(height: 14),
+                  NotePreview(
+                    note: item,
+                    targets: noteTargets,
+                    onOpenLink: onOpenNoteLink,
+                  ),
                 ],
-              ),
-            ],
-            if (item case TaskItem(notes: final notes?)
-                when notes.trim().isNotEmpty) ...[
-              const SizedBox(height: 14),
-              const Divider(),
-              const SizedBox(height: 14),
-              SelectableText(
-                notes,
-                style: const TextStyle(height: 1.6, fontSize: 14),
-              ),
-            ],
-          ],
+                if (item case CalendarEvent(
+                  description: final description?,
+                )) ...[
+                  const Divider(),
+                  const SizedBox(height: 14),
+                  SelectableText(
+                    description,
+                    style: const TextStyle(height: 1.6, fontSize: 14),
+                  ),
+                ],
+                if (item is! CalendarEvent ||
+                    !item.isReadOnly ||
+                    onTrackActivity != null) ...[
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      if (canEdit)
+                        FilledButton.tonal(
+                          onPressed: onEdit,
+                          child: Text(
+                            item is CalendarEvent && item.plannedTaskId != null
+                                ? 'Move block'
+                                : 'Edit',
+                          ),
+                        ),
+                      if (item is TaskItem && onToggleDone != null)
+                        TextButton(
+                          onPressed: onToggleDone,
+                          child: Text(item.done ? 'Reopen' : 'Mark done'),
+                        ),
+                      if (onTrackActivity != null)
+                        TextButton(
+                          onPressed: onTrackActivity,
+                          child: const Text('Track time'),
+                        ),
+                      if (onEstimate != null)
+                        TextButton(
+                          onPressed: onEstimate,
+                          child: const Text('Suggest duration'),
+                        ),
+                      if (onAppleCopy != null)
+                        TextButton(
+                          onPressed: onAppleCopy,
+                          child: Text(
+                            appleActionLabel ?? 'Copy to Apple Calendar',
+                          ),
+                        ),
+                      if (onRepeat != null)
+                        TextButton(
+                          onPressed: onRepeat,
+                          child: Text(
+                            repeatingTask ||
+                                    item is CalendarEvent &&
+                                        item.recurringSeriesId != null
+                                ? 'Repeat rule'
+                                : 'Repeat',
+                          ),
+                        ),
+                      if (onAssignPlace != null)
+                        TextButton(
+                          onPressed: onAssignPlace,
+                          child: const Text('Travel place'),
+                        ),
+                      if (onAddSubtask != null)
+                        TextButton(
+                          onPressed: onAddSubtask,
+                          child: const Text('Add subtask'),
+                        ),
+                      if (onBreakdown != null)
+                        TextButton(
+                          onPressed: onBreakdown,
+                          child: const Text('Break down'),
+                        ),
+                      if (onReminder != null)
+                        TextButton(
+                          onPressed: onReminder,
+                          child: Text(
+                            reminderSet ? 'Edit reminder' : 'Set reminder',
+                          ),
+                        ),
+                      if (onSchedule != null)
+                        TextButton(
+                          onPressed: onSchedule,
+                          child: const Text('Schedule'),
+                        ),
+                      if (onTimingHistory != null)
+                        TextButton(
+                          onPressed: onTimingHistory,
+                          child: const Text('Timing history'),
+                        ),
+                      if (onRemoveFutureBlocks != null)
+                        TextButton(
+                          onPressed: onRemoveFutureBlocks,
+                          child: const Text('Review future blocks'),
+                        ),
+                      if (canEdit)
+                        TextButton(
+                          onPressed: onDelete,
+                          style: TextButton.styleFrom(foregroundColor: muted),
+                          child: Text(
+                            repeatingTask ||
+                                    item is CalendarEvent &&
+                                        item.recurringSeriesId != null
+                                ? 'Skip'
+                                : 'Delete',
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                if (item case TaskItem(notes: final notes?)
+                    when notes.trim().isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Divider(),
+                  const SizedBox(height: 14),
+                  SelectableText(
+                    notes,
+                    style: const TextStyle(height: 1.6, fontSize: 14),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );

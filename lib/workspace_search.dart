@@ -182,8 +182,8 @@ extension _WorkspaceSearch on _WorkspaceState {
       _inform('This result is no longer available.');
       return;
     }
+    if (!await _navigate(destination) || !mounted) return;
     if (record is CalendarEvent) _changeDate(record.start);
-    _navigate(destination);
     await _openRecord(record);
   }
 }

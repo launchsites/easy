@@ -118,6 +118,23 @@ class NoteItem {
   final List<String> tags;
   final List<NoteLink> links;
 
+  NoteItem withContent({
+    required String title,
+    required String body,
+    DateTime? updated,
+  }) => NoteItem(
+    id: id,
+    title: title,
+    body: body,
+    updated: updated ?? this.updated,
+    category: category,
+    noteToSelf: noteToSelf,
+    pinned: pinned,
+    folder: folder,
+    tags: tags,
+    links: links,
+  );
+
   Map<String, Object?> toJson() => {
     'id': id,
     'title': title,

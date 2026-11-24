@@ -148,6 +148,10 @@ class _QuickCaptureState extends State<QuickCapture> {
     switch (_kind) {
       case RecordKind.task:
         final task = _parseTask(input);
+        if (task.error case final error?) {
+          _setError(error);
+          return;
+        }
         if (task.title.isEmpty) {
           _setError('Enter a task name.');
           return;
@@ -158,6 +162,7 @@ class _QuickCaptureState extends State<QuickCapture> {
             title: task.title,
             category: _category,
             date: task.dueDate ?? widget.initialTaskDate,
+            dueAt: task.dueAt,
             schedulingHold: taskSchedulingHoldHint(task.title),
             done: false,
           ),
@@ -506,14 +511,16 @@ class _QuickCaptureState extends State<QuickCapture> {
     final task = _kind == RecordKind.task && input.isNotEmpty
         ? _parseTask(input)
         : null;
-    final dueDate = task == null
+    final dueAt = task?.dueAt;
+    final dueDate = task == null || task.error != null
         ? null
         : task.dueDate ?? widget.initialTaskDate;
     final summary = event != null
         ? _eventSummary(event)
-        : dueDate == null
-        ? ''
-        : 'Due ${_formatDate(dueDate)}';
+        : [
+            if (dueDate != null) 'Due ${_formatDate(dueDate)}',
+            if (dueAt != null) _formatTime(dueAt.toLocal()),
+          ].join(' · ');
     final parsedTitle = event?.title ?? task?.title;
     final showTitle =
         parsedTitle != null && parsedTitle.isNotEmpty && parsedTitle != input;

@@ -40,12 +40,16 @@ class TasksPage extends StatefulWidget {
     required this.tasks,
     required this.onToggle,
     required this.onTaskTap,
+    this.companion = false,
+    this.selectedTaskId,
     super.key,
   });
 
   final List<TaskItem> tasks;
   final ValueChanged<TaskItem> onToggle;
   final ValueChanged<TaskItem> onTaskTap;
+  final bool companion;
+  final String? selectedTaskId;
 
   @override
   State<TasksPage> createState() => _TasksPageState();
@@ -100,6 +104,7 @@ class _TasksPageState extends State<TasksPage> {
     final labels = Theme.of(context).textTheme.labelLarge;
     return _ListPageLayout(
       title: 'Tasks',
+      companion: widget.companion,
       scrollKey: const PageStorageKey('tasks-scroll'),
       actions: Wrap(
         spacing: 4,
@@ -113,7 +118,9 @@ class _TasksPageState extends State<TasksPage> {
                   foregroundColor: _filter == filter ? ink : muted,
                   backgroundColor: _filter == filter ? _softSurface : null,
                   minimumSize: const Size(48, 42),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: widget.companion ? 8 : 14,
+                  ),
                   side: _filter == filter
                       ? const BorderSide(color: line)
                       : BorderSide.none,
@@ -171,6 +178,7 @@ class _TasksPageState extends State<TasksPage> {
                     : rowData.depth.clamp(0, 4) * 12.0,
                 childCount: rowData.childCount,
                 expanded: expanded,
+                selected: task.id == widget.selectedTaskId,
                 onDisclosure: () => _toggleChildren(task.id),
                 onToggle: () => widget.onToggle(task),
                 onTap: () => widget.onTaskTap(task),
@@ -347,6 +355,7 @@ class _TaskRow extends StatelessWidget {
     required this.indentation,
     required this.childCount,
     required this.expanded,
+    required this.selected,
     required this.onDisclosure,
     required this.onToggle,
     required this.onTap,
@@ -359,6 +368,7 @@ class _TaskRow extends StatelessWidget {
   final double indentation;
   final int childCount;
   final bool expanded;
+  final bool selected;
   final VoidCallback onDisclosure;
   final VoidCallback onToggle;
   final VoidCallback onTap;
@@ -411,72 +421,76 @@ class _TaskRow extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              onTap: onTap,
+          child: Semantics(
+            selected: selected ? true : null,
+            child: Material(
+              color: selected ? softAccent : Colors.transparent,
               borderRadius: BorderRadius.circular(9),
-              hoverColor: _softSurface,
-              focusColor: softAccent,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 58),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(8, 9, 10, 9),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        task.title,
-                        style: TextStyle(
-                          color: task.done ? muted : ink,
-                          fontSize: 16,
-                          height: 1.3,
-                          fontWeight: FontWeight.w600,
-                          decoration: task.done
-                              ? TextDecoration.lineThrough
-                              : null,
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(9),
+                hoverColor: _softSurface,
+                focusColor: softAccent,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 58),
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(8, 9, 10, 9),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          task.title,
+                          style: TextStyle(
+                            color: task.done ? muted : ink,
+                            fontSize: 16,
+                            height: 1.3,
+                            fontWeight: FontWeight.w600,
+                            decoration: task.done
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
                         ),
-                      ),
-                      if (dueLabel.isNotEmpty ||
-                          category.isNotEmpty ||
-                          showEstimate ||
-                          priority != null ||
-                          showSubtasks) ...[
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 13,
-                          runSpacing: 5,
-                          children: [
-                            if (category.isNotEmpty)
-                              _CategoryLabel(name: category),
-                            if (dueLabel.isNotEmpty)
-                              Text(
-                                dueLabel,
-                                style: group == _TaskGroup.overdue
-                                    ? metadata.copyWith(color: _overdueInk)
-                                    : metadata,
-                              ),
-                            if (showEstimate)
-                              Text(
-                                '$estimate min',
-                                semanticsLabel: 'Estimated $estimate minutes',
-                                style: metadata,
-                              ),
-                            if (priority != null)
-                              Text(
-                                '${priority.label} priority',
-                                style: metadata,
-                              ),
-                            if (showSubtasks)
-                              Text(
-                                '$childCount ${childCount == 1 ? 'subtask' : 'subtasks'}',
-                                style: metadata,
-                              ),
-                          ],
-                        ),
+                        if (dueLabel.isNotEmpty ||
+                            category.isNotEmpty ||
+                            showEstimate ||
+                            priority != null ||
+                            showSubtasks) ...[
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 13,
+                            runSpacing: 5,
+                            children: [
+                              if (category.isNotEmpty)
+                                _CategoryLabel(name: category),
+                              if (dueLabel.isNotEmpty)
+                                Text(
+                                  dueLabel,
+                                  style: group == _TaskGroup.overdue
+                                      ? metadata.copyWith(color: _overdueInk)
+                                      : metadata,
+                                ),
+                              if (showEstimate)
+                                Text(
+                                  '$estimate min',
+                                  semanticsLabel: 'Estimated $estimate minutes',
+                                  style: metadata,
+                                ),
+                              if (priority != null)
+                                Text(
+                                  '${priority.label} priority',
+                                  style: metadata,
+                                ),
+                              if (showSubtasks)
+                                Text(
+                                  '$childCount ${childCount == 1 ? 'subtask' : 'subtasks'}',
+                                  style: metadata,
+                                ),
+                            ],
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -533,10 +547,18 @@ class _CategoryLabel extends StatelessWidget {
 }
 
 class NotesPage extends StatefulWidget {
-  const NotesPage({required this.notes, required this.onNoteTap, super.key});
+  const NotesPage({
+    required this.notes,
+    required this.onNoteTap,
+    this.companion = false,
+    this.selectedNoteId,
+    super.key,
+  });
 
   final List<NoteItem> notes;
   final ValueChanged<NoteItem> onNoteTap;
+  final bool companion;
+  final String? selectedNoteId;
 
   @override
   State<NotesPage> createState() => _NotesPageState();
@@ -674,6 +696,7 @@ class _NotesPageState extends State<NotesPage> {
     final notes = _matching;
     return _ListPageLayout(
       title: 'Notes',
+      companion: widget.companion,
       scrollKey: const PageStorageKey('notes-scroll'),
       inlineActions: true,
       actions: Row(
@@ -757,6 +780,7 @@ class _NotesPageState extends State<NotesPage> {
             return _NoteRow(
               key: ValueKey(note.id),
               note: note,
+              selected: note.id == widget.selectedNoteId,
               onTap: () => widget.onNoteTap(note),
             );
           },
@@ -767,7 +791,12 @@ class _NotesPageState extends State<NotesPage> {
 }
 
 class _NoteRow extends StatelessWidget {
-  const _NoteRow({required this.note, required this.onTap, super.key});
+  const _NoteRow({
+    required this.note,
+    required this.onTap,
+    required this.selected,
+    super.key,
+  });
 
   static const _previewLength = 384;
   static final _lineBreak = RegExp(r'[\r\n\u0085\u2028\u2029]');
@@ -779,6 +808,7 @@ class _NoteRow extends StatelessWidget {
 
   final NoteItem note;
   final VoidCallback onTap;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -790,52 +820,56 @@ class _NoteRow extends StatelessWidget {
     final excerpt = preview.characters.take(_previewLength).string;
     final snippet = excerpt.length < preview.length ? '$excerpt…' : excerpt;
     final title = note.title.trim();
-    return Material(
-      type: MaterialType.transparency,
-      child: InkWell(
-        onTap: onTap,
+    return Semantics(
+      selected: selected ? true : null,
+      child: Material(
+        color: selected ? softAccent : Colors.transparent,
         borderRadius: BorderRadius.circular(7),
-        hoverColor: _softSurface,
-        focusColor: softAccent,
-        child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(5, 10, 7, 10),
-          child: Row(
-            children: [
-              Icon(
-                note.pinned
-                    ? Icons.push_pin_outlined
-                    : Icons.description_outlined,
-                size: 20,
-                color: accent,
-                semanticLabel: note.pinned ? 'Pinned' : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title.isEmpty ? 'Untitled note' : title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: ink,
-                        fontSize: 16,
-                        height: 1.25,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    _details(
-                      context,
-                      updated,
-                      snippet,
-                      fullPreview: snippet == preview ? null : preview,
-                    ),
-                  ],
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(7),
+          hoverColor: _softSurface,
+          focusColor: softAccent,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(5, 10, 7, 10),
+            child: Row(
+              children: [
+                Icon(
+                  note.pinned
+                      ? Icons.push_pin_outlined
+                      : Icons.description_outlined,
+                  size: 20,
+                  color: accent,
+                  semanticLabel: note.pinned ? 'Pinned' : null,
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title.isEmpty ? 'Untitled note' : title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: ink,
+                          fontSize: 16,
+                          height: 1.25,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      _details(
+                        context,
+                        updated,
+                        snippet,
+                        fullPreview: snippet == preview ? null : preview,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1010,6 +1044,7 @@ class _ListPageLayout extends StatelessWidget {
     required this.actions,
     required this.slivers,
     this.inlineActions = false,
+    this.companion = false,
   });
 
   final String title;
@@ -1017,11 +1052,16 @@ class _ListPageLayout extends StatelessWidget {
   final Widget actions;
   final List<Widget> Function(bool wide) slivers;
   final bool inlineActions;
+  final bool companion;
 
   @override
   Widget build(BuildContext context) {
     final mobile = MediaQuery.sizeOf(context).width < 720;
-    final horizontal = mobile ? 28.0 : 48.0;
+    final horizontal = companion
+        ? 17.0
+        : mobile
+        ? 28.0
+        : 48.0;
     final bottom = mobile ? 104 + MediaQuery.paddingOf(context).bottom : 44.0;
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1037,7 +1077,10 @@ class _ListPageLayout extends StatelessWidget {
             constraints.maxHeight < 355 &&
             availableWidth >= 440 &&
             MediaQuery.textScalerOf(context).scale(14) <= 18;
-        final titleStyle = workspaceHeadingStyle(mobile);
+        final titleStyle = companion
+            ? workspaceHeadingStyle(false)
+                  .copyWith(fontSize: 25, letterSpacing: -.7)
+            : workspaceHeadingStyle(mobile);
         final header = Semantics(
           header: true,
           child: Text(
@@ -1074,7 +1117,11 @@ class _ListPageLayout extends StatelessWidget {
               )
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [header, const SizedBox(height: 18), actions],
+                children: [
+                  header,
+                  SizedBox(height: companion ? 10 : 18),
+                  actions,
+                ],
               );
         return CustomScrollView(
           key: scrollKey,
@@ -1083,9 +1130,17 @@ class _ListPageLayout extends StatelessWidget {
             SliverPadding(
               padding: EdgeInsetsDirectional.fromSTEB(
                 horizontal,
-                shortLandscape ? 12 : (mobile ? 25 : 42),
+                companion
+                    ? 20
+                    : shortLandscape
+                    ? 12
+                    : (mobile ? 25 : 42),
                 endInset,
-                shortLandscape ? 13 : (mobile ? 20 : 26),
+                companion
+                    ? 16
+                    : shortLandscape
+                    ? 13
+                    : (mobile ? 20 : 26),
               ),
               sliver: SliverToBoxAdapter(child: head),
             ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data' show BytesBuilder;
+import 'dart:ui' show AppExitResponse;
 
 import 'package:crypto/crypto.dart';
 import 'package:file_selector/file_selector.dart';
@@ -68,6 +69,7 @@ import 'insights/insights.dart';
 import 'list_pages.dart';
 import 'mobile_home.dart';
 import 'nutrition/android_meal_photo_recovery.dart';
+import 'notes/desktop_note_editor.dart';
 import 'notes/note_preview.dart';
 import 'nutrition/meal_vision_review.dart';
 import 'nutrition/nutrition.dart';
@@ -120,6 +122,7 @@ import 'workout_plans_page.dart';
 import 'workspace_data.dart';
 
 part 'workspace_chrome.dart';
+part 'workspace_desktop_records.dart';
 part 'workspace_repeating_tasks.dart';
 part 'workspace_category_views.dart';
 part 'workspace_search.dart';
@@ -356,6 +359,12 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   final _mountedDestinations = {_Destination.today};
   String? _space;
   Object? _inspected;
+  _Destination? _inspectedReturnDestination;
+  DesktopNoteEdits? _desktopNoteEdits;
+  final _newDesktopNoteIds = <String>{};
+  bool _showWorkoutPlans = false;
+  bool _confirmingWorkoutExit = false;
+  final _workoutPanelKey = GlobalKey<WorkoutPlansPageState>();
   var _loading = true;
   var _loadFailed = false;
   final _pageStorage = PageStorageBucket();
@@ -467,6 +476,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     _reminderDebounce?.cancel();
     _voiceTranscriber.cancel();
     _heldVoiceOverlay.dispose();
+    _desktopNoteEdits?.dispose();
     _ai?.dispose();
     final aiState = _aiState;
     if (aiState != null) {
@@ -480,12 +490,26 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
   }
 
   @override
+  Future<AppExitResponse> didRequestAppExit() async {
+    if (_showWorkoutPlans && !await _mayCloseWorkoutPlans()) {
+      return AppExitResponse.cancel;
+    }
+    final edits = _desktopNoteEdits;
+    final saved = edits == null || await edits.flush();
+    if (saved) await _pendingSave;
+    return saved ? AppExitResponse.exit : AppExitResponse.cancel;
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _ai?.setForeground(
       state == AppLifecycleState.resumed && _allows(EasyFeature.ai),
     );
     _syncEstimateTimer();
-    if (state != AppLifecycleState.resumed) _voiceTranscriber.cancel();
+    if (state != AppLifecycleState.resumed) {
+      _voiceTranscriber.cancel();
+      if (_desktopNoteEdits case final edits?) unawaited(edits.flush());
+    }
     if (state != AppLifecycleState.resumed) {
       _focusSuggestionBoundary?.cancel();
     } else if (_focusSuggestionPreferences.enabled && !_loading) {
@@ -2470,7 +2494,16 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       );
       return;
     }
-    setState(() => _workoutPlans = plans);
+    if (MediaQuery.sizeOf(context).width >= 720) {
+      _flushDesktopNote();
+      setState(() {
+        _inspected = null;
+        _inspectedReturnDestination = null;
+        _destination = _Destination.today;
+        _showWorkoutPlans = true;
+      });
+      return;
+    }
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => MobileModeFrame(
@@ -2538,6 +2571,10 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _inspected = _workspaceTasks
           .where((task) => task.id == selected.id)
           .firstOrNull;
+    } else if (_inspected case final NoteItem selected) {
+      _inspected =
+          data.notes.where((note) => note.id == selected.id).firstOrNull ??
+          (_newDesktopNoteIds.contains(selected.id) ? selected : null);
     }
   }
 
@@ -2888,13 +2925,75 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }, _persistGymSessions);
   }
 
-  void _navigate(_Destination destination) {
+  void _closeWorkoutPlans() {
+    setState(() => _showWorkoutPlans = false);
+    _queueTodayFit();
+  }
+
+  void _closeDesktopRecord() {
+    _flushDesktopNote();
+    setState(() {
+      if (_inspectedReturnDestination case final destination?) {
+        _destination = destination;
+      }
+      _inspected = null;
+      _inspectedReturnDestination = null;
+    });
+    _queueTodayFit();
+  }
+
+  void _flushDesktopNote() {
+    if ((_desktopNoteEdits, _inspected) case (
+      final edits?,
+      NoteItem(:final id),
+    )) {
+      unawaited(
+        edits.flush(id).then((saved) {
+          final active = _inspected;
+          if (saved && (active is! NoteItem || active.id != id)) {
+            _newDesktopNoteIds.remove(id);
+          }
+        }),
+      );
+    }
+  }
+
+  Future<void> _createForDestination() async {
+    if (_reviewSaving) return;
+    if (_destination != _Destination.notes ||
+        MediaQuery.sizeOf(context).width < 720) {
+      await _capture();
+      return;
+    }
+    _flushDesktopNote();
+    final now = DateTime.now();
+    final note = NoteItem(
+      id: 'note-${now.microsecondsSinceEpoch}',
+      title: '',
+      body: '',
+      updated: now,
+      category: _preferredFocusCategory,
+    );
+    setState(() {
+      _newDesktopNoteIds.add(note.id);
+      _inspected = note;
+      _inspectedReturnDestination = null;
+    });
+  }
+
+  Future<bool> _navigate(_Destination destination) async {
+    if (_showWorkoutPlans && !await _mayCloseWorkoutPlans()) return false;
+    if (!mounted) return false;
+    _flushDesktopNote();
     setState(() {
       _destination = destination;
       _mountedDestinations.add(destination);
+      _showWorkoutPlans = false;
       _inspected = null;
+      _inspectedReturnDestination = null;
     });
     _queueTodayFit();
+    return true;
   }
 
   void _changeDate(DateTime date) {
@@ -2905,10 +3004,15 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     }
   }
 
-  void _changeSpace(String? space) {
+  Future<void> _changeSpace(String? space) async {
+    if (_showWorkoutPlans && !await _mayCloseWorkoutPlans()) return;
+    if (!mounted) return;
+    _flushDesktopNote();
     setState(() {
       _space = space;
+      _showWorkoutPlans = false;
       _inspected = null;
+      _inspectedReturnDestination = null;
     });
     _queueTodayFit();
   }
@@ -3910,13 +4014,15 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     } else {
       shown = target;
     }
-    if (shown is CalendarEvent) _changeDate(shown.start);
-    _navigate(
+    if (await _navigate(
       link.kind == NoteLinkKind.task
           ? _Destination.tasks
           : _Destination.calendar,
-    );
-    await _openRecord(shown);
+    )) {
+      if (!mounted) return;
+      if (shown is CalendarEvent) _changeDate(shown.start);
+      await _openRecord(shown);
+    }
   }
 
   Future<void> _openRecord(Object record) async {
@@ -3927,7 +4033,29 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
       _inform('This Apple Calendar event is unavailable.');
       return;
     }
-    if (MediaQuery.sizeOf(context).width >= 1000) {
+    final width = MediaQuery.sizeOf(context).width;
+    if (width >= 720 && (current is TaskItem || current is NoteItem)) {
+      if (_showWorkoutPlans && !await _mayCloseWorkoutPlans()) return;
+      if (!mounted) return;
+      if (_inspected is NoteItem &&
+          (current is! NoteItem || current.id != (_inspected as NoteItem).id)) {
+        _flushDesktopNote();
+      }
+      final destination = current is TaskItem
+          ? _Destination.tasks
+          : _Destination.notes;
+      setState(() {
+        if (_destination != destination) {
+          _inspectedReturnDestination = _destination;
+        }
+        _destination = destination;
+        _mountedDestinations.add(destination);
+        _showWorkoutPlans = false;
+        _inspected = current;
+      });
+      return;
+    }
+    if (width >= 1000) {
       setState(() => _inspected = current);
       return;
     }
@@ -4476,7 +4604,15 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final showTasks = mode?.sections.contains(FocusSection.tasks) ?? true;
     final focusedContent = _focusedContent(context, mode);
     final fitsNow = _todayFitsNowTaskId;
-    final inspectedAppleAction = _appleActionFor(_inspected);
+    final selected = _inspected;
+    final focusedTask =
+        !mobile && selected is TaskItem && _destination == _Destination.tasks
+        ? selected
+        : null;
+    final focusedNote =
+        !mobile && selected is NoteItem && _destination == _Destination.notes
+        ? selected
+        : null;
     final visibleCalendars =
         _calendarPreferences?.calendarsFor(space) ?? const <CalendarIdentity>{};
     final calendarProblem =
@@ -4499,7 +4635,14 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
         index: _destination.index,
         sizing: StackFit.expand,
         children: [
-          if (mobile)
+          if (_workoutPlans case final plans? when _showWorkoutPlans)
+            WorkoutPlansPage(
+              key: _workoutPanelKey,
+              plans: plans,
+              onChanged: _saveWorkoutPlans,
+              onClose: _closeWorkoutPlans,
+            )
+          else if (mobile)
             MobileHome(
               date: _today,
               mode: space,
@@ -4559,6 +4702,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                     eventsRevision: _visibleEventRevision,
                     onDateChanged: _changeDate,
                     onEventTap: _openRecord,
+                    onCreateTimedEvent: mobile ? null : _createTimedEvent,
                   ),
                 ),
               ],
@@ -4566,15 +4710,32 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
           else
             const SizedBox.shrink(),
           if (_mountedDestinations.contains(_Destination.tasks))
-            TasksPage(
-              tasks: tasks,
-              onToggle: _toggleTask,
-              onTaskTap: _openRecord,
+            _recordWorkspace(
+              mobile: mobile,
+              list: TasksPage(
+                tasks: tasks,
+                onToggle: _toggleTask,
+                onTaskTap: _openRecord,
+                companion: focusedTask != null,
+                selectedTaskId: focusedTask?.id,
+              ),
+              details: focusedTask == null
+                  ? null
+                  : _desktopRecordDetails(focusedTask, centered: true),
             )
           else
             const SizedBox.shrink(),
           if (_mountedDestinations.contains(_Destination.notes))
-            NotesPage(notes: notes, onNoteTap: _openRecord)
+            _recordWorkspace(
+              mobile: mobile,
+              list: NotesPage(
+                notes: notes,
+                onNoteTap: _openRecord,
+                companion: focusedNote != null,
+                selectedNoteId: focusedNote?.id,
+              ),
+              details: focusedNote == null ? null : _desktopNote(focusedNote),
+            )
           else
             const SizedBox.shrink(),
         ],
@@ -4583,6 +4744,20 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
     final shortcuts = <ShortcutActivator, VoidCallback>{
       const SingleActivator(LogicalKeyboardKey.keyK, control: true): _search,
       const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _search,
+      if (!mobile) ...{
+        const SingleActivator(
+          LogicalKeyboardKey.keyN,
+          control: true,
+          includeRepeats: false,
+        ): _createForDestination,
+        const SingleActivator(
+          LogicalKeyboardKey.keyN,
+          meta: true,
+          includeRepeats: false,
+        ): _createForDestination,
+      },
+      if (focusedNote != null || focusedTask != null)
+        const SingleActivator(LogicalKeyboardKey.escape): _closeDesktopRecord,
     };
     final workspaceView = _categoryScope(
       Listener(
@@ -4662,7 +4837,7 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                             children: [
                               _DesktopHeader(
                                 onSearch: _search,
-                                onCapture: _capture,
+                                onCapture: _createForDestination,
                               ),
                               Expanded(
                                 child: Padding(
@@ -4685,119 +4860,14 @@ class _WorkspaceState extends State<_Workspace> with WidgetsBindingObserver {
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(child: _Surface(child: page)),
-                                      if (_inspected != null &&
+                                      if (selected is CalendarEvent &&
                                           width >= 1000) ...[
                                         const SizedBox(width: 12),
                                         SizedBox(
                                           width: width >= 1250 ? 294 : 264,
                                           child: _Surface(
-                                            child: _RecordDetails(
-                                              record: _inspected!,
-                                              onClose: () => setState(
-                                                () => _inspected = null,
-                                              ),
-                                              onEdit: () =>
-                                                  _editRecord(_inspected!),
-                                              onToggleDone:
-                                                  switch (_inspected) {
-                                                    TaskItem task =>
-                                                      () => _toggleTask(task),
-                                                    _ => null,
-                                                  },
-                                              onDelete: () =>
-                                                  _deleteRecord(_inspected!),
-                                              noteTargets:
-                                                  _inspected is NoteItem
-                                                  ? _noteTargets()
-                                                  : const [],
-                                              onOpenNoteLink: _openNoteLink,
-                                              onEstimate:
-                                                  _canEstimate(_inspected)
-                                                  ? () => _suggestDuration(
-                                                      _inspected! as TaskItem,
-                                                    )
-                                                  : null,
-                                              appleActionLabel:
-                                                  inspectedAppleAction?.label,
-                                              onAppleCopy:
-                                                  inspectedAppleAction != null
-                                                  ? () => _appleRecordAction(
-                                                      _inspected!
-                                                          as CalendarEvent,
-                                                      inspectedAppleAction,
-                                                    )
-                                                  : null,
-                                              repeatingTask:
-                                                  _repeatingTask(_inspected) !=
-                                                  null,
-                                              onRepeat: switch (_inspected) {
-                                                CalendarEvent event
-                                                    when _canRepeatEvent(
-                                                      event,
-                                                    ) =>
-                                                  () => _setEventRepeat(event),
-                                                TaskItem task
-                                                    when _canRepeatTask(task) =>
-                                                  () => _setTaskRepeat(task),
-                                                _ => null,
-                                              },
-                                              onAssignPlace:
-                                                  _canAssignPlace(_inspected)
-                                                  ? () => _assignPlace(
-                                                      _inspected!
-                                                          as CalendarEvent,
-                                                    )
-                                                  : null,
-                                              onAddSubtask:
-                                                  _canAddSubtask(_inspected)
-                                                  ? () => _addSubtask(
-                                                      _inspected! as TaskItem,
-                                                    )
-                                                  : null,
-                                              onBreakdown:
-                                                  _canAddSubtask(_inspected)
-                                                  ? () => _breakDownTask(
-                                                      _inspected! as TaskItem,
-                                                    )
-                                                  : null,
-                                              reminderSet: _hasRecordReminder(
-                                                _inspected,
-                                              ),
-                                              onReminder:
-                                                  _recordReminderTarget(
-                                                        _inspected,
-                                                      ) !=
-                                                      null
-                                                  ? () => _editRecordReminder(
-                                                      _inspected!,
-                                                    )
-                                                  : null,
-                                              onSchedule:
-                                                  _canScheduleTask(_inspected)
-                                                  ? () => _openManualBlock(
-                                                      _inspected!,
-                                                    )
-                                                  : null,
-                                              onTimingHistory:
-                                                  _canSeeTaskTiming(_inspected)
-                                                  ? () => _openTaskTiming(
-                                                      _inspected! as TaskItem,
-                                                    )
-                                                  : null,
-                                              onTrackActivity:
-                                                  _canTrackActivity(_inspected)
-                                                  ? () => _openActualActivity(
-                                                      _inspected!,
-                                                    )
-                                                  : null,
-                                              onRemoveFutureBlocks:
-                                                  _canRemoveFutureBlocks(
-                                                    _inspected,
-                                                  )
-                                                  ? () => _removeFutureBlocks(
-                                                      _inspected! as TaskItem,
-                                                    )
-                                                  : null,
+                                            child: _desktopRecordDetails(
+                                              selected,
                                             ),
                                           ),
                                         ),

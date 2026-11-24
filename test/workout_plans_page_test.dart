@@ -202,6 +202,164 @@ void main() {
     expect(saved?.single.id, 'plan');
     expect(find.text('Open workout'), findsOneWidget);
   });
+
+  testWidgets('desktop edits exercises in the shell beside their workout', (
+    tester,
+  ) async {
+    List<WorkoutPlan>? saved;
+    var closed = false;
+    final page = GlobalKey<WorkoutPlansPageState>();
+    await _showDesktopPlans(
+      tester,
+      page: page,
+      onChanged: (plans) => saved = plans,
+      onClose: () => closed = true,
+    );
+
+    await _tap(tester, 'Upper body');
+    expect(find.text('Workspace navigation'), findsOneWidget);
+    expect(find.text('Edit workout'), findsOneWidget);
+    final name = find.widgetWithText(TextFormField, 'Workout name');
+    final otherPlan = find.widgetWithText(ListTile, 'Recovery');
+    expect(
+      tester.getCenter(otherPlan).dx,
+      greaterThan(tester.getCenter(name).dx),
+    );
+    await _enter(tester, 'Workout name', 'Upper body and cardio');
+    await _tap(tester, 'Bench press');
+
+    final exerciseName = find.widgetWithText(TextFormField, 'Exercise name');
+    final otherExercise = find.widgetWithText(ListTile, 'Treadmill');
+    expect(find.text('Workspace navigation'), findsOneWidget);
+    expect(find.text('Upper body and cardio'), findsOneWidget);
+    expect(
+      tester.getCenter(otherExercise).dx,
+      greaterThan(tester.getCenter(exerciseName).dx),
+    );
+    expect(Navigator.of(page.currentContext!).canPop(), isFalse);
+    await _enter(tester, 'Exercise name', 'Paused bench');
+
+    await tester.tap(otherExercise);
+    await tester.pumpAndSettle();
+    expect(find.text('Discard changes?'), findsOneWidget);
+    await _tap(tester, 'Cancel');
+    expect(find.text('Paused bench'), findsOneWidget);
+
+    final leave = page.currentState!.confirmLeaving();
+    await tester.pumpAndSettle();
+    expect(find.text('Discard changes?'), findsOneWidget);
+    await _tap(tester, 'Cancel');
+    expect(await leave, isFalse);
+    await _tap(tester, 'Save exercise');
+    expect(saved, isNull);
+    expect(find.text('Upper body and cardio'), findsOneWidget);
+    expect(find.widgetWithText(ListTile, 'Paused bench'), findsOneWidget);
+    await _tap(tester, 'Save workout');
+    expect(saved?.first.exercises.first.name, 'Paused bench');
+    expect(saved?.last.name, 'Recovery');
+
+    await tester.tap(find.byTooltip('Back to workout'));
+    expect(closed, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('narrow desktop keeps a readable back path and draft at 200%', (
+    tester,
+  ) async {
+    final page = GlobalKey<WorkoutPlansPageState>();
+    await _showDesktopPlans(
+      tester,
+      page: page,
+      size: const Size(720, 568),
+      textScaler: TextScaler.linear(2),
+      direction: TextDirection.rtl,
+      onChanged: (_) => fail('Back should not save the draft'),
+      onClose: () {},
+    );
+    await _tap(tester, 'Upper body');
+    await _enter(tester, 'Workout name', 'Keep this plan draft');
+    await _tap(tester, 'Treadmill');
+    await _enter(tester, 'Exercise name', 'Discard this exercise change');
+    await tester.tap(find.byTooltip('Back to workout editor'));
+    await tester.pumpAndSettle();
+    await _tap(tester, 'Discard');
+    expect(find.text('Keep this plan draft'), findsOneWidget);
+    expect(find.widgetWithText(ListTile, 'Treadmill'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back to workout plans'));
+    await tester.pumpAndSettle();
+    await _tap(tester, 'Discard');
+    expect(find.text('Upper body'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+Future<void> _showDesktopPlans(
+  WidgetTester tester, {
+  required GlobalKey<WorkoutPlansPageState> page,
+  required ValueChanged<List<WorkoutPlan>> onChanged,
+  required VoidCallback onClose,
+  Size size = const Size(1280, 780),
+  TextScaler textScaler = TextScaler.noScaling,
+  TextDirection direction = TextDirection.ltr,
+}) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = size;
+  addTearDown(tester.view.resetDevicePixelRatio);
+  addTearDown(tester.view.resetPhysicalSize);
+  final schedule = WorkoutSchedule(
+    kind: WorkoutScheduleKind.once,
+    startDate: DateTime(2026, 12, 1),
+  );
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: easyTheme(),
+      home: Scaffold(
+        body: MediaQuery(
+          data: MediaQueryData(size: size, textScaler: textScaler),
+          child: Directionality(
+            textDirection: direction,
+            child: Row(
+              children: [
+                const SizedBox(width: 190, child: Text('Workspace navigation')),
+                Expanded(
+                  child: WorkoutPlansPage(
+                    key: page,
+                    plans: [
+                      WorkoutPlan(
+                        id: 'upper',
+                        name: 'Upper body',
+                        schedule: schedule,
+                        exercises: [
+                          WorkoutExercise(
+                            id: 'bench',
+                            name: 'Bench press',
+                            kind: WorkoutExerciseKind.strength,
+                          ),
+                          WorkoutExercise(
+                            id: 'run',
+                            name: 'Treadmill',
+                            kind: WorkoutExerciseKind.cardio,
+                          ),
+                        ],
+                      ),
+                      WorkoutPlan(
+                        id: 'recovery',
+                        name: 'Recovery',
+                        schedule: schedule,
+                        exercises: const [],
+                      ),
+                    ],
+                    onChanged: onChanged,
+                    onClose: onClose,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 Future<void> _showPlans(

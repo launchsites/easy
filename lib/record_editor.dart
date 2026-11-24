@@ -17,12 +17,14 @@ class RecordEditor extends StatefulWidget {
     this.task,
     this.note,
     this.initialTaskDate,
+    this.initialEventRange,
     this.initialCategory,
     this.taskItems = const [],
     this.noteTargets = const [],
     this.initialTaskParentId,
+    this.notePropertiesOnly = false,
     super.key,
-  });
+  }) : assert(!notePropertiesOnly || (kind == RecordKind.note && note != null));
 
   final DateTime date;
   final RecordKind kind;
@@ -30,10 +32,12 @@ class RecordEditor extends StatefulWidget {
   final TaskItem? task;
   final NoteItem? note;
   final DateTime? initialTaskDate;
+  final DateTimeRange? initialEventRange;
   final String? initialCategory;
   final List<TaskItem> taskItems;
   final List<NoteTarget> noteTargets;
   final String? initialTaskParentId;
+  final bool notePropertiesOnly;
 
   @override
   State<RecordEditor> createState() => _RecordEditorState();
@@ -144,6 +148,9 @@ class _RecordEditorState extends State<RecordEditor> {
     if (event != null && !_allDay) {
       _exactStart = event.start.toLocal();
       _exactEnd = event.end.toLocal();
+    } else if (widget.initialEventRange case final range?) {
+      _exactStart = range.start.toLocal();
+      _exactEnd = range.end.toLocal();
     }
     final start = _exactStart ?? event?.start ?? defaultStart;
     final end =
@@ -483,7 +490,7 @@ class _RecordEditorState extends State<RecordEditor> {
     final folder = _noteFolder.text.trim();
     return NoteItem(
       id: existing?.id ?? id,
-      title: _title.text.trim(),
+      title: widget.notePropertiesOnly ? existing!.title : _title.text.trim(),
       body: _body.text,
       updated: updated,
       category: _category.isEmpty ? null : _category,
@@ -1096,64 +1103,66 @@ class _RecordEditorState extends State<RecordEditor> {
         ),
       ],
     ),
-    if (_showNoteDetails) ...[
+    if (_showNoteDetails) ..._noteProperties(),
+  ];
+
+  List<Widget> _noteProperties() => [
+    _propertyPanel([
+      _spaceRow(),
+      SwitchListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 13),
+        title: const Text('Pin note'),
+        value: _notePinned,
+        onChanged: (pinned) => setState(() => _notePinned = pinned),
+      ),
+    ]),
+    const SizedBox(height: 10),
+    TextFormField(
+      key: const ValueKey('note-folder'),
+      controller: _noteFolder,
+      decoration: _decoration('Folder'),
+      textInputAction: TextInputAction.next,
+      textCapitalization: TextCapitalization.words,
+    ),
+    const SizedBox(height: 10),
+    TextFormField(
+      key: const ValueKey('note-tags'),
+      controller: _noteTagText,
+      decoration: _decoration('Tags')
+          .copyWith(hintText: 'Separate tags with commas'),
+    ),
+    if (_noteLinks.isNotEmpty || widget.noteTargets.isNotEmpty) ...[
+      const SizedBox(height: 10),
       _propertyPanel([
-        _spaceRow(),
-        SwitchListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 13),
-          title: const Text('Pin note'),
-          value: _notePinned,
-          onChanged: (pinned) => setState(() => _notePinned = pinned),
-        ),
+        for (final link in _noteLinks)
+          ListTile(
+            title: Text(
+              widget.noteTargets
+                      .where((target) => target.link == link)
+                      .firstOrNull
+                      ?.title ??
+                  link.title ??
+                  link.kind.label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(link.kind.label),
+            trailing: IconButton(
+              tooltip: 'Remove ${link.kind.label.toLowerCase()} link',
+              onPressed: () => setState(() => _noteLinks.remove(link)),
+              icon: const Icon(Icons.close_rounded, size: 19),
+            ),
+          ),
+        if (widget.noteTargets.any(
+          (target) => !_noteLinks.contains(target.link),
+        ))
+          ListTile(
+            leading: const Icon(Icons.link_rounded, color: accent),
+            title: const Text('Link task or event'),
+            trailing: const Icon(Icons.chevron_right_rounded, color: muted),
+            onTap: _linkNoteTarget,
+          ),
       ]),
-      const SizedBox(height: 10),
-      TextFormField(
-        key: const ValueKey('note-folder'),
-        controller: _noteFolder,
-        decoration: _decoration('Folder'),
-        textInputAction: TextInputAction.next,
-        textCapitalization: TextCapitalization.words,
-      ),
-      const SizedBox(height: 10),
-      TextFormField(
-        key: const ValueKey('note-tags'),
-        controller: _noteTagText,
-        decoration: _decoration('Tags')
-            .copyWith(hintText: 'Separate tags with commas'),
-      ),
-      if (_noteLinks.isNotEmpty || widget.noteTargets.isNotEmpty) ...[
-        const SizedBox(height: 10),
-        _propertyPanel([
-          for (final link in _noteLinks)
-            ListTile(
-              title: Text(
-                widget.noteTargets
-                        .where((target) => target.link == link)
-                        .firstOrNull
-                        ?.title ??
-                    link.title ??
-                    link.kind.label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: Text(link.kind.label),
-              trailing: IconButton(
-                tooltip: 'Remove ${link.kind.label.toLowerCase()} link',
-                onPressed: () => setState(() => _noteLinks.remove(link)),
-                icon: const Icon(Icons.close_rounded, size: 19),
-              ),
-            ),
-          if (widget.noteTargets.any(
-            (target) => !_noteLinks.contains(target.link),
-          ))
-            ListTile(
-              leading: const Icon(Icons.link_rounded, color: accent),
-              title: const Text('Link task or event'),
-              trailing: const Icon(Icons.chevron_right_rounded, color: muted),
-              onTap: _linkNoteTarget,
-            ),
-        ]),
-      ],
     ],
   ];
 
@@ -1166,30 +1175,42 @@ class _RecordEditorState extends State<RecordEditor> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (!_editing) ...[_kindSelector(), const SizedBox(height: 18)],
-            TextFormField(
-              controller: _title,
-              focusNode: _titleFocus,
-              autofocus: !_editing,
-              decoration: _decoration('Title'),
-              style: const TextStyle(
-                color: ink,
-                fontSize: 19,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -.3,
+            if (!_editing && widget.initialEventRange == null) ...[
+              _kindSelector(),
+              const SizedBox(height: 18),
+            ],
+            if (widget.notePropertiesOnly)
+              ..._noteProperties()
+            else ...[
+              TextFormField(
+                controller: _title,
+                focusNode: _titleFocus,
+                autofocus: !_editing,
+                decoration: _decoration('Title'),
+                style: const TextStyle(
+                  color: ink,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -.3,
+                ),
+                textCapitalization: TextCapitalization.sentences,
+                textInputAction: widget.initialEventRange == null
+                    ? TextInputAction.next
+                    : TextInputAction.done,
+                onFieldSubmitted: widget.initialEventRange == null
+                    ? null
+                    : (_) => _save(),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter a title.'
+                    : null,
               ),
-              textCapitalization: TextCapitalization.sentences,
-              textInputAction: TextInputAction.next,
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Enter a title.'
-                  : null,
-            ),
-            const SizedBox(height: 14),
-            ...switch (_kind) {
-              RecordKind.task => _taskFields(),
-              RecordKind.event => _eventFields(),
-              RecordKind.note => _noteFields(),
-            },
+              const SizedBox(height: 14),
+              ...switch (_kind) {
+                RecordKind.task => _taskFields(),
+                RecordKind.event => _eventFields(),
+                RecordKind.note => _noteFields(),
+              },
+            ],
           ],
         ),
       ),
@@ -1205,7 +1226,13 @@ class _RecordEditorState extends State<RecordEditor> {
             child: Semantics(
               header: true,
               child: Text(
-                _editing ? 'Edit ${_kind.name}' : 'Add item',
+                widget.notePropertiesOnly
+                    ? 'Note details'
+                    : _editing
+                    ? 'Edit ${_kind.name}'
+                    : widget.initialEventRange != null
+                    ? 'New event'
+                    : 'Add item',
                 style: const TextStyle(
                   color: ink,
                   fontSize: 24,

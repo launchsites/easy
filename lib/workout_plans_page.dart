@@ -10,6 +10,7 @@ class WorkoutPlansPage extends StatefulWidget {
     required this.plans,
     required this.onChanged,
     this.initialPlan,
+    this.onClose,
     super.key,
   });
 
@@ -17,15 +18,43 @@ class WorkoutPlansPage extends StatefulWidget {
   final ValueChanged<List<WorkoutPlan>> onChanged;
   final WorkoutPlan? initialPlan;
 
+  /// Embeds the plan and exercise editors in the desktop workspace.
+  final VoidCallback? onClose;
+
   @override
-  State<WorkoutPlansPage> createState() => _WorkoutPlansPageState();
+  WorkoutPlansPageState createState() => WorkoutPlansPageState();
 }
 
 typedef _PlanEdit = ({WorkoutPlan plan, bool removed});
 typedef _ExerciseEdit = ({WorkoutExercise exercise, bool removed});
+typedef _PlanWorkspace = ({
+  List<WorkoutPlan> plans,
+  VoidCallback onBack,
+  ValueChanged<WorkoutPlan> onSelect,
+});
+typedef _ExerciseWorkspace = ({
+  String planName,
+  List<WorkoutExercise> exercises,
+  VoidCallback onBack,
+  ValueChanged<WorkoutExercise> onSelect,
+});
 
-class _WorkoutPlansPageState extends State<WorkoutPlansPage> {
+class WorkoutPlansPageState extends State<WorkoutPlansPage> {
   late List<WorkoutPlan> _plans = widget.plans;
+  ({WorkoutPlan? plan, GlobalKey<_WorkoutPlanEditorState> key})? _draft;
+
+  /// Checks both active drafts before the workspace changes destinations.
+  Future<bool> confirmLeaving() async {
+    final editor = _draft?.key.currentState;
+    if (editor == null || !editor._hasUnsavedChanges) return true;
+    return _confirm(context, 'Discard changes?', 'Discard');
+  }
+
+  void _showList() => setState(() => _draft = null);
+
+  void _openDraft(WorkoutPlan? plan) {
+    setState(() => _draft = (plan: plan, key: GlobalKey()));
+  }
 
   @override
   void didUpdateWidget(covariant WorkoutPlansPage oldWidget) {
@@ -50,6 +79,10 @@ class _WorkoutPlansPageState extends State<WorkoutPlansPage> {
   }
 
   Future<void> _edit([WorkoutPlan? plan]) async {
+    if (widget.onClose != null) {
+      _openDraft(plan);
+      return;
+    }
     final edit = await Navigator.of(context).push<_PlanEdit>(
       MaterialPageRoute(
         builder: (context) => MobileModeFrame(
@@ -76,8 +109,22 @@ class _WorkoutPlansPageState extends State<WorkoutPlansPage> {
       );
     }
 
-    return _PlanPage(
+    if (_draft case (plan: final plan, key: final key)) {
+      return _WorkoutPlanEditor(
+        key: key,
+        plan: plan,
+        workspace: (plans: _plans, onBack: _showList, onSelect: _openDraft),
+        onComplete: (edit) {
+          _apply(edit);
+          _showList();
+        },
+      );
+    }
+
+    final onClose = widget.onClose;
+    final page = _PlanPage(
       title: 'Workout plans',
+      back: onClose == null ? null : ('Back to workout', onClose),
       action: FilledButton(onPressed: _edit, child: const Text('New workout')),
       children: [
         if (_plans.isEmpty)
@@ -104,6 +151,15 @@ class _WorkoutPlansPageState extends State<WorkoutPlansPage> {
           ),
       ],
     );
+    return onClose == null
+        ? page
+        : PopScope<void>(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop) onClose();
+            },
+            child: page,
+          );
   }
 }
 
@@ -143,10 +199,16 @@ String _scheduleLabel(BuildContext context, WorkoutSchedule schedule) {
 }
 
 class _WorkoutPlanEditor extends StatefulWidget {
-  const _WorkoutPlanEditor({required this.plan, required this.onComplete});
+  const _WorkoutPlanEditor({
+    required this.plan,
+    required this.onComplete,
+    this.workspace,
+    super.key,
+  });
 
   final WorkoutPlan? plan;
   final ValueChanged<_PlanEdit> onComplete;
+  final _PlanWorkspace? workspace;
 
   @override
   State<_WorkoutPlanEditor> createState() => _WorkoutPlanEditorState();
@@ -163,8 +225,13 @@ class _WorkoutPlanEditorState extends State<_WorkoutPlanEditor> {
   late String _interval = (widget.plan?.schedule.intervalDays ?? 2).toString();
   late final Set<int> _selectedDays = {...?widget.plan?.schedule.weekdays};
   late final List<WorkoutExercise> _exercises = [...?widget.plan?.exercises];
+  ({WorkoutExercise? exercise, GlobalKey<_WorkoutExerciseEditorState> key})?
+  _exerciseDraft;
   bool _dirty = false;
   bool _noWeekdays = false;
+
+  bool get _hasUnsavedChanges =>
+      _dirty || (_exerciseDraft?.key.currentState?._dirty ?? false);
 
   void _markDirty() {
     if (!_dirty) setState(() => _dirty = true);
@@ -190,17 +257,34 @@ class _WorkoutPlanEditorState extends State<_WorkoutPlanEditor> {
   }
 
   Future<void> _editExercise([WorkoutExercise? exercise]) async {
+    if (widget.workspace != null) {
+      _openExercise(exercise);
+      return;
+    }
     final edit = await Navigator.of(context).push<_ExerciseEdit>(
       MaterialPageRoute(
-        builder: (_) => MobileModeFrame(
+        builder: (context) => MobileModeFrame(
           mode: 'gym',
-          child: _WorkoutExerciseEditor(exercise: exercise),
+          child: _WorkoutExerciseEditor(
+            exercise: exercise,
+            onComplete: (edit) => Navigator.pop(context, edit),
+          ),
         ),
       ),
     );
-    if (!mounted || edit == null) return;
+    if (mounted && edit != null) _applyExercise(edit);
+  }
+
+  void _openExercise(WorkoutExercise? exercise) {
+    setState(() => _exerciseDraft = (exercise: exercise, key: GlobalKey()));
+  }
+
+  void _showPlan() => setState(() => _exerciseDraft = null);
+
+  void _applyExercise(_ExerciseEdit edit) {
     final index = _exercises.indexWhere((item) => item.id == edit.exercise.id);
     setState(() {
+      _exerciseDraft = null;
       _dirty = true;
       if (edit.removed) {
         if (index >= 0) _exercises.removeAt(index);
@@ -210,6 +294,12 @@ class _WorkoutPlanEditorState extends State<_WorkoutPlanEditor> {
         _exercises[index] = edit.exercise;
       }
     });
+  }
+
+  Future<void> _leavePlan(VoidCallback leave) async {
+    if (!_dirty || await _confirm(context, 'Discard changes?', 'Discard')) {
+      if (mounted) leave();
+    }
   }
 
   void _save() {
@@ -245,18 +335,47 @@ class _WorkoutPlanEditorState extends State<_WorkoutPlanEditor> {
   @override
   Widget build(BuildContext context) {
     final plan = widget.plan;
+    final workspace = widget.workspace;
+    if (_exerciseDraft case (exercise: final exercise, key: final key)) {
+      return _WorkoutExerciseEditor(
+        key: key,
+        exercise: exercise,
+        onComplete: _applyExercise,
+        workspace: (
+          planName: _name.trim().isEmpty ? 'New workout' : _name.trim(),
+          exercises: _exercises,
+          onBack: _showPlan,
+          onSelect: _openExercise,
+        ),
+      );
+    }
+
     final date = MaterialLocalizations.of(context).formatShortDate(_start);
+    void back() =>
+        _leavePlan(workspace?.onBack ?? () => Navigator.pop(context));
     return PopScope<_PlanEdit>(
-      canPop: !_dirty,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop || !_dirty) return;
-        if (await _confirm(context, 'Discard changes?', 'Discard') &&
-            context.mounted) {
-          Navigator.pop(context);
-        }
+      canPop: workspace == null && !_dirty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) back();
       },
       child: _PlanPage(
         title: plan == null ? 'New workout' : 'Edit workout',
+        back: workspace == null ? null : ('Back to workout plans', back),
+        sidebar: workspace == null || workspace.plans.isEmpty
+            ? null
+            : _PlanContextPanel(
+                title: 'Workout plans',
+                itemCount: workspace.plans.length,
+                itemBuilder: (context, index) {
+                  final item = workspace.plans[index];
+                  return _PlanContextRow(
+                    title: item.name,
+                    detail: _scheduleLabel(context, item.schedule),
+                    selected: item.id == plan?.id,
+                    onTap: () => _leavePlan(() => workspace.onSelect(item)),
+                  );
+                },
+              ),
         action: FilledButton(
           onPressed: _save,
           child: const Text('Save workout'),
@@ -404,9 +523,16 @@ String _exerciseLabel(WorkoutExercise exercise) => switch (exercise.kind) {
 };
 
 class _WorkoutExerciseEditor extends StatefulWidget {
-  const _WorkoutExerciseEditor({required this.exercise});
+  const _WorkoutExerciseEditor({
+    required this.exercise,
+    required this.onComplete,
+    this.workspace,
+    super.key,
+  });
 
   final WorkoutExercise? exercise;
+  final ValueChanged<_ExerciseEdit> onComplete;
+  final _ExerciseWorkspace? workspace;
 
   @override
   State<_WorkoutExerciseEditor> createState() => _WorkoutExerciseEditorState();
@@ -484,6 +610,12 @@ class _WorkoutExerciseEditorState extends State<_WorkoutExerciseEditor> {
     if (!_dirty) setState(() => _dirty = true);
   }
 
+  Future<void> _leaveExercise(VoidCallback leave) async {
+    if (!_dirty || await _confirm(context, 'Discard changes?', 'Discard')) {
+      if (mounted) leave();
+    }
+  }
+
   void _save() {
     if (!_validateForm(_form)) return;
     final cardio = _kind == WorkoutExerciseKind.cardio;
@@ -499,23 +631,39 @@ class _WorkoutExerciseEditorState extends State<_WorkoutExerciseEditor> {
           : [for (final draft in _sets) draft.toSet(_weightUnit)],
       metrics: _metrics,
     );
-    Navigator.pop<_ExerciseEdit>(context, (exercise: exercise, removed: false));
+    widget.onComplete((exercise: exercise, removed: false));
   }
 
   @override
   Widget build(BuildContext context) {
     final exercise = widget.exercise;
+    final workspace = widget.workspace;
+    void back() =>
+        _leaveExercise(workspace?.onBack ?? () => Navigator.pop(context));
     return PopScope<_ExerciseEdit>(
-      canPop: !_dirty,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop || !_dirty) return;
-        if (await _confirm(context, 'Discard changes?', 'Discard') &&
-            context.mounted) {
-          Navigator.pop(context);
-        }
+      canPop: workspace == null && !_dirty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) back();
       },
       child: _PlanPage(
         title: exercise == null ? 'Add exercise' : 'Edit exercise',
+        back: workspace == null ? null : ('Back to workout editor', back),
+        sidebar: workspace == null
+            ? null
+            : _PlanContextPanel(
+                title: workspace.planName,
+                description: 'Exercises',
+                itemCount: workspace.exercises.length,
+                itemBuilder: (context, index) {
+                  final item = workspace.exercises[index];
+                  return _PlanContextRow(
+                    title: item.name,
+                    detail: _exerciseLabel(item),
+                    selected: item.id == exercise?.id,
+                    onTap: () => _leaveExercise(() => workspace.onSelect(item)),
+                  );
+                },
+              ),
         action: FilledButton(
           onPressed: _save,
           child: const Text('Save exercise'),
@@ -629,10 +777,8 @@ class _WorkoutExerciseEditorState extends State<_WorkoutExerciseEditor> {
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: TextButton(
-                onPressed: () => Navigator.pop<_ExerciseEdit>(context, (
-                  exercise: exercise,
-                  removed: true,
-                )),
+                onPressed: () =>
+                    widget.onComplete((exercise: exercise, removed: true)),
                 style: TextButton.styleFrom(
                   foregroundColor: Theme.of(context).colorScheme.error,
                 ),
@@ -1082,22 +1228,128 @@ class _Heading extends StatelessWidget {
   );
 }
 
+class _PlanContextPanel extends StatelessWidget {
+  const _PlanContextPanel({
+    required this.title,
+    required this.itemCount,
+    required this.itemBuilder,
+    this.description,
+  });
+
+  final String title;
+  final String? description;
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.surfaceContainerLow,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(17, 19, 17, 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 4,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: sectionHeadingStyle.copyWith(
+                      color: colors.onSurface,
+                      fontSize: 17,
+                    ),
+                  ),
+                ),
+                if (description case final label?)
+                  Text(
+                    label,
+                    style: contentMetadataStyle.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              primary: false,
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+              itemCount: itemCount,
+              itemBuilder: itemBuilder,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlanContextRow extends StatelessWidget {
+  const _PlanContextRow({
+    required this.title,
+    required this.detail,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String detail;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: ListTile(
+        shape: contentControlShape,
+        selected: selected,
+        selectedTileColor: colors.primaryContainer,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        title: Text(
+          title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: contentTitleStyle.copyWith(color: colors.onSurface),
+        ),
+        subtitle: Text(
+          detail,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: contentMetadataStyle.copyWith(color: colors.onSurfaceVariant),
+        ),
+        onTap: selected ? null : onTap,
+      ),
+    );
+  }
+}
+
 class _PlanPage extends StatelessWidget {
   const _PlanPage({
     required this.title,
     required this.action,
     required this.children,
     this.form,
+    this.back,
+    this.sidebar,
   });
 
   final String title;
   final Widget action;
   final List<Widget> children;
   final GlobalKey<FormState>? form;
+  final (String, VoidCallback)? back;
+  final Widget? sidebar;
 
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
+  Widget _body(double width) {
     final inset = width < 360 ? 16.0 : (width < 600 ? 20.0 : 36.0);
     final padding = EdgeInsets.fromLTRB(inset, 15, inset, 24);
     final scrolling = form == null
@@ -1113,6 +1365,84 @@ class _PlanPage extends StatelessWidget {
               ),
             ),
           );
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: Column(
+          children: [
+            Expanded(child: scrolling),
+            const Divider(),
+            Padding(
+              padding: EdgeInsets.fromLTRB(inset, 8, inset, 12),
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: SizedBox(
+                  width: width < 600 ? double.infinity : null,
+                  child: action,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (back case (final tooltip, final onBack)) {
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 18, 8),
+            child: Row(
+              spacing: 10,
+              children: [
+                IconButton(
+                  tooltip: tooltip,
+                  onPressed: onBack,
+                  icon: const BackButtonIcon(),
+                ),
+                Expanded(
+                  child: Semantics(
+                    header: true,
+                    child: Text(title, style: sectionHeadingStyle),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final sidebarWidth =
+                    sidebar != null && constraints.maxWidth >= 590
+                    ? (constraints.maxWidth * .29).clamp(180.0, 265.0)
+                    : 0.0;
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _body(
+                        constraints.maxWidth -
+                            sidebarWidth -
+                            (sidebarWidth > 0 ? 1 : 0),
+                      ),
+                    ),
+                    if (sidebarWidth > 0) ...[
+                      const VerticalDivider(width: 1),
+                      SizedBox(width: sidebarWidth, child: sidebar),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
@@ -1126,27 +1456,7 @@ class _PlanPage extends StatelessWidget {
       ),
       body: SafeArea(
         top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Column(
-              children: [
-                Expanded(child: scrolling),
-                const Divider(),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(inset, 8, inset, 12),
-                  child: Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: SizedBox(
-                      width: width < 600 ? double.infinity : null,
-                      child: action,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        child: _body(MediaQuery.sizeOf(context).width),
       ),
     );
   }
