@@ -97,4 +97,38 @@ void main() {
     await expectLater(open(), throwsA(isA<SyncVaultException>()));
     expect(await target.length(), 513 * 1024);
   });
+
+  test(
+    'unlock and open handles preserve a missing credential file for recovery',
+    () async {
+      Future<SyncPasswordVault> unlock() => openSyncPasswordVault(
+        passphrase: _passphrase,
+        filePath: path,
+        createIfMissing: false,
+      );
+      await expectLater(unlock(), throwsA(isA<SyncVaultException>()));
+      expect(await File(path).exists(), isFalse);
+      expect(await File('$path.lock').exists(), isFalse);
+
+      final initial = await open();
+      final value = base64Url.encode(Uint8List.fromList(List.filled(32, 85)));
+      await initial.write(_deviceRef, value);
+      final reopened = await unlock();
+      handles.add(reopened);
+      final stored = await File(path).rename('$path.saved');
+      await expectLater(
+        initial.write(_journalRef, value),
+        throwsA(isA<SyncVaultException>()),
+      );
+      await expectLater(
+        reopened.read(_deviceRef),
+        throwsA(isA<SyncVaultException>()),
+      );
+      expect(await File(path).exists(), isFalse);
+
+      await stored.rename(path);
+      expect(await reopened.read(_deviceRef), value);
+      expect(await reopened.read(_journalRef), isNull);
+    },
+  );
 }

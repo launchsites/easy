@@ -10,4 +10,9 @@ export 'src/password_vault_contract.dart';
 Future<SyncPasswordVault> openSyncPasswordVault({
   required String passphrase,
   String? filePath,
-}) => platform.openPasswordVault(passphrase: passphrase, filePath: filePath);
+  bool createIfMissing = true,
+}) => platform.openPasswordVault(
+  passphrase: passphrase,
+  filePath: filePath,
+  createIfMissing: createIfMissing,
+);

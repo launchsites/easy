@@ -17,10 +17,14 @@ final _queues = <String, Future<void>>{};
 const _vaultError = SyncVaultException(
   'The encrypted credential file could not be opened.',
 );
+const _vaultMissing = SyncVaultException(
+  'Restore the saved encrypted sync vault to unlock this device.',
+);
 
 Future<SyncPasswordVault> openPasswordVault({
   required String passphrase,
   String? filePath,
+  required bool createIfMissing,
 }) async {
   if (passphrase.isEmpty ||
       passphrase.length > 1024 ||
@@ -35,7 +39,15 @@ Future<SyncPasswordVault> openPasswordVault({
         (await getApplicationSupportDirectory()).uri
             .resolve('easy/sync/credentials.easyvault')
             .toFilePath();
-    final vault = _NativePasswordVault(File(path).absolute, passphrase);
+    final file = File(path).absolute;
+    if (!createIfMissing && !await _regularFileOrMissing(file)) {
+      throw _vaultMissing;
+    }
+    final vault = _NativePasswordVault(
+      file,
+      passphrase,
+      requiresFile: !createIfMissing,
+    );
     await vault._locked((password) async => vault._read(password));
     return vault;
   } on SyncVaultException {
@@ -46,10 +58,15 @@ Future<SyncPasswordVault> openPasswordVault({
 }
 
 final class _NativePasswordVault implements SyncPasswordVault {
-  _NativePasswordVault(this._file, this._passphrase);
+  _NativePasswordVault(
+    this._file,
+    this._passphrase, {
+    required this._requiresFile,
+  });
 
   final File _file;
   String? _passphrase;
+  bool _requiresFile;
 
   @override
   Future<String?> read(String reference) => _locked((password) async {
@@ -118,7 +135,11 @@ final class _NativePasswordVault implements SyncPasswordVault {
   }
 
   Future<Map<String, String>> _read(String password) async {
-    if (!await _regularFileOrMissing(_file)) return {};
+    if (!await _regularFileOrMissing(_file)) {
+      if (_requiresFile) throw _vaultMissing;
+      return {};
+    }
+    _requiresFile = true;
     if (await _file.length() > _maxFileBytes) throw _vaultError;
     final bytes = BytesBuilder(copy: false);
     await for (final block in _file.openRead()) {
@@ -178,8 +199,11 @@ final class _NativePasswordVault implements SyncPasswordVault {
     try {
       final prepared = File(staging.uri.resolve('write').toFilePath());
       await prepared.writeAsBytes(encrypted, flush: true);
-      await _regularFileOrMissing(_file);
+      if (!await _regularFileOrMissing(_file) && _requiresFile) {
+        throw _vaultMissing;
+      }
       await prepared.rename(_file.path);
+      _requiresFile = true;
     } finally {
       await staging.delete(recursive: true);
     }
