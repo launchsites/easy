@@ -10,7 +10,9 @@ Android release assembly and lint passed from a fresh archive of `12730c86ac311e
 
 Each package passed Android signature and 16 KiB ZIP alignment checks. All 15 native libraries matched their APK's ABI and 16 KiB load alignment. The compiled manifest declared a non-debuggable app, minimum SDK 24, target SDK 36, and `app.launchsites.easy.MainActivity` as the launcher. Its compiled network policy permits cleartext only on exact IPv4 and IPv6 loopback addresses. Its backup settings disable older Android backup and exclude workspace domains from Android 12 and later cloud backup and device transfer.
 
-Release lint reported no issues. Gradle emitted a separate deprecation summary. The packages use a development signing certificate. Startup, notification delivery, and the platform's enforcement of the compiled policies still require Android device or emulator verification.
+Release lint reported no issues. Gradle emitted a separate deprecation summary. The packages use a development signing certificate. These three APKs were checked at package level.
+
+Separately, the hosted AOSP API 36 emulator installed and launched the development-signed x86-64 release built from `93bdea7fdfa1e527203718d2323c7b84d4d75728`. The run verified an empty private SQLite workspace with setup pending and captured the first-launch screen. Physical-device interaction, notification delivery, and Android's enforcement of the compiled policies still require runtime coverage. [Hosted emulator run](https://github.com/launchsites/easy/actions/runs/45337863946)
 
 ```sh
 flutter build apk --release --split-per-abi
